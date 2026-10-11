@@ -21,7 +21,7 @@ const BANNER =
 
 const INSTALL =
   "### Installation\n\nRun the `.mcaddon` file to install both the Behavior Pack and Resource Pack " +
-  "automatically. No download is needed when playing on the Betafied server.\n\n— fyreic";
+  "automatically. No download is needed when playing on the Betafied server.";
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");

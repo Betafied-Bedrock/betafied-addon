@@ -10,20 +10,28 @@ import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { runCatching } from "../core/errorReporter.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
-import { isVanillaId } from "../core/betaRegistry.js";
+import { isBetaItem, isVanillaId } from "../core/betaRegistry.js";
 
-const ARMOR_TABLE: Readonly<Record<string, number>> = Object.freeze({
-    "minecraft:leather_helmet": 1, "minecraft:leather_chestplate": 3,
-    "minecraft:leather_leggings": 2, "minecraft:leather_boots": 1,
-    "minecraft:golden_helmet": 2, "minecraft:golden_chestplate": 5,
-    "minecraft:golden_leggings": 3, "minecraft:golden_boots": 1,
-    "minecraft:chainmail_helmet": 2, "minecraft:chainmail_chestplate": 5,
-    "minecraft:chainmail_leggings": 4, "minecraft:chainmail_boots": 1,
-    "minecraft:iron_helmet": 2, "minecraft:iron_chestplate": 6,
-    "minecraft:iron_leggings": 5, "minecraft:iron_boots": 2,
-    "minecraft:diamond_helmet": 3, "minecraft:diamond_chestplate": 8,
-    "minecraft:diamond_leggings": 6, "minecraft:diamond_boots": 3
+// Beta 1.7.3 ItemArmor.damageReduceAmountArray is indexed by slot, not by material: a fresh
+// leather piece absorbs exactly as much as a fresh diamond piece of the same slot. The tier only
+// scales maxDurability (maxDamageArray[slot] * 3 << tier), so better armor lasts longer rather
+// than protecting more. The material-specific point table (leather 7, gold 11, chain 12, iron 15,
+// diamond 20) is the post-1.9 overhaul and never applied to 1.7.3.
+const ARMOR_POINTS_BY_SLOT: Readonly<Record<string, number>> = Object.freeze({
+    helmet: 3,
+    cap: 3,
+    chestplate: 8,
+    tunic: 8,
+    leggings: 6,
+    pants: 6,
+    boots: 3
 });
+
+function slotArmorPoints(baseName: string): number {
+    const underscore = baseName.lastIndexOf("_");
+    if (underscore < 0) return 0;
+    return ARMOR_POINTS_BY_SLOT[baseName.substring(underscore + 1)] ?? 0;
+}
 
 const BYPASS_SOURCES = Object.freeze(new Set([
     EntityDamageCause.void,
@@ -61,26 +69,15 @@ export function damageArmor(player: Player): void {
 }
 
 export function getBaseArmorPoints(typeId: string): number {
-    const direct = ARMOR_TABLE[typeId];
-    if (direct !== undefined) return direct;
-
     const colonIdx = typeId.indexOf(":");
     const baseName = colonIdx >= 0 ? typeId.substring(colonIdx + 1) : typeId;
-    const mcEquivalent = `minecraft:${baseName}`;
-    const mcDirect = ARMOR_TABLE[mcEquivalent];
-    if (mcDirect !== undefined) return mcDirect;
 
-    // A vanilla id reaches this point only when it is not authentic Beta armor (netherite, turtle),
-    // so it gets no points. The suffix heuristic exists for third-party addon armor, which cannot be
-    // enumerated here; applying it to a vanilla id would contradict the registry that strips the gear.
-    if (isVanillaId(typeId)) return 0;
+    // A vanilla id that reaches this point is not authentic Beta armor (netherite, turtle), so it
+    // gets no points; the slot lookup also serves third-party addon armor, which cannot be
+    // enumerated here. Applying it to a stripped vanilla id would contradict the registry.
+    if (isVanillaId(typeId) && !isBetaItem(typeId)) return 0;
 
-    if (baseName.endsWith("_helmet") || baseName.endsWith("_cap")) return 2;
-    if (baseName.endsWith("_chestplate") || baseName.endsWith("_tunic")) return 6;
-    if (baseName.endsWith("_leggings") || baseName.endsWith("_pants")) return 5;
-    if (baseName.endsWith("_boots")) return 2;
-
-    return 0;
+    return slotArmorPoints(baseName);
 }
 
 export interface ArmorMitigationResult {

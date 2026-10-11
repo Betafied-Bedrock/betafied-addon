@@ -221,6 +221,20 @@ Still open:
   the farmland under the crop correctly, and was skipped entirely in Creative — which is the bug those
   traces were written to find. Re-adding a trace is the way to check it again.
 
+## 9. Doubled slabs are script-assembled, and only across the pack's own halves
+
+Beta 1.7.3's `BlockSlab` rebuilt two halves as one full block, so `interactions/slabStacking.ts`
+assembles `bh:double_*_slab` from the slab a player places against a matching one. The merged block
+has no `menu_category` and no item definition on purpose: Beta's doubled slab was never a holdable
+item, and mining it pays the two halves back through its loot table.
+
+Still open: a **vanilla** half never merges with a `bh:` one. The inventory sweep retypes every held
+`*_slab` onto its `bh:` id and the scrubber leaves world-placed `minecraft:*_slab` alone because
+`BETA_BLOCK_IDS` calls it authentic terrain, so the only vanilla halves left are ones a structure,
+an old save or a command placed — the same coexistence §4 describes for fences. Plumbing a mixed pair
+would first have to answer which family the full block belongs to, so the two families stay apart
+until someone decides that.
+
 ## Why this file exists
 
 The failure mode these items share is the one worth guarding against: a rule was written down in one

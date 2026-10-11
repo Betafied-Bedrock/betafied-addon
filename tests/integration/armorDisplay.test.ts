@@ -19,26 +19,40 @@ import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
 
 describe("Beta Armor Points & Titleraw HUD Display", () => {
     describe("getBaseArmorPoints", () => {
-        it("returns authentic points for vanilla armor", () => {
+        it("gives every material the same slot protection, as Beta 1.7.3 did", () => {
             assert.equal(getBaseArmorPoints("minecraft:diamond_helmet"), 3);
             assert.equal(getBaseArmorPoints("minecraft:diamond_chestplate"), 8);
             assert.equal(getBaseArmorPoints("minecraft:diamond_leggings"), 6);
             assert.equal(getBaseArmorPoints("minecraft:diamond_boots"), 3);
-            assert.equal(getBaseArmorPoints("minecraft:iron_chestplate"), 6);
-            assert.equal(getBaseArmorPoints("minecraft:leather_helmet"), 1);
+
+            // Pre-Beta-1.9 armor indexed protection by slot alone, so leather matched diamond
+            // point for point; the tier only changed how long the piece lasted.
+            assert.equal(getBaseArmorPoints("minecraft:leather_helmet"), 3);
+            assert.equal(getBaseArmorPoints("minecraft:leather_chestplate"), 8);
+            assert.equal(getBaseArmorPoints("minecraft:leather_leggings"), 6);
+            assert.equal(getBaseArmorPoints("minecraft:leather_boots"), 3);
+
+            assert.equal(getBaseArmorPoints("minecraft:iron_chestplate"), 8);
+            assert.equal(getBaseArmorPoints("minecraft:golden_leggings"), 6);
+            assert.equal(getBaseArmorPoints("minecraft:chainmail_boots"), 3);
         });
 
         it("correctly resolves custom namespace armor matching vanilla names", () => {
             assert.equal(getBaseArmorPoints("bh:diamond_helmet"), 3);
             assert.equal(getBaseArmorPoints("bh:diamond_chestplate"), 8);
-            assert.equal(getBaseArmorPoints("custom:iron_boots"), 2);
+            assert.equal(getBaseArmorPoints("custom:iron_boots"), 3);
         });
 
-        it("provides fallback heuristics for arbitrary custom armor pieces", () => {
-            assert.equal(getBaseArmorPoints("custom:ruby_chestplate"), 6);
-            assert.equal(getBaseArmorPoints("custom:obsidian_helmet"), 2);
-            assert.equal(getBaseArmorPoints("custom:emerald_leggings"), 5);
-            assert.equal(getBaseArmorPoints("custom:topaz_boots"), 2);
+        it("provides the shared slot values for arbitrary custom armor pieces", () => {
+            assert.equal(getBaseArmorPoints("custom:ruby_chestplate"), 8);
+            assert.equal(getBaseArmorPoints("custom:obsidian_helmet"), 3);
+            assert.equal(getBaseArmorPoints("custom:emerald_leggings"), 6);
+            assert.equal(getBaseArmorPoints("custom:topaz_boots"), 3);
+        });
+
+        it("keeps post-Beta vanilla armor at zero points", () => {
+            assert.equal(getBaseArmorPoints("minecraft:netherite_helmet"), 0);
+            assert.equal(getBaseArmorPoints("minecraft:turtle_helmet"), 0);
         });
 
         it("returns 0 for non-armor items", () => {
@@ -60,6 +74,23 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
                 [EquipmentSlot.Chest, { typeId: "minecraft:diamond_chestplate", getComponent: () => null }],
                 [EquipmentSlot.Legs, { typeId: "minecraft:diamond_leggings", getComponent: () => null }],
                 [EquipmentSlot.Feet, { typeId: "minecraft:diamond_boots", getComponent: () => null }]
+            ]);
+
+            player.setComponent(EntityComponentTypes.Equippable, {
+                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
+            });
+
+            const points = getEffectiveArmorPoints(player as any);
+            assert.equal(points, 20);
+        });
+
+        it("gives a full undamaged leather set the same 20 points as diamond", () => {
+            const player = new Player();
+            const equipment = new Map<EquipmentSlot, any>([
+                [EquipmentSlot.Head, { typeId: "minecraft:leather_helmet", getComponent: () => null }],
+                [EquipmentSlot.Chest, { typeId: "minecraft:leather_chestplate", getComponent: () => null }],
+                [EquipmentSlot.Legs, { typeId: "minecraft:leather_leggings", getComponent: () => null }],
+                [EquipmentSlot.Feet, { typeId: "minecraft:leather_boots", getComponent: () => null }]
             ]);
 
             player.setComponent(EntityComponentTypes.Equippable, {

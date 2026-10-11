@@ -254,7 +254,7 @@ Next steps:
      Match the published GitHub style: a one-line summary, then '### Section' headings of
      '- Added/Changed/Fixed/Removed' bullets.
   2. npm run check                       # write the notes first; the suite requires the section
-  3. git add -A && git commit            # 'Betafied ${tag}: <summary>', authored as fyreic
+  3. git add -A && git commit            # 'Betafied ${tag}: <summary>', as the authenticated GitHub user, no agent trailer
   4. git tag -a ${tag} -m "Betafied ${tag}: <summary>"
   5. git push origin HEAD && git push origin ${tag}
   6. npm run release -- --dry-run        # read the notes before publishing

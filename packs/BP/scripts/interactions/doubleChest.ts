@@ -255,6 +255,12 @@ export function hasAnyItem<T>(contents: readonly (T | undefined)[]): boolean {
 }
 
 /**
+ * Mirrors whole stacks between the two halves without reshuffling them: the halves are one 54-slot
+ * screen to the player, so a stack keeps the slot the player left it in, and only a slot the other
+ * half already occupies sends it to the lowest free slot instead. Compacting every drain the way the
+ * old cursor did moved a stack the player parked at, say, slot 20 up to the next free slot, which
+ * read as the chest rearranging itself when the lid closed.
+ *
  * Whole stacks only: a destination that has run out of empty slots leaves the rest behind in the
  * source. That is loss-free without having to know each item's stack limit, which matters because
  * writing an amount over an item's limit would have the engine drop the overflow.
@@ -267,18 +273,23 @@ export function planPlacement<T>(
     const destinationAfter = [...destination];
     const moves: { from: number; to: number }[] = [];
 
+    // The lowest slot the destination has yet to hand out. Nothing ever frees a slot below it, so
+    // one forward scan per collision still lands on the destination's lowest free slot.
     let cursor = 0;
     for (let slot = 0; slot < sourceAfter.length; slot++) {
         const stack = sourceAfter[slot];
         if (!stack) continue;
 
-        while (cursor < destinationAfter.length && destinationAfter[cursor] !== undefined) cursor++;
-        if (cursor >= destinationAfter.length) break;
+        let target = slot < destinationAfter.length && destinationAfter[slot] === undefined ? slot : -1;
+        if (target === -1) {
+            while (cursor < destinationAfter.length && destinationAfter[cursor] !== undefined) cursor++;
+            if (cursor >= destinationAfter.length) break;
+            target = cursor;
+        }
 
-        destinationAfter[cursor] = stack;
+        destinationAfter[target] = stack;
         sourceAfter[slot] = undefined;
-        moves.push({ from: slot, to: cursor });
-        cursor++;
+        moves.push({ from: slot, to: target });
     }
 
     return { destination: destinationAfter, source: sourceAfter, moves };

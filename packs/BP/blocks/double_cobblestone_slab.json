@@ -1,0 +1,40 @@
+{
+    "format_version": "1.26.50",
+    "minecraft:block": {
+        "description": {
+            "identifier": "bh:double_cobblestone_slab"
+        },
+        "components": {
+            "minecraft:geometry": {
+                "identifier": "minecraft:geometry.full_block"
+            },
+            "minecraft:material_instances": {
+                "*": {
+                    "texture": "bh_cobblestone",
+                    "render_method": "opaque"
+                }
+            },
+            "minecraft:collision_box": {
+                "origin": [-8, 0, -8],
+                "size": [16, 16, 16]
+            },
+            "minecraft:selection_box": {
+                "origin": [-8, 0, -8],
+                "size": [16, 16, 16]
+            },
+            "minecraft:destructible_by_mining": {
+                "seconds_to_destroy": 2.0
+            },
+            "minecraft:destructible_by_explosion": {
+                "explosion_resistance": 6
+            },
+            "minecraft:loot": "loot_tables/blocks/double_cobblestone_slab.json",
+            "minecraft:map_color": "#7A7A7A",
+            "minecraft:sound": {
+                "sound": "stone"
+            },
+            "minecraft:display_name": "Cobblestone Slab",
+            "minecraft:tags": ["stone", "minecraft:is_pickaxe_item_destructible"]
+        }
+    }
+}

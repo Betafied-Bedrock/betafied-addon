@@ -2,6 +2,23 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.5 — 2026-10-11
+
+5.5 restores Beta's doubled slabs and its pre-1.9 armor math, and stops a double chest from reshuffling its contents when the lid closes.
+
+### Beta Parity
+
+- Added the era's doubled slabs: a `bh:` single placed against a matching one assembles `bh:double_*_slab` as a full block in the lower cell. The merged block is never a holdable item, matching Beta, and mining it pays the two halves back.
+- Changed armor protection to Beta's slot-indexed table — a helmet is 3 points, a chestplate 8, leggings 6 and boots 3, whatever the material — with the tier scaling only durability. Leather now protects point for point with diamond, and post-Beta netherite and turtle armor still count for nothing.
+
+### Double Chests
+
+- Fixed a double chest sliding whole stacks up its own half as the lid closed; a stack keeps the slot the player left it in, and only falls back to the lowest free slot when that slot is already taken.
+
+### Tooling
+
+- Changed the printed release steps and the generated GitHub release notes to address the authenticated GitHub user instead of a personal handle.
+
 ## 5.4.1 — 2026-10-10
 
 5.4.1 is a fix-up for drop conversion and creeper behavior, restoring two details Beta got right.

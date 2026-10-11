@@ -223,6 +223,9 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:oak_slab", "minecraft:cobblestone_slab", "minecraft:stone_slab", "minecraft:smooth_stone_slab", "minecraft:sandstone_slab",
     "bh:oak_stairs", "bh:cobblestone_stairs", "bh:oak_log", "bh:birch_log", "bh:spruce_log",
     "bh:wooden_slab", "bh:cobblestone_slab", "bh:sandstone_slab", "bh:stone_slab",
+    // The era's doubled slabs: real blocks, but never items a player could hold. `slabStacking`
+    // builds them from two singles, and their loot tables hand the two singles back.
+    "bh:double_wooden_slab", "bh:double_cobblestone_slab", "bh:double_sandstone_slab", "bh:double_stone_slab",
     "minecraft:oak_fence", BH_FENCE_ID,
     "minecraft:bricks", "minecraft:brick_block", "minecraft:bookshelf",
     "minecraft:glass", "minecraft:ladder", "minecraft:torch",
