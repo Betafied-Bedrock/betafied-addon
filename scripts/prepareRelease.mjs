@@ -260,7 +260,8 @@ function printNextSteps(tag) {
 Next steps:
   1. Write the '## ${tag}' section in CHANGELOG.md, replacing ${RELEASE_NOTES_PLACEHOLDER}.
      Match the published GitHub style: a one-line summary, then '### Section' headings of
-     '- Added/Changed/Fixed/Removed' bullets.
+     '- Added/Changed/Fixed/Removed' bullets. Each bullet must be a single, concise sentence
+     describing the feature for players (strictly user-facing, no file paths or developer details).
   2. npm run check                       # write the notes first; the suite requires the section
   3. git add -A && git commit            # 'Betafied ${tag}: <summary>', as the authenticated GitHub user, no agent trailer
   4. git tag -a ${tag} -m "Betafied ${tag}: <summary>"
