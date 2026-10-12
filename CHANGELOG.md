@@ -2,9 +2,7 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
-## 5.6 — 2026-10-12
-
-5.6 restores authentic door mechanics, unstackable utility items, unified crafting recipes, entity blob shadows, and classic visual lighting.
+## Unreleased
 
 ### Doors
 
