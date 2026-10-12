@@ -2098,9 +2098,25 @@
         "textures": "glowing_obsidian"
     },
     "glowstone": {
+        "ambient_occlusion_exponent": 0.0,
+        "carried_textures": {
+            "down": "glowstone_bottom",
+            "east": "glowstone_north_south",
+            "north": "glowstone_east_west",
+            "south": "glowstone_east_west",
+            "up": "glowstone",
+            "west": "glowstone_north_south"
+        },
         "isotropic": false,
         "sound": "glass",
-        "textures": "glowstone"
+        "textures": {
+            "down": "glowstone_bottom",
+            "east": "glowstone_east_west",
+            "north": "glowstone_north_south",
+            "south": "glowstone_north_south",
+            "up": "glowstone",
+            "west": "glowstone_east_west"
+        }
     },
     "gold_block": {
         "isotropic": false,
@@ -2855,27 +2871,29 @@
         "textures": "deepslate_redstone_ore"
     },
     "lit_furnace": {
+        "ambient_occlusion_exponent": 0.0,
         "isotropic": false,
         "sound": "stone",
         "textures": {
-            "down": "furnace_top",
-            "east": "furnace_front_on",
-            "north": "furnace_side",
-            "south": "furnace_side",
+            "down": "lit_furnace_bottom",
+            "east": "lit_furnace_front_east_west",
+            "north": "lit_furnace_side_north_south",
+            "south": "lit_furnace_side_north_south",
             "up": "furnace_top",
-            "west": "furnace_side"
+            "west": "lit_furnace_side_east_west"
         }
     },
     "lit_pumpkin": {
+        "ambient_occlusion_exponent": 0.0,
         "isotropic": false,
         "sound": "wood",
         "textures": {
-            "down": "pumpkin_top",
-            "east": "pumpkin_side",
-            "north": "pumpkin_side",
-            "south": "pumpkin_face",
+            "down": "jack_o_lantern_bottom",
+            "east": "jack_o_lantern_side_east_west",
+            "north": "jack_o_lantern_side_north_south",
+            "south": "jack_o_lantern_face_north_south",
             "up": "pumpkin_top",
-            "west": "pumpkin_side"
+            "west": "jack_o_lantern_side_east_west"
         }
     },
     "lit_redstone_lamp": {
@@ -2884,9 +2902,17 @@
         "textures": "redstone_lamp_on"
     },
     "lit_redstone_ore": {
+        "ambient_occlusion_exponent": 0.0,
         "isotropic": false,
         "sound": "stone",
-        "textures": "redstone_ore"
+        "textures": {
+            "down": "lit_redstone_ore_bottom",
+            "east": "lit_redstone_ore_east_west",
+            "north": "lit_redstone_ore_north_south",
+            "south": "lit_redstone_ore_north_south",
+            "up": "redstone_ore",
+            "west": "lit_redstone_ore_east_west"
+        }
     },
     "lit_smoker": {
         "isotropic": false,
@@ -3717,6 +3743,7 @@
         "textures": "polished_granite"
     },
     "portal": {
+        "ambient_occlusion_exponent": 0.0,
         "isotropic": false,
         "sound": "glass",
         "textures": "portal"
