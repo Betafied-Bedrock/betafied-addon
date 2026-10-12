@@ -11,17 +11,12 @@ export const SLOW_BLOCKS = new Set([
 
 export const PICKAXES: ReadonlySet<string> = BETA_PICKAXE_IDS;
 
-// Only ids that exist on this engine belong here: the legacy aliases (`web`, `leaves`, `leaves2`,
-// `wooden_stairs`, `wool`) never resolve, and the palette comes from the registry so a species or
-// colour the shears recognize is never missing from the sword bonus.
 export const SWORD_FAST_BLOCKS = new Set([
     "minecraft:cobweb",
     "minecraft:oak_leaves", "minecraft:spruce_leaves", "minecraft:birch_leaves",
     "minecraft:oak_planks", "minecraft:spruce_planks", "minecraft:birch_planks",
     "minecraft:planks",
     "minecraft:oak_stairs",
-    // Beta's reworked wooden stairs keep their own wood tool class, unlike the slab
-    // below which shares the stone slab's internals.
     "bh:oak_stairs",
     "minecraft:pumpkin", "minecraft:carved_pumpkin", "minecraft:lit_pumpkin",
     ...WOOL_BY_COLOR
@@ -41,13 +36,6 @@ interface ToolBonus {
     readonly blocks: ReadonlySet<string>;
 }
 
-/**
- * One pass of the era's "hold the right tool at the right block" rule.
- *
- * Beta 1.7.3 expressed these as the tool's own harvest speed, which an addon cannot reach, so each is
- * simulated by an effect that lapses the moment the tool or the block under the crosshair changes. The
- * two bonuses differ only in their effect and their block palette, which is why they share this pass.
- */
 function clearBonus(bonus: ToolBonus, active: Set<string>, player: Player): void {
     if (!active.delete(player.id)) return;
     runCatching(

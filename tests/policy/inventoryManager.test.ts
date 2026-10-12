@@ -144,34 +144,137 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
         });
     });
 
-    describe("Utility Item Unstacking", () => {
-        const unstackableUtilities = [
-            "minecraft:wooden_door",
-            "minecraft:iron_door",
-            "minecraft:oak_sign",
-            "minecraft:bucket",
-            "minecraft:cake"
-        ];
+    describe("Door Retyping", () => {
+        const doorPairs = [
+            ["minecraft:wooden_door", "bh:wooden_door"],
+            ["minecraft:iron_door", "bh:iron_door"]
+        ] as const;
 
-        for (const typeId of unstackableUtilities) {
-            it(`marks stacked ${typeId} (amount > 1) for unstacking`, () => {
-                const item = new ItemStack(typeId, 3);
-                const action = evaluateItemAction(item);
+        for (const [vanilla, pack] of doorPairs) {
+            it(`retypes a stacked ${vanilla} onto ${pack} and marks it for splitting`, () => {
+                const action = evaluateItemAction(new ItemStack(vanilla, 64));
 
                 assert.equal(action.type, "unstack_utility");
                 if (action.type === "unstack_utility") {
-                    assert.equal(action.targetId, typeId);
+                    assert.equal(action.targetId, pack);
+                    assert.equal(action.totalAmount, 64);
+                }
+            });
+
+            it(`retypes a single ${vanilla} without splitting it`, () => {
+                const action = evaluateItemAction(new ItemStack(vanilla, 1));
+
+                assert.equal(action.type, "replace");
+                if (action.type === "replace") {
+                    assert.equal(action.item.typeId, pack);
+                    assert.equal(action.item.amount, 1);
+                }
+            });
+        }
+
+        it("spreads a swept vanilla door stack one per slot", () => {
+            const player = new Player();
+            player.name = "DoorSteve";
+            player.id = "door_steve_1";
+            player.gameMode = GameMode.Survival;
+
+            const inv = new Container(36);
+            inv.setItem(0, new ItemStack("minecraft:wooden_door", 3));
+            player.setComponent(EntityComponentTypes.Inventory, { container: inv });
+
+            processInventory(player);
+
+            for (const slot of [0, 1, 2]) {
+                assert.equal(inv.getItem(slot)?.typeId, "bh:wooden_door");
+                assert.equal(inv.getItem(slot)?.amount, 1, `slot ${slot} must hold one door`);
+            }
+            assert.equal(inv.getItem(3), undefined);
+        });
+    });
+
+    describe("Capped Item Unstacking", () => {
+        const cappedPairs = [
+            ["minecraft:oak_sign", "bh:oak_sign"],
+            ["minecraft:cake", "bh:cake"]
+        ] as const;
+
+        for (const [vanilla, pack] of cappedPairs) {
+            it(`retypes a stacked ${vanilla} onto ${pack} and marks it for splitting`, () => {
+                const action = evaluateItemAction(new ItemStack(vanilla, 3));
+
+                assert.equal(action.type, "unstack_utility");
+                if (action.type === "unstack_utility") {
+                    assert.equal(action.targetId, pack);
                     assert.equal(action.totalAmount, 3);
                 }
             });
 
-            it(`keeps single ${typeId} (amount === 1) as-is`, () => {
-                const item = new ItemStack(typeId, 1);
-                const action = evaluateItemAction(item);
+            it(`retypes a single ${vanilla} onto ${pack} without splitting it`, () => {
+                const action = evaluateItemAction(new ItemStack(vanilla, 1));
 
-                assert.equal(action.type, "keep");
+                assert.equal(action.type, "replace");
+                if (action.type === "replace") {
+                    assert.equal(action.item.typeId, pack);
+                    assert.equal(action.item.amount, 1);
+                }
             });
         }
+
+        it("holds a vanilla bucket stack to one per slot without changing what the bucket is", () => {
+            // The engine stacks empty buckets to sixteen and its own bucket is the only item that fills
+            // from a source block, so the era's cap is the sweep's to keep rather than an item JSON's.
+            const stacked = evaluateItemAction(new ItemStack("minecraft:bucket", 3));
+
+            assert.equal(stacked.type, "unstack_utility");
+            if (stacked.type === "unstack_utility") {
+                assert.equal(stacked.targetId, "minecraft:bucket", "a retyped bucket could not be filled");
+                assert.equal(stacked.totalAmount, 3);
+            }
+
+            assert.equal(
+                evaluateItemAction(new ItemStack("minecraft:bucket", 1)).type,
+                "keep",
+                "a lone bucket stays the engine's own item"
+            );
+        });
+
+        it("spreads a swept vanilla bucket stack one per slot", () => {
+            const player = new Player();
+            player.name = "BucketSteve";
+            player.id = "bucket_steve_1";
+            player.gameMode = GameMode.Survival;
+
+            const inv = new Container(36);
+            inv.setItem(0, new ItemStack("minecraft:bucket", 3));
+            player.setComponent(EntityComponentTypes.Inventory, { container: inv });
+
+            processInventory(player);
+
+            for (const slot of [0, 1, 2]) {
+                assert.equal(inv.getItem(slot)?.typeId, "minecraft:bucket");
+                assert.equal(inv.getItem(slot)?.amount, 1, `slot ${slot} must hold one bucket`);
+            }
+            assert.equal(inv.getItem(3), undefined);
+        });
+
+        it("spreads a swept vanilla sign stack one per slot", () => {
+            const player = new Player();
+            player.name = "SignSteve";
+            player.id = "sign_steve_1";
+            player.gameMode = GameMode.Survival;
+
+            const inv = new Container(36);
+            inv.setItem(0, new ItemStack("minecraft:oak_sign", 3));
+            player.setComponent(EntityComponentTypes.Inventory, { container: inv });
+
+            processInventory(player);
+
+            for (const slot of [0, 1, 2]) {
+                assert.equal(inv.getItem(slot)?.typeId, "bh:oak_sign");
+                assert.equal(inv.getItem(slot)?.amount, 1, `slot ${slot} must hold one sign`);
+            }
+            assert.equal(inv.getItem(3), undefined);
+        });
 
         it("marks stacked bh:bow for unstacking", () => {
             const item = new ItemStack("bh:bow", 2);

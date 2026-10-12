@@ -6,7 +6,6 @@ import {
     Container,
     EntityHealthComponent,
     ItemUseBeforeEvent,
-    PlayerInteractWithBlockBeforeEvent,
     EntityComponentTypes
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
@@ -18,9 +17,6 @@ interface FoodConfig {
     returnContainer?: string;
 }
 
-// Health is Beta gameplay and lives here; which vanilla foods become which `bh:` item is the
-// normalizer's conversion table. The membership of `FOOD_ITEMS` is derived from that table rather
-// than re-listed, so a food the sweep retypes can never be one this module forgets to feed.
 const FOOD_HEALTH: Readonly<Record<string, FoodConfig>> = Object.freeze({
     "bh:apple": { health: 4 },
     "bh:bread": { health: 5 },
@@ -32,8 +28,7 @@ const FOOD_HEALTH: Readonly<Record<string, FoodConfig>> = Object.freeze({
     "bh:cooked_porkchop": { health: 8 }
 });
 
-// Mushroom stew is authentic Beta but the engine consumes it natively, so it is never retyped and is
-// the one food the conversion table does not name.
+// Engine consumes mushroom stew natively, so it bypasses normalizer conversion.
 const NATIVE_FOODS: Readonly<Record<string, FoodConfig>> = Object.freeze({
     "minecraft:mushroom_stew": { health: 10, returnContainer: "minecraft:bowl" }
 });
@@ -51,13 +46,6 @@ function buildFoodItems(): Record<string, FoodConfig> {
 }
 
 const FOOD_ITEMS: Readonly<Record<string, FoodConfig>> = Object.freeze(buildFoodItems());
-
-const CAKE_CONFIG = Object.freeze({
-    blockId: "minecraft:cake",
-    healthRestore: 3,
-    maxBites: 6,
-    stateProperty: "bite_counter"
-});
 
 class FoodAndHealth {
     constructor() {
@@ -82,7 +70,6 @@ class FoodAndHealth {
 
     private registerEventHandlers(): void {
         eventBus.onItemUse(this.handleFoodConsumption.bind(this));
-        eventBus.onPlayerInteractWithBlock(this.handleCakeInteraction.bind(this));
     }
 
     private handleFoodConsumption(event: ItemUseBeforeEvent): void {
@@ -153,51 +140,6 @@ class FoodAndHealth {
         if (foodData.returnContainer && newAmount <= 0) {
             this.tryAddItemToInventory(inventory, new ItemStack(foodData.returnContainer, 1));
         }
-    }
-
-    private handleCakeInteraction(event: PlayerInteractWithBlockBeforeEvent): void {
-        const { player, block } = event;
-        if (!block || block.typeId !== CAKE_CONFIG.blockId) return;
-
-        event.cancel = true;
-
-        system.run(() => {
-            try {
-                if (!player.isValid) return;
-
-                const healthComponent = player.getComponent(EntityComponentTypes.Health);
-                if (!healthComponent) return;
-
-                const currentHealth = healthComponent.currentValue;
-                const maxHealth = healthComponent.defaultValue;
-                const newHealth = Math.min(currentHealth + CAKE_CONFIG.healthRestore, maxHealth);
-
-                if (newHealth > currentHealth) {
-                    healthComponent.setCurrentValue(newHealth);
-                    player.playSound("random.burp", { volume: 0.5, pitch: 1.0 });
-                }
-
-                const stateVal = block.permutation.getState(CAKE_CONFIG.stateProperty);
-                const currentBites = typeof stateVal === "number" ? stateVal : 0;
-                const newBites = currentBites + 1;
-
-                if (newBites < CAKE_CONFIG.maxBites) {
-                    block.setPermutation(
-                        block.permutation.withState(CAKE_CONFIG.stateProperty, newBites)
-                    );
-                } else {
-                    system.runTimeout(() => {
-                        block.setType("minecraft:air");
-                    }, 1);
-                }
-            } catch (e) {
-                reportError({
-                    system: "foodAndHealth",
-                    operation: "updateCakeState",
-                    target: player.name
-                }, e);
-            }
-        });
     }
 
     private tryAddItemToInventory(inventory: Container, itemStack: ItemStack): boolean {

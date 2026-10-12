@@ -1,8 +1,12 @@
 {
-    "format_version": "1.21.0",
+    "format_version": "1.21.70",
     "minecraft:entity": {
         "description": {
             "identifier": "minecraft:slime",
+      "properties": {
+          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.25, "client_sync": true },
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.425, "client_sync": true }
+      },
             "spawn_category": "monster",
             "is_spawnable": true,
             "is_summonable": true
@@ -13,15 +17,15 @@
                     "value": 4
                 },
                 "minecraft:collision_box": {
-                    "width": 2.08,
-                    "height": 2.08
+                    "width": 2.4,
+                    "height": 2.4
                 },
                 "minecraft:health": {
                     "value": 16,
                     "max": 16
                 },
                 "minecraft:movement": {
-                    "value": 0.6
+                    "value": 0.46
                 },
                 "minecraft:attack": {
                     "damage": 4
@@ -57,15 +61,15 @@
                     "value": 2
                 },
                 "minecraft:collision_box": {
-                    "width": 1.04,
-                    "height": 1.04
+                    "width": 1.2,
+                    "height": 1.2
                 },
                 "minecraft:health": {
                     "value": 4,
                     "max": 4
                 },
                 "minecraft:movement": {
-                    "value": 0.4
+                    "value": 0.46
                 },
                 "minecraft:attack": {
                     "damage": 2
@@ -101,15 +105,15 @@
                     "value": 1
                 },
                 "minecraft:collision_box": {
-                    "width": 0.52,
-                    "height": 0.52
+                    "width": 0.6,
+                    "height": 0.6
                 },
                 "minecraft:health": {
                     "value": 1,
                     "max": 1
                 },
                 "minecraft:movement": {
-                    "value": 0.3
+                    "value": 0.46
                 },
                 "minecraft:attack": {
                     "damage": 0
@@ -136,9 +140,19 @@
             }
         },
         "components": {
+            "minecraft:renders_when_invisible": {},
+            "minecraft:spell_effects": {
+                "add_effects": [
+                    {
+                        "effect": "invisibility",
+                        "duration": "infinite",
+                        "visible": false
+                    }
+                ]
+            },
             "minecraft:collision_box": {
-                "width": 2.08,
-                "height": 2.08
+                "width": 2.4,
+                "height": 2.4
             },
             "minecraft:is_hidden_when_invisible": {},
             "minecraft:experience_reward": {
@@ -196,7 +210,7 @@
             "minecraft:behavior.slime_float": {
                 "priority": 1,
                 "jump_chance_percentage": 0.8,
-                "speed_multiplier": 1.2
+                "speed_multiplier": 1.0
             },
             "minecraft:behavior.slime_attack": {
                 "priority": 3

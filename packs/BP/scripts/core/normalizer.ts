@@ -1,4 +1,7 @@
-import { BH_BOW_ID, BH_CHEST_ID, BH_FENCE_ID, isBetaBlock, isBetaItem, isVanillaId, WOOD_SPECIES } from "./betaRegistry.js";
+import {
+    BH_BOW_ID, BH_CAKE_ID, BH_CHEST_ID, BH_FENCE_ID, BH_SIGN_ID, BH_WOODEN_DOOR_ID,
+    BETA_CAPPED_ITEM_OF, isBetaBlock, isBetaItem, isVanillaId, WOOD_SPECIES
+} from "./betaRegistry.js";
 
 export type NormalizationAction = "keep" | "convert" | "remove";
 
@@ -7,18 +10,12 @@ export interface NormalizationResult {
     readonly targetId?: string;
 }
 
-// Copper is deliberately absent: Beta had no copper at all, so a raw copper pickup falls through
-// to `normalizeItem` and lands on cobblestone like every other copper item — one owner for both
-// the ground and inventory paths.
 const ORE_DROP_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:raw_iron": "minecraft:iron_ore",
     "minecraft:raw_gold": "minecraft:gold_ore"
 });
 
 export function normalizeEntityDrop(itemId: string): NormalizationResult {
-    // No explicit banned set: `normalizeItem` already removes every vanilla id the registry does not
-    // recognize, so a hand-maintained list of "bad" drops would only be a second owner of the same
-    // fact and could drift from the allowlist it was meant to mirror.
     const oreReplacement = ORE_DROP_CONVERSIONS[itemId];
     if (oreReplacement) {
         return { action: "convert", targetId: oreReplacement };
@@ -44,8 +41,6 @@ const NETHER_ORES: Readonly<Record<string, string>> = Object.freeze({
 });
 
 function matchNetherOre(bareId: string): NormalizationResult | null {
-    // Beta 1.7.3's Nether held no ores, but vanilla still hangs quartz, gold and debris off the
-    // `nether` biome tag our single Nether biome carries, so they dissolve back into netherrack.
     const target = NETHER_ORES[bareId];
     return target === undefined ? null : { action: "convert", targetId: target };
 }
@@ -87,15 +82,14 @@ function matchWoodBuilding(bareId: string): NormalizationResult | null {
 
 const SIMPLE_WOOD_ITEMS: Readonly<Record<string, string>> = Object.freeze({
     _leaves: "minecraft:oak_leaves",
-    _door: "minecraft:wooden_door",
+    _door: BH_WOODEN_DOOR_ID,
     _trapdoor: "minecraft:trapdoor",
-    _sign: "minecraft:oak_sign",
+    _sign: BH_SIGN_ID,
     _boat: "minecraft:boat",
     _sapling: "minecraft:oak_sapling"
 });
 
-// Hoisted: `matchWoodItem` runs once per inventory slot per tick, and rebuilding this list with
-// Object.entries on every call was the allocation the inventory sweep spent its time on.
+// Hoisted entries to avoid per-slot allocation in inventory sweep.
 const SIMPLE_WOOD_ENTRIES: readonly (readonly [string, string])[] = Object.freeze(
     Object.entries(SIMPLE_WOOD_ITEMS)
 );
@@ -135,14 +129,7 @@ export function normalizeBlock(blockId: string): NormalizationResult {
     return normalizeItem(blockId);
 }
 
-/**
- * Maps a vanilla placer item to the custom `bh:` item the inventory sweeper retypes it into.
- *
- * The sweep and the drop rewriter must agree on the final identifier: a drop left as the vanilla id
- * is a different item from the stack it is destined for, so the engine has no stack to merge a second
- * pickup into and the inventory fills with hand-stacked singles. Resolving through the same table on
- * both paths keeps the ground item and the inventory item identical, so the engine merges natively.
- */
+/** Maps vanilla placer item to custom bh: replacement block. */
 export function resolvePlacerReplacement(id: string): string | undefined {
     if (!id.startsWith("minecraft:")) {
         return undefined;
@@ -160,15 +147,25 @@ export function resolvePlacerReplacement(id: string): string | undefined {
     }
 
     if (bareId === "chest") {
-        // The Beta chest is the custom block: it wears the era's model and its halves pair through
-        // script, so a vanilla chest in a hotbar would place a block that never pairs.
         return BH_CHEST_ID;
     }
 
+    // Every post-Beta species collapses onto the era's oak door; the iron door only ever answered to
+    // its own id, so the table decides between the two and the suffix catches the rest.
+    if (bareId.endsWith("_door")) {
+        return BETA_CAPPED_ITEM_OF[id] ?? BH_WOODEN_DOOR_ID;
+    }
+
+    // Beta had one sign, cut from any of its three woods, and one cake.
+    if (bareId.endsWith("_sign")) {
+        return BH_SIGN_ID;
+    }
+
+    if (bareId === "cake") {
+        return BH_CAKE_ID;
+    }
+
     if (bareId.endsWith("_fence") || bareId.endsWith("_fence_gate")) {
-        // Beta had a single wooden fence and no gates. A vanilla fence left in a hotbar places the
-        // modern block, whose connection state nothing maintains and which never joins the pack's
-        // bh:fence, so every species collapses onto bh:fence instead of converting a tick later.
         return BH_FENCE_ID;
     }
 
@@ -186,11 +183,7 @@ export function resolvePlacerReplacement(id: string): string | undefined {
     return undefined;
 }
 
-/**
- * Vanilla foods the inventory sweep retypes into the custom `bh:` items that carry Beta's
- * instant-consumption behaviour. Mirrored on the drop path so a dropped porkchop is already the
- * item it will merge into, rather than a vanilla stack the engine can never combine with the bh one.
- */
+/** Vanilla foods retyped into instant-consumption bh: items. */
 export const FOOD_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:apple": "bh:apple",
     "minecraft:bread": "bh:bread",
@@ -202,36 +195,19 @@ export const FOOD_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze(
     "minecraft:cookie": "bh:cookie",
     "minecraft:salmon": "bh:cod",
     "minecraft:cooked_salmon": "bh:cooked_cod",
-    // Bedrock's fishing tables name the raw/cooked fish items as `fish`/`cooked_fish`; the registry
-    // and this table both accept them so a caught fish lands on the bh: item the sweep keeps.
     "minecraft:fish": "bh:cod",
     "minecraft:cooked_fish": "bh:cooked_cod"
 });
 
-/**
- * The identifier the inventory sweep leaves an item as when it is picked up, or `undefined` when
- * the sweep does not retype it.
- *
- * The sweep and the drop rewriter must agree on the final identifier: a ground item left as the
- * vanilla id is a different item from the stack it is destined for, so the engine has no stack to
- * merge a second pickup into and the inventory fills with hand-stacked singles. `resolvePlacerReplacement`
- * covers the placed blocks; the bow and the foods are retyped outside it, and this is the one place
- * both paths resolve them.
- */
+/** Returns replacement ID for held or picked-up items, or undefined if untouched. */
 export function resolveHeldItemReplacement(id: string): string | undefined {
     if (id === "minecraft:bow") {
         return BH_BOW_ID;
     }
-    return resolvePlacerReplacement(id) ?? FOOD_CONVERSIONS[id];
+    return resolvePlacerReplacement(id) ?? FOOD_CONVERSIONS[id] ?? BETA_CAPPED_ITEM_OF[id];
 }
 
-/**
- * The identifier an item entity must carry once Betafied has normalized it, or `null` when the item
- * has no Beta 1.7.3 counterpart and must not sit on the ground at all.
- *
- * Both the spawn handler and the periodic cleaner resolve through this one function, so a ground
- * item is always the exact id the inventory sweep will merge it into.
- */
+/** Resolves normalized drop ID, or null if removed. */
 export function resolveDropId(itemId: string): string | null {
     const retyped = resolveHeldItemReplacement(itemId);
     if (retyped !== undefined) {

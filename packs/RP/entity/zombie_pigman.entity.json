@@ -3,6 +3,7 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:zombie_pigman",
+            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "min_engine_version": "1.8.0",
             "materials": {
                 "default": "zombie"
@@ -87,7 +88,8 @@
                 },
                 {
                     "zombie_attack_bare_hand": "controller.animation.zombie.attack_bare_hand"
-                }
+                },
+                { "bh_entity_shadow": "controller.animation.betarock.entity_shadow" }
             ],
             "render_controllers": [
                 "controller.render.zombie_pigman"

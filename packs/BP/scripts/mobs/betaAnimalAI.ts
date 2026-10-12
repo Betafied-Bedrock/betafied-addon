@@ -29,14 +29,7 @@ export const PASSIVE_MOBS = Object.freeze(new Set([
     "minecraft:chicken"
 ]));
 
-/**
- * Beta 1.7.3's shearing drop, `1 + rand.nextInt(3)`.
- *
- * A punch and a pair of shears reach different owners for this number: shears run the engine's
- * `minecraft:interact`, which reads `loot_tables/entities/sheep_shear.json`, while the punch path below
- * spawns the stack itself. The two had drifted (2-4 by shears, 1-3 by punch), so both are pinned here
- * and `tests/integration/sheepPunch.test.ts` asserts the loot table still agrees.
- */
+// Beta 1.7.3 shearing drop count (1-3), matching sheep_shear.json loot table.
 export const WOOL_DROP_MIN = 1;
 export const WOOL_DROP_MAX = 3;
 
@@ -74,10 +67,6 @@ eventBus.onEntityHurt((ev) => {
     }
 });
 
-/**
- * Recreates Java Beta 1.7.3 isCollidedHorizontally hop behavior.
- * Evaluates whether an animal is bumping into terrain/fences, crowded in a pen, or in water.
- */
 export function evaluateHopConditions(entity: Entity, dimension: Dimension): boolean {
     const loc = entity.location;
 
@@ -161,10 +150,6 @@ export function doHop(entity: Entity): void {
     }
 }
 
-/**
- * Player-scoped generator job to prevent O(N^2) global dimension queries.
- * Scans active player view radii for passive animals and applies Beta hop physics.
- */
 function tryAnimalHop(entity: Entity, dimension: Dimension, currentTick: number): void {
     const hurtEnd = hurtCooldowns.get(entity.id);
     if (hurtEnd && currentTick < hurtEnd) return;

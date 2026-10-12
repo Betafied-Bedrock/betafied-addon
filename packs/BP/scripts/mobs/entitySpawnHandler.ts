@@ -1,9 +1,10 @@
-import { world, system, ItemStack, Dimension, Entity, EntityComponentTypes } from "@minecraft/server";
+import { world, system, ItemStack, Dimension, Entity, EntityComponentTypes, Vector3 } from "@minecraft/server";
 import { reportError } from "../core/errorReporter.js";
 import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
 import { resolveDropId } from "../core/normalizer.js";
 import { eventBus } from "../core/eventBus.js";
+import { migrateEntity } from "./entityMigration.js";
 
 const recentBrokenLeaves = new Map<string, number>();
 const recentBrokenChests = new Map<string, number>();
@@ -39,14 +40,7 @@ function hasBetaTreeAround(dim: Dimension, x: number, y: number, z: number): boo
     return false;
 }
 
-/**
- * Whether a fresh `minecraft:apple` item entity is the engine's own leaf-decay drop rather than a
- * player's.
- *
- * Bedrock's C++ engine hardcodes apple drops when leaves are destroyed or decay, and Beta 1.7.3 trees
- * never dropped apples. A leaf broken in the neighbourhood owns the drop; a chest broken there or a
- * nearby death does not, and neither does a player close enough to have broken the leaf themselves.
- */
+// Bedrock engine hardcodes leaf apple drops; Beta 1.7.3 trees never dropped apples.
 export function isTreeAppleDrop(entity: Entity): boolean {
     const loc = entity.location;
     const dim = entity.dimension;
@@ -116,9 +110,7 @@ function handleItemDrop(entity: Entity): void {
         return;
     }
 
-    // The inventory sweeper retypes held items into their `bh:` form on pickup, so the drop
-    // has to land on that same identifier. Left as the vanilla id, a second log finds no stack
-    // to merge into - the first one is already `bh:oak_log` - and every pickup lands alone.
+    // Convert to bh: identifier so drops merge into existing converted inventory stacks.
     const finalId = resolveDropId(itemId);
     if (finalId === null) {
         entity.remove();
@@ -127,15 +119,25 @@ function handleItemDrop(entity: Entity): void {
         const dim = entity.dimension;
         entity.remove();
         const dropAmount = (itemId === "minecraft:raw_iron" || itemId === "minecraft:raw_gold") ? 1 : amount;
-        dim.spawnItem(new ItemStack(finalId, dropAmount), loc);
+        spawnStackedDrop(dim, loc, finalId, dropAmount);
+    }
+}
+
+// Splits drops exceeding target item max stack size (e.g. unstackable bh:porkchop).
+function spawnStackedDrop(dim: Dimension, loc: Vector3, itemId: string, amount: number): void {
+    const maxStack = Math.max(1, new ItemStack(itemId, 1).maxAmount);
+    let remaining = amount;
+
+    while (remaining > 0) {
+        const stackSize = Math.min(remaining, maxStack);
+        dim.spawnItem(new ItemStack(itemId, stackSize), loc);
+        remaining -= stackSize;
     }
 }
 
 export function sanitizeWorldEntity(entity: Entity | undefined): void {
     if (!entity || !entity.isValid) return;
 
-    // Checked before the type branch: another addon's decor is often a `minecraft:item`, which the
-    // namespace rule cannot see, and the drop rewrite would delete it out from under its owner.
     if (isForeignOwnedEntity(entity)) return;
 
     if (entity.typeId === "minecraft:item") {
@@ -151,6 +153,7 @@ export function sanitizeWorldEntity(entity: Entity | undefined): void {
 eventBus.onEntitySpawn((event) => {
     try {
         sanitizeWorldEntity(event.entity);
+        migrateEntity(event.entity);
     } catch (e) {
         reportError({
             system: "entitySpawnHandler",
@@ -163,6 +166,7 @@ eventBus.onEntitySpawn((event) => {
 eventBus.onEntityLoad((event) => {
     try {
         sanitizeWorldEntity(event.entity);
+        migrateEntity(event.entity);
     } catch (e) {
         reportError({
             system: "entitySpawnHandler",

@@ -3,6 +3,7 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:squid",
+            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "materials": {
                 "default": "squid"
             },
@@ -13,13 +14,15 @@
                 "default": "geometry.squid"
             },
             "animations": {
+                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "move": "animation.squid.move",
                 "squid_rotate": "animation.squid.rotate"
             },
             "scripts": {
                 "animate": [
                     "move",
-                    "squid_rotate"
+                    "squid_rotate",
+                    "bh_entity_shadow"
                 ]
             },
             "render_controllers": [

@@ -1,8 +1,12 @@
 {
-  "format_version": "1.16.0",
+  "format_version": "1.21.70",
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:creeper",
+      "properties": {
+          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.5, "client_sync": true },
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.275, "client_sync": true }
+      },
       "is_spawnable": true,
       "is_summonable": true,
       "is_experimental": false
@@ -60,14 +64,28 @@
       }
     },
     "components": {
+      "minecraft:renders_when_invisible": {},
+      "minecraft:spell_effects": {
+        "add_effects": [
+          {
+            "effect": "invisibility",
+            "duration": "infinite",
+            "visible": false
+          }
+        ]
+      },
+      "minecraft:is_hidden_when_invisible": {},
       "minecraft:type_family": {
         "family": ["creeper", "monster", "mob"]
       },
+      "minecraft:attack": {
+        "damage": 3
+      },
       "minecraft:behavior.melee_attack": {
-        "priority": 1,
+        "priority": 4,
         "speed_multiplier": 1.0,
-        "track_target": true,
-        "require_complete_path": false
+        "track_target": false,
+        "reach_multiplier": 0.0
       },
 
       "minecraft:breathable": {
@@ -94,7 +112,7 @@
         ]
       },
       "minecraft:movement": {
-        "value": 0.2
+        "value": 0.322
       },
       "minecraft:navigation.walk": {
         "is_amphibious": false,
@@ -128,7 +146,7 @@
       },
       "minecraft:behavior.random_stroll": {
         "priority": 5,
-        "speed_multiplier": 0.8
+        "speed_multiplier": 1.0
       },
       "minecraft:behavior.random_look_around": {
         "priority": 6

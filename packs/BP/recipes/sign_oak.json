@@ -2,7 +2,7 @@
   "format_version": "1.20.10",
   "minecraft:recipe_shaped": {
     "description": {
-    "identifier": "bh:sign_oak"
+    "identifier": "minecraft:sign_oak"
     },
 
     
@@ -27,7 +27,7 @@
       }
     ],
     "result": {
-      "item": "minecraft:oak_sign",
+      "item": "bh:oak_sign",
       "count": 1
     }
   }

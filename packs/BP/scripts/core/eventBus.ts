@@ -14,6 +14,7 @@ import type {
     BlockContainerOpenedAfterEvent,
     ChatSendAfterEvent,
     EntityDieAfterEvent,
+    EntityHitBlockAfterEvent,
     EntityHitEntityAfterEvent,
     EntityHurtAfterEvent,
     EntityLoadAfterEvent,
@@ -48,10 +49,6 @@ class EventBus {
     private initialized = false;
     private nextId = 1;
 
-    /**
-     * Subscribe a handler to a specific event with an optional priority (higher runs first).
-     * Returns an unsubscription callback.
-     */
     subscribe<T>(eventName: string, callback: (event: T) => void, priority: number = 0): () => void {
         const id = this.nextId++;
         const list = this.handlers.get(eventName) ?? [];
@@ -66,9 +63,6 @@ class EventBus {
         };
     }
 
-    /**
-     * Dispatch an event to all registered handlers in priority order.
-     */
     dispatch<T extends object>(eventName: string, event: T): void {
         const list = this.handlers.get(eventName);
         if (!list || list.length === 0) return;
@@ -121,6 +115,10 @@ class EventBus {
 
     onEntityHitEntity(callback: (event: EntityHitEntityAfterEvent) => void, priority: number = 0): () => void {
         return this.subscribe("entityHitEntity", callback, priority);
+    }
+
+    onEntityHitBlock(callback: (event: EntityHitBlockAfterEvent) => void, priority: number = 0): () => void {
+        return this.subscribe("entityHitBlock", callback, priority);
     }
 
     onPlayerPlaceBlock(callback: (event: PlayerPlaceBlockAfterEvent) => void, priority: number = 0): () => void {
@@ -210,6 +208,7 @@ class EventBus {
         world.afterEvents.entityDie.subscribe((e) => this.dispatch("entityDie", e));
         world.afterEvents.entityHurt.subscribe((e) => this.dispatch("entityHurt", e));
         world.afterEvents.entityHitEntity.subscribe((e) => this.dispatch("entityHitEntity", e));
+        world.afterEvents.entityHitBlock.subscribe((e) => this.dispatch("entityHitBlock", e));
         world.afterEvents.playerPlaceBlock.subscribe((e) => this.dispatch("playerPlaceBlock", e));
         world.afterEvents.playerBreakBlock.subscribe((e) => this.dispatch("playerBreakBlock", e));
         world.afterEvents.playerDimensionChange.subscribe((e) => this.dispatch("playerDimensionChange", e));

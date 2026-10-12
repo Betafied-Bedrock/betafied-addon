@@ -1,0 +1,201 @@
+import { describe, it, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import {
+    canStackSlab,
+    canMergePlacedSlab,
+    DOUBLE_SLAB_OF,
+    SLAB_SOUND_OF
+} from "../../packs/BP/scripts/interactions/slabStacking.js";
+import {
+    Direction,
+    EntityComponentTypes,
+    EntityEquippableComponent,
+    EquipmentSlot,
+    GameMode,
+    ItemStack,
+    Player,
+    resetMocks,
+    scheduledTimeouts,
+    world
+} from "@minecraft/server";
+import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
+
+describe("Slab Stacking - Beta 1.7.3 Pre-Placement Stacking", () => {
+    beforeEach(() => {
+        resetMocks();
+        eventBus.init();
+    });
+
+    describe("canStackSlab - interaction qualification", () => {
+        it("allows stacking when clicking the top face with the matching slab", () => {
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.Up, "bh:wooden_slab"), true);
+            assert.equal(canStackSlab("bh:stone_slab", Direction.Up, "bh:stone_slab"), true);
+            assert.equal(canStackSlab("bh:cobblestone_slab", Direction.Up, "bh:cobblestone_slab"), true);
+            assert.equal(canStackSlab("bh:sandstone_slab", Direction.Up, "bh:sandstone_slab"), true);
+        });
+
+        it("forbids stacking when clicking non-up faces", () => {
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.Down, "bh:wooden_slab"), false);
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.North, "bh:wooden_slab"), false);
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.South, "bh:wooden_slab"), false);
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.East, "bh:wooden_slab"), false);
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.West, "bh:wooden_slab"), false);
+        });
+
+        it("forbids stacking when held item does not match", () => {
+            assert.equal(canStackSlab("bh:wooden_slab", Direction.Up, "bh:stone_slab"), false);
+            assert.equal(canStackSlab("bh:stone_slab", Direction.Up, undefined), false);
+            assert.equal(canStackSlab("bh:cobblestone_slab", Direction.Up, "minecraft:dirt"), false);
+        });
+
+        it("forbids stacking on full blocks or already doubled slabs", () => {
+            assert.equal(canStackSlab("bh:double_wooden_slab", Direction.Up, "bh:wooden_slab"), false);
+            assert.equal(canStackSlab("minecraft:oak_planks", Direction.Up, "bh:wooden_slab"), false);
+        });
+    });
+
+    describe("canMergePlacedSlab - placement fallback qualification", () => {
+        it("allows merge when placed slab is placed directly on top of the same slab", () => {
+            assert.equal(canMergePlacedSlab("bh:wooden_slab", "bh:wooden_slab"), true);
+            assert.equal(canMergePlacedSlab("bh:stone_slab", "bh:stone_slab"), true);
+        });
+
+        it("forbids merge when block below does not match", () => {
+            assert.equal(canMergePlacedSlab("bh:wooden_slab", "bh:cobblestone_slab"), false);
+            assert.equal(canMergePlacedSlab("bh:wooden_slab", "minecraft:air"), false);
+            assert.equal(canMergePlacedSlab("bh:wooden_slab", undefined), false);
+        });
+
+        it("forbids merge for non-slab items", () => {
+            assert.equal(canMergePlacedSlab("minecraft:stone", "minecraft:stone"), false);
+        });
+    });
+
+    describe("Mappings", () => {
+        it("maps every single slab to its double slab", () => {
+            assert.deepEqual(DOUBLE_SLAB_OF, {
+                "bh:wooden_slab": "bh:double_wooden_slab",
+                "bh:cobblestone_slab": "bh:double_cobblestone_slab",
+                "bh:sandstone_slab": "bh:double_sandstone_slab",
+                "bh:stone_slab": "bh:double_stone_slab"
+            });
+        });
+
+        it("defines placement sounds for each slab type", () => {
+            assert.equal(SLAB_SOUND_OF["bh:wooden_slab"], "use.wood");
+            assert.equal(SLAB_SOUND_OF["bh:stone_slab"], "use.stone");
+            assert.equal(SLAB_SOUND_OF["bh:cobblestone_slab"], "use.stone");
+            assert.equal(SLAB_SOUND_OF["bh:sandstone_slab"], "use.stone");
+        });
+    });
+
+    describe("Event Interception & Execution", () => {
+        it("cancels top-face interaction and doubles slab in Survival, consuming 1 item", () => {
+            const dim = world.getDimension("overworld");
+            const loc = { x: 10, y: 64, z: 10 };
+            const block = dim.getBlock(loc);
+            block.setType("bh:wooden_slab");
+
+            const player = new Player("p1", "Tester");
+            player.gameMode = GameMode.Survival;
+            const equip = new EntityEquippableComponent();
+            player.setComponent(EntityComponentTypes.Equippable, equip);
+            equip.setEquipment(EquipmentSlot.Mainhand, new ItemStack("bh:wooden_slab", 3));
+
+            const event: any = {
+                block,
+                blockFace: Direction.Up,
+                faceLocation: { x: 0.5, y: 1.0, z: 0.5 },
+                isFirstEvent: true,
+                itemStack: new ItemStack("bh:wooden_slab", 3),
+                player,
+                cancel: false
+            };
+
+            eventBus.dispatch("playerInteractWithBlock", event);
+            assert.equal(event.cancel, true, "Interaction must be cancelled immediately");
+
+            // Flush scheduled system.run callback
+            while (scheduledTimeouts.length > 0) {
+                const item = scheduledTimeouts.shift()!;
+                item.callback();
+            }
+
+            assert.equal(block.typeId, "bh:double_wooden_slab", "Block must turn into double slab");
+            const held = equip.getEquipment(EquipmentSlot.Mainhand);
+            assert.equal(held?.amount, 2, "Held item stack count must decrease by 1");
+        });
+
+        it("does not consume item in Creative mode", () => {
+            const dim = world.getDimension("overworld");
+            const loc = { x: 12, y: 64, z: 12 };
+            const block = dim.getBlock(loc);
+            block.setType("bh:stone_slab");
+
+            const player = new Player("p2", "Builder");
+            player.gameMode = GameMode.Creative;
+            const equip = new EntityEquippableComponent();
+            player.setComponent(EntityComponentTypes.Equippable, equip);
+            equip.setEquipment(EquipmentSlot.Mainhand, new ItemStack("bh:stone_slab", 1));
+
+            const event: any = {
+                block,
+                blockFace: Direction.Up,
+                faceLocation: { x: 0.5, y: 1.0, z: 0.5 },
+                isFirstEvent: true,
+                itemStack: new ItemStack("bh:stone_slab", 1),
+                player,
+                cancel: false
+            };
+
+            eventBus.dispatch("playerInteractWithBlock", event);
+            assert.equal(event.cancel, true);
+
+            while (scheduledTimeouts.length > 0) {
+                scheduledTimeouts.shift()!.callback();
+            }
+
+            assert.equal(block.typeId, "bh:double_stone_slab");
+            const held = equip.getEquipment(EquipmentSlot.Mainhand);
+            assert.equal(held?.amount, 1, "Creative mode must not consume item");
+        });
+
+        it("cancels playerPlaceBlockBefore when placing a slab directly onto another", () => {
+            const dim = world.getDimension("overworld");
+            const lowerLoc = { x: 5, y: 60, z: 5 };
+            const lowerBlock = dim.getBlock(lowerLoc);
+            lowerBlock.setType("bh:cobblestone_slab");
+
+            const upperLoc = { x: 5, y: 61, z: 5 };
+            const upperBlock = dim.getBlock(upperLoc);
+            upperBlock.setType("minecraft:air");
+
+            const player = new Player("p3", "Survivalist");
+            player.gameMode = GameMode.Survival;
+            const equip = new EntityEquippableComponent();
+            player.setComponent(EntityComponentTypes.Equippable, equip);
+            equip.setEquipment(EquipmentSlot.Mainhand, new ItemStack("bh:cobblestone_slab", 1));
+
+            const event: any = {
+                block: upperBlock,
+                face: Direction.Up,
+                faceLocation: { x: 0.5, y: 0.0, z: 0.5 },
+                permutationToPlace: { type: { id: "bh:cobblestone_slab" } },
+                player,
+                cancel: false
+            };
+
+            eventBus.dispatch("playerPlaceBlockBefore", event);
+            assert.equal(event.cancel, true, "Placement event must be cancelled");
+
+            while (scheduledTimeouts.length > 0) {
+                scheduledTimeouts.shift()!.callback();
+            }
+
+            assert.equal(lowerBlock.typeId, "bh:double_cobblestone_slab", "Lower block must become double slab");
+            assert.equal(upperBlock.typeId, "minecraft:air", "Upper cell must remain air");
+            const held = equip.getEquipment(EquipmentSlot.Mainhand);
+            assert.equal(held, undefined, "Last item in stack should be removed when consumed");
+        });
+    });
+});

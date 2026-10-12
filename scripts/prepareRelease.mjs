@@ -147,8 +147,8 @@ function resolveTarget({ bump, explicit }) {
 function bumpPackageVersion(version) {
   const file = path.join(ROOT, "package.json");
   const source = fs.readFileSync(file, "utf8");
+  if (!/("version":\s*")[^"]*(")/.test(source)) fail("package.json has no version field to bump");
   const replaced = source.replace(/("version":\s*")[^"]*(")/, `$1${version}$2`);
-  if (replaced === source) fail("package.json has no version field to bump");
   fs.writeFileSync(file, replaced);
 }
 
@@ -183,12 +183,21 @@ function assertArchiver() {
   }
 }
 
-function agentsMdFiles(root) {
+function unwantedPackFiles(root) {
   const found = [];
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     const full = path.join(root, entry.name);
-    if (entry.isDirectory()) found.push(...agentsMdFiles(full));
-    else if (entry.name === "AGENTS.md") found.push(full);
+    if (entry.isDirectory()) {
+      found.push(...unwantedPackFiles(full));
+    } else if (
+      entry.name.endsWith(".md") ||
+      ((entry.name.toLowerCase().includes("agent") ||
+        entry.name.toLowerCase().includes("claude") ||
+        entry.name.toLowerCase().includes("gemini")) &&
+        !entry.name.toLowerCase().includes("magenta"))
+    ) {
+      found.push(full);
+    }
   }
   return found;
 }
@@ -210,9 +219,8 @@ function copyExport(source, destination) {
 /**
  * Package the Regolith export into `build/<tag>/`.
  *
- * The instruction files are *not* cleaned up here. `filters/agents-md-strip/` is supposed to
- * have removed them from the export, and a silently-stripped one would hide a filter that had
- * stopped running — which is how 5.3.2 shipped four of them inside its `.mcpack`.
+ * Pack source trees must never contain instruction or markdown files, and any leaked
+ * files will fail packaging here before any archive is created.
  */
 function packageInstallers(tag) {
   const mojang = mojangRoot();
@@ -233,10 +241,10 @@ function packageInstallers(tag) {
   const folders = [];
   for (const [kind, source, folder] of sources) {
     copyExport(source, path.join(outDir, folder));
-    const leaked = agentsMdFiles(path.join(outDir, folder));
+    const leaked = unwantedPackFiles(path.join(outDir, folder));
     if (leaked.length > 0) {
       fail(
-        `the ${kind} export still carries ${leaked.length} AGENTS.md file(s) — filters/agents-md-strip/ did not run`
+        `the ${kind} export carries forbidden markdown/agent file(s): ${leaked.map((f) => path.relative(outDir, f)).join(", ")}`
       );
     }
     folders.push(folder);
@@ -252,9 +260,10 @@ function printNextSteps(tag) {
 Next steps:
   1. Write the '## ${tag}' section in CHANGELOG.md, replacing ${RELEASE_NOTES_PLACEHOLDER}.
      Match the published GitHub style: a one-line summary, then '### Section' headings of
-     '- Added/Changed/Fixed/Removed' bullets.
+     '- Added/Changed/Fixed/Removed' bullets. Each bullet must be a single, concise sentence
+     describing the feature for players (strictly user-facing, no file paths or developer details).
   2. npm run check                       # write the notes first; the suite requires the section
-  3. git add -A && git commit            # 'Betafied ${tag}: <summary>', authored as fyreic
+  3. git add -A && git commit            # 'Betafied ${tag}: <summary>', as the authenticated GitHub user, no agent trailer
   4. git tag -a ${tag} -m "Betafied ${tag}: <summary>"
   5. git push origin HEAD && git push origin ${tag}
   6. npm run release -- --dry-run        # read the notes before publishing

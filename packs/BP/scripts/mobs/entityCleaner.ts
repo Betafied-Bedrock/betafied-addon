@@ -4,6 +4,7 @@ import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
 import { resolveDropId } from "../core/normalizer.js";
 import { tickManager } from "../core/tickManager.js";
+import { migrateEntity } from "./entityMigration.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 100,
@@ -11,10 +12,6 @@ const CONFIG = Object.freeze({
     ENTITIES_PER_TICK: 20
 });
 
-/**
- * Generator for asynchronous periodic entity cleanup.
- * Removes non-Beta entities using the canonical allowlist and replaces/removes modern item drops.
- */
 export function* cleanerJob(): Generator<void, void, unknown> {
     const players = world.getAllPlayers();
     let processed = 0;
@@ -31,8 +28,6 @@ export function* cleanerJob(): Generator<void, void, unknown> {
             for (const ent of entities) {
                 if (!ent.isValid) continue;
 
-                // The spawn gate spares another addon's decor; this sweep has to spare it too, or it
-                // is deleted a few seconds later instead of at spawn.
                 if (isForeignOwnedEntity(ent)) continue;
 
                 if (isVanillaId(ent.typeId) && !isBetaEntity(ent.typeId)) {
@@ -52,6 +47,8 @@ export function* cleanerJob(): Generator<void, void, unknown> {
                             dim.spawnItem(new ItemStack(finalId, amount), loc);
                         }
                     }
+                } else {
+                    migrateEntity(ent);
                 }
 
                 processed++;

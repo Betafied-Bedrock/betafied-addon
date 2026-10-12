@@ -1,12 +1,6 @@
 /**
- * Beta 1.7.3 double chests are two blocks sharing one 54-slot inventory. Bedrock cannot hand a
- * custom multi-block a shared container: every part of a multi-block owns its own block entity
- * by design (26.50 changelog), and no stable API opens one block entity's container for another.
- *
- * So the pair keeps exactly one half as the items' home ("master", part 0) and moves the
- * contents into whichever half a player opens, moving them back once the pair goes idle. The
- * contents are only ever moved, never copied, which is what keeps an interrupted session (a
- * crash, a broken chest, an explosion) from duplicating or double-dropping a single stack.
+ * Beta 1.7.3 double chest inventory synchronization and multi-block pairing.
+ * Moves contents between halves on open/close sessions to emulate a shared 54-slot container.
  */
 
 import {
@@ -42,7 +36,6 @@ const PART_STATE = "minecraft:multi_block_part";
 const DIRECTION_STATE = "minecraft:cardinal_direction";
 const SWEEP_INTERVAL_TICKS = 10;
 export const CHEST_PAIRS_PER_TICK = 10;
-/** A chest placed this tick has no block entity to read yet, so the merge waits for the next one. */
 const MERGE_DELAY_TICKS = 1;
 
 export type CardinalDirection = "north" | "south" | "east" | "west";
@@ -51,19 +44,10 @@ type PairAxis = "x" | "z";
 const CARDINAL_DIRECTIONS: readonly CardinalDirection[] = Object.freeze(["north", "south", "east", "west"]);
 
 export interface PairLayout {
-    /** Cell offset from the pair's part 0 (the master half) to part 1. */
     step: ChestLocation;
-    /** The long face the two latches meet on, always perpendicular to the step. */
     latch: CardinalDirection;
 }
 
-/**
- * A large chest's latch sits on one of its long faces, so the engine's part axis and the latch
- * together leave exactly four layouts, and the block's `cardinal_direction` state names one of them.
- * The state therefore carries the step from part 0 to part 1 rather than the latch alone: part 0 is
- * the half on the viewer's left in every layout, which keeps slots 0-26 the left half the way
- * vanilla splits a double chest.
- */
 export const PAIR_LAYOUTS: Readonly<Record<CardinalDirection, PairLayout>> = Object.freeze({
     east: { step: { x: 1, y: 0, z: 0 }, latch: "south" },
     west: { step: { x: -1, y: 0, z: 0 }, latch: "north" },
@@ -71,7 +55,6 @@ export const PAIR_LAYOUTS: Readonly<Record<CardinalDirection, PairLayout>> = Obj
     south: { step: { x: 0, y: 0, z: 1 }, latch: "west" }
 });
 
-/** The inverse of PAIR_LAYOUTS: which layout wears each latch face. */
 export const PAIR_STATE_BY_LATCH: Readonly<Record<CardinalDirection, CardinalDirection>> = Object.freeze({
     south: "east",
     north: "west",
@@ -86,13 +69,11 @@ export const INVERSE_DIRECTION: Readonly<Record<CardinalDirection, CardinalDirec
     west: "east"
 });
 
-/** The latches that can sit on a long face of a pair running along each axis. */
 const SIDE_LATCHES: Readonly<Record<PairAxis, readonly CardinalDirection[]>> = Object.freeze({
     x: ["north", "south"],
     z: ["east", "west"]
 });
 
-/** Chests placed end to end have no latch on a long face; the pair still needs a readable side. */
 const FALLBACK_LATCH: Readonly<Record<PairAxis, CardinalDirection>> = Object.freeze({
     x: "south",
     z: "east"
@@ -127,7 +108,6 @@ export interface PlacementPlan<T> {
 }
 
 export interface ChestNeighbour {
-    /** Where the neighbouring chest sits, relative to the chest that was just placed. */
     offset: ChestLocation;
     latch: CardinalDirection | undefined;
 }
@@ -135,11 +115,9 @@ export interface ChestNeighbour {
 export interface PairPlan {
     state: CardinalDirection;
     latch: CardinalDirection;
-    /** The part-0 cell, relative to the chest that was just placed. */
     masterOffset: ChestLocation;
 }
 
-/** The layout whose step runs in the given direction, or undefined for anything but a single step. */
 function layoutStep(direction: ChestLocation): CardinalDirection | undefined {
     return CARDINAL_DIRECTIONS.find(state => {
         const step = PAIR_LAYOUTS[state].step;
@@ -156,13 +134,9 @@ function onLongFace(latch: CardinalDirection | undefined, axis: PairAxis): latch
 }
 
 function planAgainst(placedLatch: CardinalDirection | undefined, neighbour: ChestNeighbour): PairPlan | undefined {
-    // Only a chest sharing a face can join; a diagonal or distant chest is not a partner at all.
     const axis = neighbour.offset.x !== 0 ? "x" : "z";
     if (!layoutStep(neighbour.offset)) return undefined;
 
-    // A latch belongs on a long face, so the latch the placer is looking at wins whenever the two
-    // halves ended up beside each other. Chests placed end to end leave only the neighbour's latch
-    // before the pair falls back on the side that stays readable.
     const latch = onLongFace(placedLatch, axis)
         ? placedLatch
         : onLongFace(neighbour.latch, axis)
@@ -179,10 +153,6 @@ function planAgainst(placedLatch: CardinalDirection | undefined, neighbour: Ches
     };
 }
 
-/**
- * Plans the pair a freshly placed chest joins: which layout the halves take, and which of the two
- * cells ends up as part 0. Only one partner can join a chest, so the caller's order breaks ties.
- */
 export function planPair(
     placedLatch: CardinalDirection | undefined,
     neighbours: readonly ChestNeighbour[]
@@ -196,18 +166,6 @@ export function planPair(
     return plans.find(plan => plan.latch === placedLatch) ?? plans[0];
 }
 
-/**
- * Whether a chest may stand in a cell given the chests already touching it.
- *
- * Beta's `BlockChest.canPlaceBlockAt` counted the chests sharing a face and refused to place at more
- * than one, which is what keeps a chest from touching two others at once; its `isThereANeighborChest`
- * refused when the neighbour was already half of a pair, which is why two large chests can never meet.
- * A chest with no neighbour becomes a single, and a chest with exactly one single neighbour becomes
- * that single's other half — everything else is refused.
- *
- * Only the four horizontal neighbours are handed in: a chest stacked directly on another is a
- * separate container in the era and is never asked about here.
- */
 export function planChestPlacement(neighbourTypeIds: readonly string[]): boolean {
     let singles = 0;
     for (const typeId of neighbourTypeIds) {
@@ -254,11 +212,6 @@ export function hasAnyItem<T>(contents: readonly (T | undefined)[]): boolean {
     return contents.some(stack => stack !== undefined);
 }
 
-/**
- * Whole stacks only: a destination that has run out of empty slots leaves the rest behind in the
- * source. That is loss-free without having to know each item's stack limit, which matters because
- * writing an amount over an item's limit would have the engine drop the overflow.
- */
 export function planPlacement<T>(
     source: readonly (T | undefined)[],
     destination: readonly (T | undefined)[]
@@ -272,13 +225,16 @@ export function planPlacement<T>(
         const stack = sourceAfter[slot];
         if (!stack) continue;
 
-        while (cursor < destinationAfter.length && destinationAfter[cursor] !== undefined) cursor++;
-        if (cursor >= destinationAfter.length) break;
+        let target = slot < destinationAfter.length && destinationAfter[slot] === undefined ? slot : -1;
+        if (target === -1) {
+            while (cursor < destinationAfter.length && destinationAfter[cursor] !== undefined) cursor++;
+            if (cursor >= destinationAfter.length) break;
+            target = cursor;
+        }
 
-        destinationAfter[cursor] = stack;
+        destinationAfter[target] = stack;
         sourceAfter[slot] = undefined;
-        moves.push({ from: slot, to: cursor });
-        cursor++;
+        moves.push({ from: slot, to: target });
     }
 
     return { destination: destinationAfter, source: sourceAfter, moves };
@@ -293,12 +249,6 @@ export interface OpenDecisionInput {
     shadowViewers: number;
 }
 
-/**
- * The items follow the half that is being opened, because an open container is the one place a
- * player can see and edit them. A half that already has a viewer keeps them: emptying a chest
- * under someone mid-session reads as items being deleted, so the other half opens empty and
- * whatever is dropped into it drains back to the master when that session ends.
- */
 export function planOpen(input: OpenDecisionInput): MirrorMove {
     if (input.half === "shadow") {
         if (!input.firstViewer) return "none";
@@ -320,32 +270,14 @@ export function planSweep(input: { shadowViewers: number; shadowHasItems: boolea
     return input.shadowViewers === 0 && input.shadowHasItems ? "shadow-to-master" : "none";
 }
 
-/**
- * The pair only ever holds one inventory, so a second player opening the other half would find it
- * empty and could stock a half that is not the one on screen. Turning that interaction away keeps
- * both players on the same page; the mirror stays what makes the pair safe, this only spares the
- * confusion.
- */
 export function planOpenBlock(input: { half: ChestHalf; masterViewers: number; shadowViewers: number }): boolean {
     return input.half === "master" ? input.shadowViewers > 0 : input.masterViewers > 0;
 }
 
-/**
- * Whether the era refuses to open the clicked half of a chest: a solid block directly above it. The
- * check lived in `BlockChest.onBlockActivated` and looked only at the cell the player clicked, so the
- * other half of a large chest is not consulted.
- *
- * A player crouching with an item in hand is not opening the chest — the engine hands that interaction
- * to the item, placing it against the face — so the lid check must leave it alone.
- */
 export function chestOpenBlocked(input: { placing: boolean; aboveSolid: boolean }): boolean {
     return input.aboveSolid && !input.placing;
 }
 
-/**
- * A close event is not guaranteed to arrive (a dropped connection, a crash, a reload), and a viewer
- * that never leaves would freeze the pair: its other half stays empty and the items stay parked.
- */
 export function dropOfflineViewers(viewers: Set<string>, onlinePlayerIds: ReadonlySet<string>): number {
     let dropped = 0;
     for (const playerId of [...viewers]) {
@@ -403,16 +335,10 @@ function spansCells(dimensionId: string, resolution: PairResolution): boolean {
     return isHalf(blockAt(dimensionId, resolution.master)) && isHalf(blockAt(dimensionId, resolution.shadow));
 }
 
-/** The block's declared slot count is not a promise, so slot work is bounded by the container itself. */
 export function clampSlots(requested: number, size: number | undefined): number {
     return size === undefined ? 0 : Math.min(requested, size);
 }
 
-/**
- * Converting a placed single into a half leaves that half's block entity with the 27 slots it was
- * born with, not the 54 the double chest declares, and addressing past that throws. The container's
- * own `size` is the only slot count both halves agree on.
- */
 function slotCapacity(container: Container, requested: number): number | undefined {
     const measured = guard("containerSize", () => container.size);
     return measured.ok ? clampSlots(requested, measured.value) : undefined;
@@ -421,13 +347,10 @@ function slotCapacity(container: Container, requested: number): number | undefin
 function readSlots(container: Container, slots: number): (ItemStack | undefined)[] | undefined {
     const contents: (ItemStack | undefined)[] = [];
     const capacity = slotCapacity(container, slots);
-    // A container that cannot even report its size is unreadable, which callers must not read as empty.
     if (capacity === undefined) return undefined;
 
     for (let slot = 0; slot < capacity; slot++) {
         const read = guard(`readSlot:${slot}`, () => container.getItem(slot));
-        // A half-read container is worse than no read at all: treating a slot we could not read as
-        // empty would let a move overwrite it.
         if (!read.ok) return undefined;
         contents.push(read.value);
     }
@@ -441,7 +364,6 @@ function clearSlots(container: Container, slots: number): void {
     }
 }
 
-/** Undefined when the half could not be read, which callers must not mistake for "empty". */
 function containerHasItems(dimensionId: string, location: ChestLocation): boolean | undefined {
     const block = blockAt(dimensionId, location);
     if (!block) return undefined;
@@ -458,18 +380,12 @@ function writeSlots(container: Container, contents: readonly (ItemStack | undefi
     for (let slot = 0; slot < contents.length; slot++) {
         const stack = contents[slot];
         if (!stack) continue;
-        // A stack the container is too small to hold is handed to the world rather than dropped.
         if (slot < capacity && guard(`writeSlot:${slot}`, () => container.setItem(slot, stack)).ok) continue;
 
         guard("spawnUnplacedStack", () => fallback.dimension.spawnItem(stack, fallback.center()));
     }
 }
 
-/**
- * Returns the number of stacks still sitting in the source, or undefined when the pair could not
- * be read at all. A cleared source slot is what hands the stack to the destination, so a write
- * that fails after the clear hands the stack back to the world instead of losing it.
- */
 function moveContents(dimensionId: string, from: ChestLocation, to: ChestLocation): number | undefined {
     const source = blockAt(dimensionId, from);
     const destination = blockAt(dimensionId, to);
@@ -648,8 +564,6 @@ export function* sweepPairsJob(): Generator<void, void, unknown> {
 
         const master = blockAt(session.dimensionId, session.master);
         const shadow = blockAt(session.dimensionId, session.shadow);
-        // The pair is gone (broken, exploded or replaced): the engine already dropped whatever the
-        // halves held, so there is nothing left to move.
         if (!isHalf(master) || !isHalf(shadow)) {
             sessions.delete(key);
             processed++;
@@ -685,7 +599,6 @@ export function* sweepPairsJob(): Generator<void, void, unknown> {
         }
 
         const drained = applyMove(planSweep({ shadowViewers: 0, shadowHasItems }), session);
-        // Leftovers mean the master is full; the shadow keeps them until the master has room.
         dropIfIdle(session, key, drained);
 
         processed++;
@@ -703,19 +616,10 @@ export function sweepPairs(): void {
 }
 
 interface PairCells {
-    /** The cell the engine made part 0: the half the pair's items live in. */
     home: ChestLocation;
     other: ChestLocation;
 }
 
-/**
- * The engine builds a multi-block when it places the block, not when a permutation is written over a
- * chest that is already standing there. Writing the two parts by hand only dresses two unrelated
- * blocks in the same id - each keeping the 27-slot block entity it was born with - and the world
- * later cleans that mess up by taking a chest with it. Emptying both cells first is what turns the
- * pair into a fresh placement, and each attempt is checked against the world afterwards, because
- * being handed the permutations is not the same thing as becoming one multi-block.
- */
 function assemblePair(master: Block, shadow: Block, state: CardinalDirection): PairCells | undefined {
     const dimensionId = master.dimension.id;
     const masterCell = cellOf(master);
@@ -732,8 +636,6 @@ function assemblePair(master: Block, shadow: Block, state: CardinalDirection): P
     const filled = readPair(dimensionId, masterCell, shadowCell);
     if (filled) return filled;
 
-    // A fill is not obliged to assemble the parts, so the pair gets one plainer placement attempt -
-    // still over two empty cells, which is what keeps it from dressing two unrelated blocks again.
     clearPairCells(dimensionId, masterCell, shadowCell);
     const placed = blockAt(dimensionId, masterCell);
     if (placed) guard("placePair", () => placed.setPermutation(permutation));
@@ -750,7 +652,6 @@ function clearPairCells(dimensionId: string, masterCell: ChestLocation, shadowCe
     }
 }
 
-/** The engine owns the part order, so the pair is read back out of the world rather than assumed. */
 function readPair(dimensionId: string, masterCell: ChestLocation, shadowCell: ChestLocation): PairCells | undefined {
     const built = blockAt(dimensionId, masterCell);
     const twin = blockAt(dimensionId, shadowCell);
@@ -762,7 +663,6 @@ function readPair(dimensionId: string, masterCell: ChestLocation, shadowCell: Ch
     return home === "master" ? { home: masterCell, other: shadowCell } : { home: shadowCell, other: masterCell };
 }
 
-/** Which of the two cells the engine made part 0, or undefined when the cells are not one pair. */
 export function partHome(masterPart: unknown, shadowPart: unknown): ChestHalf | undefined {
     const built = Number(masterPart);
     const twin = Number(shadowPart);
@@ -783,9 +683,6 @@ function restoreSingles(
     masterContents: (ItemStack | undefined)[],
     shadowContents: (ItemStack | undefined)[]
 ): void {
-    // Each single goes back the way the placer left it, so a failed pair does not spin a chest around.
-    // Both writes are guarded because the contents are already empty and nothing may stop them
-    // from being handed back below.
     guard("restoreMasterSingle", () => master.setPermutation(singlePermutation(masterLatch)));
     guard("restoreShadowSingle", () => shadow.setPermutation(singlePermutation(shadowLatch)));
 
@@ -795,7 +692,6 @@ function restoreSingles(
     console.warn("doubleChest: pairing failed, kept two single chests");
 }
 
-/** Puts stacks back where they came from, dropping them at the block when its container is gone. */
 function handBackContents(block: Block, contents: readonly (ItemStack | undefined)[]): void {
     const container = containerOf(block);
     if (container) {
@@ -813,10 +709,6 @@ function singlePermutation(latch: CardinalDirection): BlockPermutation {
     return BlockPermutation.resolve(SINGLE_CHEST_ID, { [DIRECTION_STATE]: latch });
 }
 
-/**
- * Two singles become one 54-slot pair: the merged contents land in whichever half the engine made
- * part 0 and the other half stays empty, since the pair only fills a half while a player has it open.
- */
 function mergePair(master: Block, shadow: Block, state: CardinalDirection): void {
     const dimensionId = master.dimension.id;
     const masterCell = cellOf(master);
@@ -833,8 +725,6 @@ function mergePair(master: Block, shadow: Block, state: CardinalDirection): void
     const masterLatch = directionStateOf(master) ?? FALLBACK_LATCH.x;
     const shadowLatch = directionStateOf(shadow) ?? FALLBACK_LATCH.x;
 
-    // The assembly replaces both blocks, so their block entities are emptied before the swap to keep
-    // the pair from dropping the stacks the replaced singles still held.
     clearSlots(masterContainer, SINGLE_CHEST_SLOTS);
     clearSlots(shadowContainer, SINGLE_CHEST_SLOTS);
 
@@ -859,30 +749,21 @@ function mergePair(master: Block, shadow: Block, state: CardinalDirection): void
 
     writeSlots(homeContainer, mergeContents(masterContents, shadowContents), home);
 
-    // The other half is a fresh block entity, so anything readable there is a copy the pair carried.
     const otherContainer = containerOf(other);
     if (otherContainer) clearSlots(otherContainer, DOUBLE_CHEST_SLOTS);
 }
 
-/**
- * `Block.isSolid` answers the era's `isBlockNormalCube` question closely: the engine reports a block
- * solid when it is impassable, so a ladder, a fence and a torch leave the lid free while stone and
- * glass do not. It is pre-release surface, which is why the read goes through `guard`.
- */
 function solidAbove(block: Block): boolean {
     const above = guard("cellAbove", () => block.offset({ x: 0, y: 1, z: 0 }));
     if (!above.ok || !above.value) return false;
 
     const aboveBlock = above.value;
-    // A chest is not a normal cube in the era: `renderAsNormalBlock` was false for it, so a vertical
-    // stack of chests never stopped the lower one opening.
     if (aboveBlock.typeId === SINGLE_CHEST_ID || aboveBlock.typeId === DOUBLE_CHEST_ID) return false;
 
     const solid = guard("cellAboveSolid", () => aboveBlock.isSolid);
     return solid.ok && solid.value;
 }
 
-/** The types sharing a horizontal face with this cell, for the placement rule to judge. */
 function neighbourTypeIds(cell: Block): string[] {
     const types: string[] = [];
 
@@ -911,8 +792,6 @@ function chestNeighbours(placed: Block): ChestNeighbour[] {
 function handleChestPlacement(event: PlayerPlaceBlockBeforeEvent): void {
     if (event.permutationToPlace.type.id !== SINGLE_CHEST_ID) return;
 
-    // The event's block is the cell the chest would occupy, so the types sharing a face with it are
-    // the chests the new one would have to live beside.
     if (!planChestPlacement(neighbourTypeIds(event.block))) {
         event.cancel = true;
     }
@@ -925,9 +804,6 @@ function handleChestPlaced(event: PlayerPlaceBlockAfterEvent): void {
     const dimensionId = placed.dimension.id;
     const location: ChestLocation = { x: placed.location.x, y: placed.location.y, z: placed.location.z };
 
-    // The merge empties both halves before the engine overwrites them, so it cannot run until the
-    // placed chest's block entity is readable. Holding the id and the cell keeps no block reference
-    // alive across the tick either.
     system.runTimeout(() => {
         try {
             mergeChestAt(dimensionId, location);
@@ -1004,7 +880,6 @@ function handleInteractWithBlock(event: PlayerInteractWithBlockBeforeEvent): voi
     if (!block) return;
 
     if (block.typeId === SINGLE_CHEST_ID || block.typeId === DOUBLE_CHEST_ID) {
-        // A crouch places the held item against the face instead of opening the container.
         const placing = event.player.isSneaking && event.itemStack !== undefined;
 
         if (chestOpenBlocked({ placing, aboveSolid: solidAbove(block) })) {

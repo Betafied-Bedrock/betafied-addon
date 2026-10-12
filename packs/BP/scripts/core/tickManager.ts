@@ -23,9 +23,6 @@ export class TickManager {
     private masterIntervalId: number | null = null;
     private currentTick: number = 0;
 
-    /**
-     * Registers a recurring task with an interval in ticks and an optional staggered offset.
-     */
     register(id: string, intervalTicks: number, task: TaskCallback, offset?: number): void {
         const validInterval = Math.max(1, Math.floor(intervalTicks));
         const computedOffset = offset !== undefined ? Math.max(0, Math.floor(offset)) : this.tasks.size % validInterval;
@@ -38,9 +35,6 @@ export class TickManager {
         });
     }
 
-    /**
-     * Unregisters a task by its unique identifier.
-     */
     unregister(id: string): void {
         const inFlight = this.inFlightJobs.get(id);
         if (inFlight !== undefined) {
@@ -50,31 +44,18 @@ export class TickManager {
         this.tasks.delete(id);
     }
 
-    /**
-     * Checks if a task is registered.
-     */
     isRegistered(id: string): boolean {
         return this.tasks.has(id);
     }
 
-    /**
-     * Returns the current master tick counter.
-     */
     getCurrentTick(): number {
         return this.currentTick;
     }
 
-    /**
-     * Returns all registered task identifiers.
-     */
     getRegisteredTaskIds(): string[] {
         return Array.from(this.tasks.keys());
     }
 
-    /**
-     * Advances by one tick, executing all tasks scheduled for this tick.
-     * Wrapped in errorReporter boundaries to isolate failures.
-     */
     step(): void {
         const tick = this.currentTick++;
         for (const task of this.tasks.values()) {
@@ -100,9 +81,6 @@ export class TickManager {
         }
     }
 
-    /**
-     * Starts the master tick loop if not already running.
-     */
     start(): void {
         if (this.masterIntervalId !== null) return;
         this.masterIntervalId = system.runInterval(() => {
@@ -110,9 +88,6 @@ export class TickManager {
         }, 1);
     }
 
-    /**
-     * Stops the master tick loop and resets the tick counter.
-     */
     stop(): void {
         if (this.masterIntervalId !== null) {
             system.clearRun(this.masterIntervalId);

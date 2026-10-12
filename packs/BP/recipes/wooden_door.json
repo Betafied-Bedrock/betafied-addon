@@ -2,10 +2,8 @@
   "format_version": "1.20.10",
   "minecraft:recipe_shaped": {
     "description": {
-    "identifier": "bh:wooden_door"
+      "identifier": "minecraft:wooden_door"
     },
-
-    
     "tags": [ "beta_crafting" ],
     "group": "wooden_door",
     "pattern": [
@@ -15,16 +13,16 @@
     ],
     "key": {
       "#": {
-        "item": "minecraft:oak_planks"
+        "tag": "minecraft:planks"
       }
     },
     "unlock": [
       {
-        "item": "minecraft:oak_planks"
+        "tag": "minecraft:planks"
       }
     ],
     "result": {
-      "item": "minecraft:wooden_door",
+      "item": "bh:wooden_door",
       "count": 1
     }
   }

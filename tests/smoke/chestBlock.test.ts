@@ -129,22 +129,20 @@ describe("Classic Item Contract - Beta 1.7.3 chest items", () => {
 
     it("crafts the custom chest block itself", () => {
         // Crafting a vanilla chest would only hand the player an item the inventory sweep converts
-        // a tick later, and a chest placed in that window would not join the pair. Overriding the
-        // vanilla recipe id ensures vanilla chests cannot be crafted on either crafting table.
+        // a tick later, and a chest placed in that window would not join the pair. Vanilla's chest
+        // recipe id is `minecraft:Chest_recipeId`, so that is the id to override — the pack used to
+        // name itself `minecraft:chest`, which left vanilla's own recipe in place beside it.
         const recipe = recipeOf("chest")["minecraft:recipe_shaped"];
         assert.equal(recipe.result.item, "bh:chest");
         assert.equal(
             recipe.description.identifier,
-            "minecraft:chest",
+            "minecraft:Chest_recipeId",
             "the recipe must override vanilla's id rather than sit beside it"
         );
-        assert.ok(
-            recipe.tags.includes("crafting_table"),
-            "the vanilla table has to offer the Beta result too"
-        );
-        assert.ok(
-            recipe.tags.includes("beta_crafting"),
-            "the custom crafting table serves this tag and must keep offering it"
+        assert.deepEqual(
+            recipe.tags,
+            ["beta_crafting"],
+            "the custom crafting table is the only interface the pack's recipes belong to"
         );
         assert.equal(
             recipe.key["#"].tag,

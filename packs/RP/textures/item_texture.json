@@ -25,6 +25,18 @@
 		},
 		"planks_oak": {
 			"textures": "textures/blocks/planks_oak"
+		},
+		"door_wood": {
+			"textures": "textures/items/door_wood"
+		},
+		"door_iron": {
+			"textures": "textures/items/door_iron"
+		},
+		"sign": {
+			"textures": "textures/items/sign"
+		},
+		"cake": {
+			"textures": "textures/items/cake"
 		}
 	}
 }

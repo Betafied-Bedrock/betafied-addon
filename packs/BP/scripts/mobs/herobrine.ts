@@ -14,34 +14,21 @@ import { reportError, runCatching } from "../core/errorReporter.js";
 const ENTITY_ID = "bh:herobrine";
 
 const CONFIG = Object.freeze({
-    /** How often the scheduler wakes up to compare the world clock against its timer. */
     SWEEP_INTERVAL_TICKS: 20,
-    /** Long, quiet first window so a freshly loaded world never opens with an apparition. */
     INITIAL_GAP_MIN_TICKS: 6000,
     INITIAL_GAP_MAX_TICKS: 18000,
-    /** Later windows are re-rolled after each wake-up, so the schedule never settles into a rhythm. */
     GAP_MIN_TICKS: 1200,
     GAP_MAX_TICKS: 7200,
-    /** Deliberately low and entirely flat: no trigger, no escalation, no memory of past sightings. */
     SIGHTING_CHANCE: 0.12,
     MIN_DISTANCE: 12,
     MAX_DISTANCE: 40,
-    /** Widest sideways spread off the player's facing, in radians. Keeps him out of the crosshair. */
     MIN_SPREAD_RADIANS: 0.26,
     MAX_SPREAD_RADIANS: 1.03,
-    /** Any player this close ends the sighting. */
     VANISH_RADIUS: 4.7,
-    /**
-     * No sighting may be placed this close to any player. Kept at or above the vanish radius so a
-     * spawn is never created already doomed to dismiss itself on the next maintenance pass.
-     */
     SPAWN_CLEARANCE: 5,
-    /** The apparition dissolves once nobody is left within this radius. */
     FORGET_RADIUS: 56,
-    /** Hard ceiling so a single sighting never lingers. */
     LIFETIME_TICKS: 600,
     LOOK_RADIUS: 44,
-    /** Cone width, either side of a player's crosshair, that counts as looking straight at him. */
     LOOK_CONE_DEGREES: 30,
     CAVE_VOLUME_MIN: 0.5,
     CAVE_VOLUME_MAX: 0.9,
@@ -59,7 +46,6 @@ const POSES: readonly string[] = Object.freeze([
     "animation.herobrine.sneak"
 ]);
 
-// Distant sightings can sit a fair way above or below the player, so the footing search is wide.
 const FOOTING_OFFSETS: readonly number[] = Object.freeze([0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, -7, -8]);
 
 interface Sighting {
@@ -68,25 +54,13 @@ interface Sighting {
     readonly expiresAtTick: number;
 }
 
-/**
- * Only one apparition may exist at a time across the whole server; multiplayer visibility comes
- * from the fact that every player renders the same entity, not from per-player instances.
- */
 let sighting: Sighting | null = null;
 
-/**
- * Distance for a sighting. Squaring the uniform sample skews the spread hard toward the far end,
- * so most apparitions are distant shapes on the horizon rather than something in the player's face.
- */
 export function pickSightDistance(): number {
     const skew = 1 - Math.random() ** 2;
     return CONFIG.MIN_DISTANCE + skew * (CONFIG.MAX_DISTANCE - CONFIG.MIN_DISTANCE);
 }
 
-/**
- * Randomised gaps are what keep the appearance schedule from ever becoming predictable: the next
- * window is drawn fresh each time instead of accumulating toward a guaranteed appearance.
- */
 export function pickRollDelayTicks(first: boolean): number {
     const min = first ? CONFIG.INITIAL_GAP_MIN_TICKS : CONFIG.GAP_MIN_TICKS;
     const max = first ? CONFIG.INITIAL_GAP_MAX_TICKS : CONFIG.GAP_MAX_TICKS;
@@ -98,7 +72,6 @@ export function facingYaw(from: Vector3, to: Vector3): number {
     return Math.atan2(-(to.x - from.x), to.z - from.z) * (180 / Math.PI);
 }
 
-/** Whether `toTarget` falls inside the look cone around a player's normalised `view` direction. */
 export function isWithinLookCone(view: Vector3, toTarget: Vector3): boolean {
     const length = Math.hypot(toTarget.x, toTarget.y, toTarget.z);
     if (length < 1e-3) return true;
@@ -124,7 +97,6 @@ function isFooting(dimension: Dimension, x: number, y: number, z: number): boole
         if (!ground.isSolid || ground.isLiquid) return false;
         return feet.isAir && head.isAir;
     } catch {
-        // Unloaded chunk or out-of-bounds query
         return false;
     }
 }
@@ -145,10 +117,6 @@ function isSpotVacant(dimension: Dimension, location: Vector3, excludeId: string
     return true;
 }
 
-/**
- * Picks a standable spot off to one side of the target's field of view. Spawning square in front
- * would read as an ambush; a side offset makes him something the player has to notice.
- */
 function pickSpawnLocation(target: Player): Vector3 | null {
     const dimension = target.dimension;
     const origin = target.location;
@@ -246,10 +214,6 @@ function attemptAppearance(target: Player): boolean {
     return true;
 }
 
-/**
- * Forces a sighting outside the normal rarity roll. Used by the operator `/appear` command so the
- * system can be demonstrated without waiting out the timer.
- */
 export function forceAppearance(preferred?: Player): boolean {
     const players = world.getAllPlayers().filter((player) => player.isValid);
     if (players.length === 0) return false;
@@ -268,10 +232,6 @@ function clearSighting(): void {
     sighting = null;
 }
 
-/**
- * Wind-up timer for the next possible sighting, on the world clock. -1 means the first window has
- * not been drawn yet since scripts loaded.
- */
 let nextRollTick = -1;
 
 function rollSweep(): void {
@@ -284,7 +244,6 @@ function rollSweep(): void {
 
     if (now < nextRollTick) return;
 
-    // Consume the window either way: a sighting must never chain straight into the next window.
     nextRollTick = now + pickRollDelayTicks(false);
 
     if (sighting) return;

@@ -22,7 +22,6 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
             task1Runs++;
         }, 0);
 
-        // Task 2: every 20 ticks, offset 5 -> runs at tick 5, 25, 45...
         tickManager.register("task2", 20, () => {
             task2Runs++;
         }, 5);
@@ -30,24 +29,20 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
         assert.equal(tickManager.isRegistered("task1"), true);
         assert.equal(tickManager.isRegistered("task2"), true);
 
-        // Tick 0
         tickManager.step();
         assert.equal(task1Runs, 1);
         assert.equal(task2Runs, 0);
 
-        // Ticks 1 to 4
         for (let i = 1; i <= 4; i++) {
             tickManager.step();
         }
         assert.equal(task1Runs, 1);
         assert.equal(task2Runs, 0);
 
-        // Tick 5
         tickManager.step();
         assert.equal(task1Runs, 1);
         assert.equal(task2Runs, 1);
 
-        // Advance to Tick 20
         for (let i = 6; i <= 20; i++) {
             tickManager.step();
         }
@@ -136,38 +131,30 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
             return longJob();
         }, 0);
 
-        // Tick 0: starts longJob
         tickManager.step();
         assert.equal(runs, 1);
         assert.equal(activeJobs.length, 1);
 
-        // Step once in engine: advances to first yield (before stepCount++)
         (system as any).advanceTicks(1);
         assert.equal(stepCount, 0);
 
-        // Tick 1 (not due)
         tickManager.step();
         assert.equal(runs, 1);
 
-        // Tick 2: Interval fires, but generator is still in flight -> MUST skip invocation!
         tickManager.step();
         assert.equal(runs, 1, "task must not be re-invoked while previous generator is in flight");
 
-        // Step second time: advances past first yield, executes stepCount++, reaches second yield
         (system as any).advanceTicks(1);
         assert.equal(stepCount, 1);
         assert.equal(activeJobs.length, 1);
 
-        // Step third time: completes generator
         (system as any).advanceTicks(1);
         assert.equal(stepCount, 2);
         assert.equal(activeJobs.length, 0);
 
-        // Tick 3 (not due)
         tickManager.step();
         assert.equal(runs, 1);
 
-        // Tick 4: Interval fires again, generator is now completed -> should start a new run
         tickManager.step();
         assert.equal(runs, 2, "task is invoked on next scheduled tick after generator completes");
         assert.equal(activeJobs.length, 1);
@@ -217,22 +204,18 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
             return faultyJob();
         }, 0);
 
-        // Tick 0: starts generator
         tickManager.step();
         assert.equal(invocations, 1);
         assert.equal(activeJobs.length, 1);
 
-        // Tick 1: reaches yield
         (system as any).advanceTicks(1);
         assert.equal(activeJobs.length, 1);
 
-        // Tick 2: resumes and throws, caught by JobRunner, onFinally cleans up
         (system as any).advanceTicks(1);
         assert.equal(activeJobs.length, 0, "failing job is untracked");
 
-        // Tick 2 scheduled interval: task runs again because onFinally cleared in-flight state
-        tickManager.step(); // tick 1
-        tickManager.step(); // tick 2
+        tickManager.step();
+        tickManager.step();
         assert.equal(invocations, 2, "task can run again after previous generator error was handled");
     });
 });

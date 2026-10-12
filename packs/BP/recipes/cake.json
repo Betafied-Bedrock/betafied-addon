@@ -2,7 +2,7 @@
     "format_version": "1.20.10",
     "minecraft:recipe_shaped": {
         "description": {
-            "identifier": "bh:cake"
+            "identifier": "minecraft:cake"
         },
         "tags": [
             "beta_crafting"
@@ -14,8 +14,7 @@
         ],
         "key": {
             "A": {
-                "item": "minecraft:bucket",
-                "data": 1
+                "item": "minecraft:milk_bucket"
             },
             "B": {
                 "item": "minecraft:sugar"
@@ -34,12 +33,11 @@
         ],
         "result": [
             {
-                "item": "minecraft:cake"
+                "item": "bh:cake"
             },
             {
                 "item": "minecraft:bucket",
-                "count": 3,
-                "data": 0
+                "count": 3
             }
         ]
     }

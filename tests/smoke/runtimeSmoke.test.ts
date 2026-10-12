@@ -22,7 +22,6 @@ describe("Bedrock Runtime Smoke Suite - Manifest & Entrypoint Integrity", () => 
         assert.ok(scriptModule, "BP manifest must have a script module");
         assert.equal(scriptModule.entry, "scripts/main.js", "Script entrypoint must be scripts/main.js");
 
-        // Verify @minecraft/server dependency exists with valid version
         const serverDep = manifest.dependencies.find((d: any) => d.module_name === "@minecraft/server");
         assert.ok(serverDep, "BP manifest must declare @minecraft/server dependency");
         assert.ok(serverDep.version, "@minecraft/server dependency must have a version");

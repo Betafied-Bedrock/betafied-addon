@@ -1,0 +1,44 @@
+{
+    "format_version": "1.26.50",
+    "minecraft:block": {
+        "description": {
+            "identifier": "bh:double_wooden_slab"
+        },
+        "components": {
+            "minecraft:geometry": {
+                "identifier": "minecraft:geometry.full_block"
+            },
+            "minecraft:material_instances": {
+                "*": {
+                    "texture": "bh_planks_oak",
+                    "render_method": "opaque"
+                }
+            },
+            "minecraft:collision_box": {
+                "origin": [-8, 0, -8],
+                "size": [16, 16, 16]
+            },
+            "minecraft:selection_box": {
+                "origin": [-8, 0, -8],
+                "size": [16, 16, 16]
+            },
+            "minecraft:destructible_by_mining": {
+                "seconds_to_destroy": 2.0
+            },
+            "minecraft:destructible_by_explosion": {
+                "explosion_resistance": 3
+            },
+            "minecraft:loot": "loot_tables/blocks/double_wooden_slab.json",
+            "minecraft:flammable": {
+                "catch_chance_modifier": 5,
+                "destroy_chance_modifier": 20
+            },
+            "minecraft:map_color": "#B8945F",
+            "minecraft:sound": {
+                "sound": "wood"
+            },
+            "minecraft:display_name": "Wooden Slab",
+            "minecraft:tags": ["stone", "minecraft:is_pickaxe_item_destructible"]
+        }
+    }
+}

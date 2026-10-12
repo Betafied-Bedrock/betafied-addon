@@ -2,9 +2,9 @@
   "format_version": "1.20.10",
   "minecraft:recipe_shaped": {
     "description": {
-      "identifier": "minecraft:chest"
+      "identifier": "minecraft:Chest_recipeId"
     },
-    "tags": [ "crafting_table", "beta_crafting" ],
+    "tags": [ "beta_crafting" ],
     "pattern": [
       "###",
       "# #",

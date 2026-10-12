@@ -422,6 +422,37 @@ describe("Chest relocation helpers", () => {
         assert.deepEqual(plan.moves, [{ from: 0, to: 0 }, { from: 2, to: 2 }]);
     });
 
+    it("keeps a stack where the player left it rather than sliding it up the chest", () => {
+        const plan = planPlacement(
+            [undefined, undefined, "a", undefined, "b"],
+            [undefined, undefined, undefined, undefined, undefined]
+        );
+
+        assert.deepEqual(plan.destination, [undefined, undefined, "a", undefined, "b"]);
+        assert.deepEqual(plan.moves, [{ from: 2, to: 2 }, { from: 4, to: 4 }]);
+    });
+
+    it("survives the whole open-and-close round trip a player would see", () => {
+        const empty: (string | undefined)[] = [undefined, undefined, undefined, undefined, undefined, undefined];
+
+        // The pair's items follow the half the player opens, then come back when the lid closes.
+        const opening = planPlacement(["a", "b", ...empty.slice(2)], [...empty]);
+        const stocked = [...opening.destination];
+        stocked[5] = "c";
+
+        const closing = planPlacement(stocked, opening.source);
+
+        assert.deepEqual(closing.destination, ["a", "b", undefined, undefined, undefined, "c"]);
+        assert.equal(closing.destination[5], "c", "a stack dropped into a far slot must still be there after closing");
+    });
+
+    it("falls back to the lowest free slot when the stack's own slot is taken", () => {
+        const plan = planPlacement(["a", "b"], ["c", undefined, undefined]);
+
+        assert.deepEqual(plan.destination, ["c", "a", "b"]);
+        assert.deepEqual(plan.moves, [{ from: 0, to: 1 }, { from: 1, to: 2 }]);
+    });
+
     it("leaves stacks behind instead of dropping them when the destination is full", () => {
         const plan = planPlacement(["a", "b"], ["c", "d"]);
 

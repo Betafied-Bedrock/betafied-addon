@@ -26,6 +26,8 @@ export function resetMocks(): void {
     mockDynamicProperties.clear();
     for (const dim of dimensions.values()) {
         dim.blocks.clear();
+        dim.particles.length = 0;
+        dim.soundsPlayed.length = 0;
     }
     nextRunId = 1;
 }
@@ -46,6 +48,15 @@ function createEventSignal(registry: Map<string, Function[]>, name: string) {
     };
 }
 
+// Beta forbids stacking the custom foods and the bow; cookies cap at 8. Everything else defaults to
+// the common 64, matching the item JSON the real engine reads for `maxAmount`.
+const MOCK_UNSTACKABLE_IDS = new Set([
+    "bh:apple", "bh:bread", "bh:porkchop", "bh:cooked_porkchop",
+    "bh:cod", "bh:cooked_cod", "bh:golden_apple", "bh:bow",
+    "minecraft:bow", "bh:wooden_door", "bh:iron_door",
+    "bh:oak_sign", "bh:cake"
+]);
+
 export class ItemStack {
     typeId: string;
     amount: number;
@@ -54,6 +65,11 @@ export class ItemStack {
     constructor(typeId: string, amount: number = 1) {
         this.typeId = typeId;
         this.amount = amount;
+    }
+
+    get maxAmount(): number {
+        if (this.typeId === "bh:cookie" || this.typeId === "minecraft:cookie") return 8;
+        return MOCK_UNSTACKABLE_IDS.has(this.typeId) ? 1 : 64;
     }
 
     getComponent(componentId: string) {
@@ -94,6 +110,10 @@ export class BlockPermutation {
         return this.states[key];
     }
 
+    getAllStates(): Record<string, any> {
+        return { ...this.states };
+    }
+
     withState(key: string, value: any): BlockPermutation {
         const next = new BlockPermutation(this.typeId, { ...this.states, [key]: value });
         return next;
@@ -102,6 +122,22 @@ export class BlockPermutation {
     matches(typeId: string): boolean {
         return this.typeId === typeId;
     }
+}
+
+export class MolangVariableMap {
+    readonly variables = new Map<string, number>();
+
+    setFloat(variableName: string, number: number): void {
+        this.variables.set(variableName, number);
+    }
+
+    setColorRGB(_variableName: string, _color: any): void {}
+
+    setColorRGBA(_variableName: string, _color: any): void {}
+
+    setSpeedAndDirection(_variableName: string, _speed: number, _direction: any): void {}
+
+    setVector3(_variableName: string, _vector: any): void {}
 }
 
 export class BlockVolume {
@@ -113,6 +149,15 @@ export class BlockVolume {
         this.to = to;
     }
 }
+
+const FACE_OFFSETS: Readonly<Record<string, { x: number; y: number; z: number }>> = Object.freeze({
+    Down: { x: 0, y: -1, z: 0 },
+    Up: { x: 0, y: 1, z: 0 },
+    North: { x: 0, y: 0, z: -1 },
+    South: { x: 0, y: 0, z: 1 },
+    West: { x: -1, y: 0, z: 0 },
+    East: { x: 1, y: 0, z: 0 }
+});
 
 export class MockDimension {
     readonly id: string;
@@ -126,19 +171,50 @@ export class MockDimension {
         this.blocks.set(`${location.x},${location.y},${location.z}`, blockData);
     }
 
+    setBlockPermutation(location: { x: number; y: number; z: number }, perm: BlockPermutation) {
+        const block = this.getBlock(location);
+        block.setPermutation(perm);
+    }
+
+    setBlockType(location: { x: number; y: number; z: number }, typeId: string) {
+        const block = this.getBlock(location);
+        block.setType(typeId);
+    }
+
     getBlock(location: { x: number; y: number; z: number }) {
         const key = `${location.x},${location.y},${location.z}`;
         if (this.blocks.has(key)) {
             return this.blocks.get(key);
         }
-        return {
+        const block = {
             typeId: "minecraft:stone",
             permutation: BlockPermutation.resolve("minecraft:stone"),
+            location: { ...location },
+            dimension: this,
             isSolid: true,
             isLiquid: false,
-            setType(_typeId: string) {},
-            setPermutation(_perm: BlockPermutation) {}
+            isValid: true,
+            setType(typeId: string) {
+                this.typeId = typeId;
+                this.permutation = BlockPermutation.resolve(typeId);
+            },
+            setPermutation(perm: BlockPermutation) {
+                this.permutation = perm;
+                this.typeId = perm.type.id;
+            },
+            canPlace(_blockToPlace: string, faceToPlaceOn?: string) {
+                const step = FACE_OFFSETS[faceToPlaceOn ?? ""];
+                if (!step) return false;
+                const destination = this.dimension.getBlock({
+                    x: this.location.x + step.x,
+                    y: this.location.y + step.y,
+                    z: this.location.z + step.z
+                });
+                return destination.typeId === "minecraft:air";
+            }
         };
+        this.blocks.set(key, block);
+        return block;
     }
 
     getEntities(_query?: any) {
@@ -176,6 +252,12 @@ export class MockDimension {
         return { id: "mock_item_entity", typeId: "minecraft:item" };
     }
 
+    particles: { effectName: string; location: any; molang?: any }[] = [];
+
+    spawnParticle(effectName: string, location: { x: number; y: number; z: number }, molangVariables?: any) {
+        this.particles.push({ effectName, location, molang: molangVariables });
+    }
+
     soundsPlayed: { soundId: string; location: any; options?: any }[] = [];
 
     playSound(soundId: string, location: any, options?: any) {
@@ -187,13 +269,17 @@ export class MockDimension {
     }
 }
 
+const overworldDim = new MockDimension("minecraft:overworld");
+const netherDim = new MockDimension("minecraft:the_nether");
+const endDim = new MockDimension("minecraft:the_end");
+
 const dimensions = new Map<string, MockDimension>([
-    ["overworld", new MockDimension("minecraft:overworld")],
-    ["nether", new MockDimension("minecraft:the_nether")],
-    ["the_end", new MockDimension("minecraft:the_end")],
-    ["minecraft:overworld", new MockDimension("minecraft:overworld")],
-    ["minecraft:the_nether", new MockDimension("minecraft:the_nether")],
-    ["minecraft:the_end", new MockDimension("minecraft:the_end")]
+    ["overworld", overworldDim],
+    ["nether", netherDim],
+    ["the_end", endDim],
+    ["minecraft:overworld", overworldDim],
+    ["minecraft:the_nether", netherDim],
+    ["minecraft:the_end", endDim]
 ]);
 
 export const world = {
@@ -247,6 +333,7 @@ export const world = {
         blockBreak: createEventSignal(registeredAfterEvents, "blockBreak"),
         entityHurt: createEventSignal(registeredAfterEvents, "entityHurt"),
         entityHitEntity: createEventSignal(registeredAfterEvents, "entityHitEntity"),
+        entityHitBlock: createEventSignal(registeredAfterEvents, "entityHitBlock"),
         playerSpawn: createEventSignal(registeredAfterEvents, "playerSpawn"),
         playerLeave: createEventSignal(registeredAfterEvents, "playerLeave"),
         playerPlaceBlock: createEventSignal(registeredAfterEvents, "playerPlaceBlock"),
@@ -437,6 +524,17 @@ export const ItemComponentTypes = Object.freeze({
     Cooldown: "minecraft:cooldown"
 });
 
+/**
+ * Property identifiers the pack's own entity definitions declare, with the default an unwritten
+ * property reads back as. The engine throws on a write to an identifier the entity type does not
+ * have and returns undefined for one it never declared, so the mock mirrors both: an undeclared
+ * identifier is what tells a pass to leave an entity alone rather than post to it.
+ */
+export const declaredEntityProperties: Map<string, number> = new Map([
+    ["betarock:shadow_span", 1],
+    ["betarock:shadow_alpha", 0.5]
+]);
+
 export class Entity {
     id: string = "mock_entity";
     typeId: string = "minecraft:item";
@@ -445,6 +543,52 @@ export class Entity {
     dimension: any = dimensions.get("minecraft:overworld");
     protected components = new Map<string, any>();
     isRemoved: boolean = false;
+    isOnGround: boolean = true;
+    /** Half-extents the engine would report for this entity; a pig's 0.9 hitbox is 0.45 here. */
+    hitboxExtent: { x: number; y: number; z: number } = { x: 0.45, y: 0.45, z: 0.45 };
+    private effects = new Map<string, { duration: number; options?: any }>();
+    private propertyValues = new Map<string, boolean | number | string>();
+    /** Every property write, in order, because each one is a networked actor update. */
+    propertyWrites: { identifier: string; value: boolean | number | string }[] = [];
+
+    getProperty(identifier: string): boolean | number | string | undefined {
+        return this.propertyValues.get(identifier);
+    }
+
+    resetProperty(identifier: string): boolean | number | string {
+        const defaultVal = declaredEntityProperties.get(identifier);
+        if (defaultVal === undefined) {
+            throw new Error(`resetProperty: ${this.typeId} has no property ${identifier}`);
+        }
+        this.propertyValues.set(identifier, defaultVal);
+        this.propertyWrites.push({ identifier, value: defaultVal });
+        return defaultVal;
+    }
+
+    setProperty(identifier: string, value: boolean | number | string): void {
+        if (!declaredEntityProperties.has(identifier)) {
+            throw new Error(`setProperty: ${this.typeId} has no property ${identifier}`);
+        }
+        this.propertyValues.set(identifier, value);
+        this.propertyWrites.push({ identifier, value });
+    }
+
+    getAABB(): { center: { x: number; y: number; z: number }; extent: { x: number; y: number; z: number } } {
+        return { center: { ...this.location }, extent: { ...this.hitboxExtent } };
+    }
+
+    getEffect(effectType: string): any {
+        const effect = this.effects.get(effectType);
+        return effect ? { typeId: effectType, duration: effect.duration, ...effect.options } : undefined;
+    }
+
+    addEffect(effectType: string, duration: number, options?: any): void {
+        this.effects.set(effectType, { duration, options });
+    }
+
+    removeEffect(effectType: string): boolean {
+        return this.effects.delete(effectType);
+    }
 
     getComponent(typeId: string): any {
         return this.components.get(typeId);
@@ -533,6 +677,10 @@ export class Player extends Entity {
 
     getGameMode(): string {
         return this.gameMode;
+    }
+
+    getRotation() {
+        return { ...this.rotation };
     }
 
     public animationsPlayed: { animationName: string; options?: any }[] = [];

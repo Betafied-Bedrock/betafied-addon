@@ -1,0 +1,284 @@
+{
+    "format_version": "1.26.50",
+    "minecraft:block": {
+        "description": {
+            "identifier": "bh:cake",
+            "menu_category": {
+                "category": "nature",
+                "group": "minecraft:itemGroup.name.miscFood"
+            },
+            "states": {
+                "bh:bites": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ]
+            }
+        },
+        "components": {
+            "minecraft:geometry": {
+                "identifier": "geometry.bh_cake",
+                "bone_visibility": {
+                    "bites_0": "q.block_state('bh:bites') == 0",
+                    "bites_1": "q.block_state('bh:bites') == 1",
+                    "bites_2": "q.block_state('bh:bites') == 2",
+                    "bites_3": "q.block_state('bh:bites') == 3",
+                    "bites_4": "q.block_state('bh:bites') == 4",
+                    "bites_5": "q.block_state('bh:bites') == 5"
+                }
+            },
+            "minecraft:material_instances": {
+                "*": {
+                    "texture": "bh_cake_side",
+                    "render_method": "opaque"
+                },
+                "cake_side": {
+                    "texture": "bh_cake_side",
+                    "render_method": "opaque"
+                },
+                "cake_top": {
+                    "texture": "bh_cake_top",
+                    "render_method": "opaque"
+                },
+                "cake_bottom": {
+                    "texture": "bh_cake_bottom",
+                    "render_method": "opaque"
+                },
+                "cake_cut": {
+                    "texture": "bh_cake_inner",
+                    "render_method": "opaque"
+                },
+                "up": {
+                    "texture": "bh_cake_top",
+                    "render_method": "opaque"
+                },
+                "down": {
+                    "texture": "bh_cake_bottom",
+                    "render_method": "opaque"
+                },
+                "north": {
+                    "texture": "bh_cake_side",
+                    "render_method": "opaque"
+                },
+                "south": {
+                    "texture": "bh_cake_side",
+                    "render_method": "opaque"
+                },
+                "east": {
+                    "texture": "bh_cake_side",
+                    "render_method": "opaque"
+                },
+                "west": {
+                    "texture": "bh_cake_side",
+                    "render_method": "opaque"
+                }
+            },
+            "minecraft:placement_filter": {
+                "conditions": [
+                    {
+                        "allowed_faces": [
+                            "up"
+                        ]
+                    }
+                ]
+            },
+            "minecraft:movable": {
+                "movement_type": "popped"
+            },
+            "minecraft:destructible_by_mining": {
+                "seconds_to_destroy": 0.5
+            },
+            "minecraft:destructible_by_explosion": {
+                "explosion_resistance": 0.5
+            },
+            "minecraft:loot": "loot_tables/blocks/cake.json",
+            "minecraft:map_color": "#000000",
+            "minecraft:sound": {
+                "sound": "cloth"
+            },
+            "minecraft:display_name": "Cake",
+            "minecraft:tags": [
+                "bh:cake"
+            ]
+        },
+        "permutations": [
+            {
+                "condition": "q.block_state('bh:bites') == 0",
+                "components": {
+                    "minecraft:collision_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            14,
+                            7,
+                            14
+                        ]
+                    },
+                    "minecraft:selection_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            14,
+                            8,
+                            14
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('bh:bites') == 1",
+                "components": {
+                    "minecraft:collision_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            12,
+                            7,
+                            14
+                        ]
+                    },
+                    "minecraft:selection_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            12,
+                            8,
+                            14
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('bh:bites') == 2",
+                "components": {
+                    "minecraft:collision_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            10,
+                            7,
+                            14
+                        ]
+                    },
+                    "minecraft:selection_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            10,
+                            8,
+                            14
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('bh:bites') == 3",
+                "components": {
+                    "minecraft:collision_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            8,
+                            7,
+                            14
+                        ]
+                    },
+                    "minecraft:selection_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            8,
+                            8,
+                            14
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('bh:bites') == 4",
+                "components": {
+                    "minecraft:collision_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            6,
+                            7,
+                            14
+                        ]
+                    },
+                    "minecraft:selection_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            6,
+                            8,
+                            14
+                        ]
+                    }
+                }
+            },
+            {
+                "condition": "q.block_state('bh:bites') == 5",
+                "components": {
+                    "minecraft:collision_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            4,
+                            7,
+                            14
+                        ]
+                    },
+                    "minecraft:selection_box": {
+                        "origin": [
+                            -7,
+                            0,
+                            -7
+                        ],
+                        "size": [
+                            4,
+                            8,
+                            14
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+}

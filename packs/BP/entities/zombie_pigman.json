@@ -1,8 +1,12 @@
 {
-  "format_version": "1.13.0",
+  "format_version": "1.21.70",
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:zombie_pigman",
+      "properties": {
+          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.5, "client_sync": true },
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.275, "client_sync": true }
+      },
       "is_spawnable": true,
       "is_summonable": true,
       "is_experimental": false
@@ -43,6 +47,17 @@
     },
 
     "components": {
+      "minecraft:renders_when_invisible": {},
+      "minecraft:spell_effects": {
+        "add_effects": [
+          {
+            "effect": "invisibility",
+            "duration": "infinite",
+            "visible": false
+          }
+        ]
+      },
+      "minecraft:is_hidden_when_invisible": {},
       "minecraft:breathable": {
         "total_supply": 15,
         "suffocate_time": 0,
@@ -50,7 +65,7 @@
       },
       "minecraft:collision_box": {
         "width": 0.6,
-        "height": 1.9
+        "height": 1.8
       },
       "minecraft:nameable": {
       },
@@ -96,7 +111,7 @@
       },
       "minecraft:behavior.melee_attack": {
         "priority": 3,
-        "speed_multiplier": 1.5,
+        "speed_multiplier": 1.9,
         "track_target": false
       },
       "minecraft:behavior.stomp_turtle_egg": {
@@ -107,9 +122,6 @@
         "goal_radius": 1.14,
         "search_count": 4,
         "interval": 20
-      },
-      "minecraft:behavior.move_towards_restriction": {
-        "priority": 5
       },
       "minecraft:behavior.random_stroll": {
         "priority": 7,

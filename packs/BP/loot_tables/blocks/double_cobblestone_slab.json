@@ -1,0 +1,14 @@
+{
+  "pools": [
+    {
+      "rolls": 2,
+      "entries": [
+        {
+          "type": "item",
+          "name": "bh:cobblestone_slab",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,13 +1,28 @@
 {
-  "format_version": "1.21.0",
+  "format_version": "1.21.70",
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:spider",
+      "properties": {
+          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 1.0, "client_sync": true },
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.3875, "client_sync": true }
+      },
       "is_spawnable": true,
       "is_summonable": true,
       "is_experimental": false
     },
     "components": {
+      "minecraft:renders_when_invisible": {},
+      "minecraft:spell_effects": {
+        "add_effects": [
+          {
+            "effect": "invisibility",
+            "duration": "infinite",
+            "visible": false
+          }
+        ]
+      },
+      "minecraft:is_hidden_when_invisible": {},
       "minecraft:type_family": {
         "family": [
           "spider",
@@ -25,15 +40,15 @@
       },
       "minecraft:nameable": {},
       "minecraft:collision_box": {
-        "width": 1.1,
-        "height": 0.7
+        "width": 1.4,
+        "height": 0.9
       },
       "minecraft:health": {
         "value": 16,
         "max": 16
       },
       "minecraft:movement": {
-        "value": 0.3
+        "value": 0.368
       },
       "minecraft:navigation.climb": {
         "can_path_over_water": true
@@ -52,7 +67,7 @@
       },
       "minecraft:behavior.random_stroll": {
         "priority": 6,
-        "speed_multiplier": 0.8
+        "speed_multiplier": 1.0
       },
       "minecraft:behavior.look_at_player": {
         "priority": 7,

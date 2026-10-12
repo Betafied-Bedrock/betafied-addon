@@ -12,20 +12,18 @@ describe("Central EventBus Architecture", () => {
 
         const unsub1 = eventBus.onPlayerInteractWithBlock(() => {
             order.push(1);
-        }, 20); // Priority 20 (runs earlier)
+        }, 20);
 
         const unsub3 = eventBus.onPlayerInteractWithBlock(() => {
             order.push(3);
-        }, 0); // Priority 0 (runs last)
+        }, 0);
 
-        // Dispatch synthetic event
         eventBus.dispatch("playerInteractWithBlock", {
             cancel: false
         });
 
         assert.deepEqual(order, [1, 2, 3], "Handlers must execute in descending priority order");
 
-        // Test unsubscription
         unsub1();
         unsub2();
         unsub3();

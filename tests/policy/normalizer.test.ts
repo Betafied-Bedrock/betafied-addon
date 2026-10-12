@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
     normalizeItem,
     normalizeBlock,
-    normalizeEntityDrop
+    normalizeEntityDrop,
+    resolveHeldItemReplacement,
+    resolvePlacerReplacement
 } from "../../packs/BP/scripts/core/normalizer.js";
 
 describe("Heuristic Inverse Normalizer", () => {
@@ -53,9 +55,24 @@ describe("Heuristic Inverse Normalizer", () => {
             assert.deepEqual(normalizeItem("minecraft:stripped_mangrove_log"), { action: "convert", targetId: "minecraft:oak_log" });
             assert.deepEqual(normalizeItem("minecraft:crimson_stem"), { action: "convert", targetId: "minecraft:oak_log" });
 
-            assert.deepEqual(normalizeItem("minecraft:cherry_door"), { action: "convert", targetId: "minecraft:wooden_door" });
+            assert.deepEqual(normalizeItem("minecraft:cherry_door"), { action: "convert", targetId: "bh:wooden_door" });
             assert.deepEqual(normalizeItem("minecraft:crimson_trapdoor"), { action: "convert", targetId: "minecraft:trapdoor" });
             assert.deepEqual(normalizeItem("minecraft:bamboo_fence"), { action: "convert", targetId: "bh:fence" });
+
+            // Beta cut one sign from any of its three woods and hung signs separately, so every modern
+            // species lands on the pack's single sign rather than a species of its own.
+            assert.deepEqual(normalizeItem("minecraft:cherry_sign"), { action: "convert", targetId: "bh:oak_sign" });
+            assert.deepEqual(normalizeItem("minecraft:crimson_sign"), { action: "convert", targetId: "bh:oak_sign" });
+        });
+
+        it("sends every placer the era capped at one onto its pack item", () => {
+            assert.equal(resolvePlacerReplacement("minecraft:cake"), "bh:cake");
+            assert.equal(resolvePlacerReplacement("minecraft:iron_door"), "bh:iron_door");
+            assert.equal(
+                resolveHeldItemReplacement("minecraft:bucket"),
+                undefined,
+                "the engine's own bucket is already the era's item, so nothing retypes it"
+            );
         });
 
         it("converts modern stone, deepslate, and copper variants", () => {

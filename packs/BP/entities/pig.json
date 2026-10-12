@@ -3,6 +3,10 @@
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:pig",
+      "properties": {
+          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.7, "client_sync": true },
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.3875, "client_sync": true }
+      },
       "spawn_category": "creature",
       "is_spawnable": true,
       "is_summonable": true
@@ -77,6 +81,16 @@
       }
     },
     "components": {
+      "minecraft:renders_when_invisible": {},
+      "minecraft:spell_effects": {
+        "add_effects": [
+          {
+            "effect": "invisibility",
+            "duration": "infinite",
+            "visible": false
+          }
+        ]
+      },
       "minecraft:is_hidden_when_invisible": {},
       "minecraft:damage_sensor": {
         "triggers": {
@@ -128,7 +142,7 @@
         ]
       },
       "minecraft:movement": {
-        "value": 0.2
+        "value": 0.322
       },
       "minecraft:navigation.walk": {
         "can_path_over_water": false,
@@ -163,7 +177,7 @@
       },
       "minecraft:behavior.random_stroll": {
         "priority": 7,
-        "speed_multiplier": 0.8,
+        "speed_multiplier": 1.0,
         "interval": 200
       },
       "minecraft:behavior.look_at_player": {

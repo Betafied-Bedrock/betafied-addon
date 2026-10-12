@@ -10,7 +10,26 @@
 			],
 			"textures": [
 				"texture.default"
-			]
+			],
+			"light_color_multiplier": 0.8,
+			"overlay_color": {
+				"r": "0.0",
+				"g": "0.0",
+				"b": "0.0",
+				"a": "-1.0"
+			},
+			"is_hurt_color": {
+				"r": "0.0",
+				"g": "0.0",
+				"b": "0.0",
+				"a": "-1.0"
+			},
+			"on_fire_color": {
+				"r": "0.0",
+				"g": "0.0",
+				"b": "0.0",
+				"a": "-1.0"
+			}
 		},
 		"controller.render.custom_minecart_fueled": {
 			"geometry": "geometry.fueled",
@@ -21,7 +40,26 @@
 			],
 			"textures": [
 				"texture.default"
-			]
+			],
+			"light_color_multiplier": 0.8,
+			"overlay_color": {
+				"r": "0.0",
+				"g": "0.0",
+				"b": "0.0",
+				"a": "-1.0"
+			},
+			"is_hurt_color": {
+				"r": "0.0",
+				"g": "0.0",
+				"b": "0.0",
+				"a": "-1.0"
+			},
+			"on_fire_color": {
+				"r": "0.0",
+				"g": "0.0",
+				"b": "0.0",
+				"a": "-1.0"
+			}
 		}
 	}
 }

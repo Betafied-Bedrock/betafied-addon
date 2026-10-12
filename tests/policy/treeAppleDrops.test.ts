@@ -33,7 +33,6 @@ describe("Authentic Beta 1.7.3 Leaf Apple Drops Policy", () => {
     it("identifies and prevents apple drops when leaves are broken by a player", () => {
         const dim = world.getDimension("minecraft:overworld") as any;
 
-        // Player breaks an oak leaves block
         eventBus.dispatch("playerBreakBlock", {
             block: { dimension: dim, x: 10, y: 70, z: 20 },
             brokenBlockPermutation: BlockPermutation.resolve("minecraft:oak_leaves")
@@ -56,7 +55,6 @@ describe("Authentic Beta 1.7.3 Leaf Apple Drops Policy", () => {
     it("identifies and prevents apple drops from natural leaf decay near trees", () => {
         const dim = world.getDimension("minecraft:overworld") as any;
 
-        // Simulate tree canopy blocks (leaves adjacent to decaying leaf)
         dim.setBlock({ x: 50, y: 72, z: 50 }, {
             typeId: "minecraft:oak_leaves",
             permutation: BlockPermutation.resolve("minecraft:oak_leaves")
@@ -108,7 +106,6 @@ describe("Authentic Beta 1.7.3 Leaf Apple Drops Policy", () => {
         player.dimension = dim;
         mockPlayers.push(player);
 
-        // Player drops item right in front of them (< 1.5 blocks)
         const appleEntity = new Entity();
         appleEntity.typeId = "minecraft:item";
         appleEntity.location = { x: 200.5, y: 65.2, z: 200.5 };
