@@ -147,8 +147,8 @@ function resolveTarget({ bump, explicit }) {
 function bumpPackageVersion(version) {
   const file = path.join(ROOT, "package.json");
   const source = fs.readFileSync(file, "utf8");
+  if (!/("version":\s*")[^"]*(")/.test(source)) fail("package.json has no version field to bump");
   const replaced = source.replace(/("version":\s*")[^"]*(")/, `$1${version}$2`);
-  if (replaced === source) fail("package.json has no version field to bump");
   fs.writeFileSync(file, replaced);
 }
 

@@ -6,7 +6,6 @@ import {
     Container,
     EntityHealthComponent,
     ItemUseBeforeEvent,
-    PlayerInteractWithBlockBeforeEvent,
     EntityComponentTypes
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
@@ -48,13 +47,6 @@ function buildFoodItems(): Record<string, FoodConfig> {
 
 const FOOD_ITEMS: Readonly<Record<string, FoodConfig>> = Object.freeze(buildFoodItems());
 
-const CAKE_CONFIG = Object.freeze({
-    blockId: "minecraft:cake",
-    healthRestore: 3,
-    maxBites: 6,
-    stateProperty: "bite_counter"
-});
-
 class FoodAndHealth {
     constructor() {
         this.disableNaturalRegeneration();
@@ -78,7 +70,6 @@ class FoodAndHealth {
 
     private registerEventHandlers(): void {
         eventBus.onItemUse(this.handleFoodConsumption.bind(this));
-        eventBus.onPlayerInteractWithBlock(this.handleCakeInteraction.bind(this));
     }
 
     private handleFoodConsumption(event: ItemUseBeforeEvent): void {
@@ -149,51 +140,6 @@ class FoodAndHealth {
         if (foodData.returnContainer && newAmount <= 0) {
             this.tryAddItemToInventory(inventory, new ItemStack(foodData.returnContainer, 1));
         }
-    }
-
-    private handleCakeInteraction(event: PlayerInteractWithBlockBeforeEvent): void {
-        const { player, block } = event;
-        if (!block || block.typeId !== CAKE_CONFIG.blockId) return;
-
-        event.cancel = true;
-
-        system.run(() => {
-            try {
-                if (!player.isValid) return;
-
-                const healthComponent = player.getComponent(EntityComponentTypes.Health);
-                if (!healthComponent) return;
-
-                const currentHealth = healthComponent.currentValue;
-                const maxHealth = healthComponent.defaultValue;
-                const newHealth = Math.min(currentHealth + CAKE_CONFIG.healthRestore, maxHealth);
-
-                if (newHealth > currentHealth) {
-                    healthComponent.setCurrentValue(newHealth);
-                    player.playSound("random.burp", { volume: 0.5, pitch: 1.0 });
-                }
-
-                const stateVal = block.permutation.getState(CAKE_CONFIG.stateProperty);
-                const currentBites = typeof stateVal === "number" ? stateVal : 0;
-                const newBites = currentBites + 1;
-
-                if (newBites < CAKE_CONFIG.maxBites) {
-                    block.setPermutation(
-                        block.permutation.withState(CAKE_CONFIG.stateProperty, newBites)
-                    );
-                } else {
-                    system.runTimeout(() => {
-                        block.setType("minecraft:air");
-                    }, 1);
-                }
-            } catch (e) {
-                reportError({
-                    system: "foodAndHealth",
-                    operation: "updateCakeState",
-                    target: player.name
-                }, e);
-            }
-        });
     }
 
     private tryAddItemToInventory(inventory: Container, itemStack: ItemStack): boolean {

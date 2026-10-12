@@ -16,7 +16,6 @@ export const BH_CRAFTING_TABLE_ID = "bh:crafting_table";
 export const BH_WOODEN_DOOR_ID = "bh:wooden_door";
 export const BH_IRON_DOOR_ID = "bh:iron_door";
 export const BH_SIGN_ID = "bh:oak_sign";
-export const BH_BUCKET_ID = "bh:bucket";
 export const BH_CAKE_ID = "bh:cake";
 
 /**
@@ -36,17 +35,29 @@ export const BETA_DOOR_BLOCK_IDS: ReadonlySet<string> = Object.freeze(
 
 /**
  * Vanilla ids the era capped at one that the pack has to own, because the engine keeps its own stack
- * size for an item it defines natively: the two doors (`ItemDoor`), the sign (`ItemSign`), the bucket
- * (`ItemBucket`) and the cake (`ItemReed`). Each maps onto the pack item that replaces it, so a
- * chest, a drop and a hotbar all end up holding the same capped id.
+ * size for an item it defines natively: the two doors (`ItemDoor`), the sign (`ItemSign`) and the cake
+ * (`ItemReed`). Each maps onto the pack item that replaces it, so a chest, a drop and a hotbar all end
+ * up holding the same capped id.
+ *
+ * `ItemBucket` capped the same way and is the one the pack does not own: filling from a source block
+ * and pouring it back is the engine's own bucket behaviour, which a pack item cannot be given, so that
+ * item stays vanilla and its stack is the sweep's to hold — see `BETA_CAPPED_VANILLA_IDS`.
  */
 export const BETA_CAPPED_ITEM_OF: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:wooden_door": BH_WOODEN_DOOR_ID,
     "minecraft:iron_door": BH_IRON_DOOR_ID,
     "minecraft:oak_sign": BH_SIGN_ID,
-    "minecraft:bucket": BH_BUCKET_ID,
     "minecraft:cake": BH_CAKE_ID
 });
+
+/**
+ * Capped vanilla ids the engine already provides, so the pack leaves the item alone and only the sweep
+ * holds its stack to one. A bucket is the one item whose use is a fluid — the engine's own bucket fills
+ * from a water or lava source and pours it back — which is why the item cannot be the pack's.
+ */
+export const BETA_CAPPED_VANILLA_IDS: ReadonlySet<string> = Object.freeze(new Set([
+    "minecraft:bucket"
+]));
 
 /** The pack items above; every one of them holds a single item per slot. */
 export const BETA_CAPPED_ITEM_IDS: ReadonlySet<string> = Object.freeze(
@@ -76,6 +87,12 @@ export const BETA_HOSTILE_TYPES: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:slime",
     "minecraft:ghast",
     ...BETA_PIGMAN_TYPES
+]));
+
+export const BETA_MOB_TYPES: ReadonlySet<string> = Object.freeze(new Set([
+    "minecraft:player",
+    ...BETA_PASSIVE_TYPES,
+    ...BETA_HOSTILE_TYPES
 ]));
 
 export const BETA_ENTITY_TYPES: ReadonlySet<string> = Object.freeze(new Set([
@@ -145,7 +162,7 @@ export const BETA_ITEM_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:bucket", "minecraft:water_bucket", "minecraft:lava_bucket", "minecraft:milk_bucket",
     "minecraft:snowball", "minecraft:music_disc_13", "minecraft:music_disc_cat", "minecraft:painting", "minecraft:bed",
     "minecraft:oak_sign", "minecraft:wooden_door", "minecraft:iron_door",
-    BH_WOODEN_DOOR_ID, BH_IRON_DOOR_ID, BH_SIGN_ID, BH_BUCKET_ID, BH_CAKE_ID,
+    BH_WOODEN_DOOR_ID, BH_IRON_DOOR_ID, BH_SIGN_ID, BH_CAKE_ID,
     "minecraft:empty_map", "minecraft:filled_map"
 ]));
 
@@ -243,7 +260,7 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:lever", "minecraft:stone_button", "minecraft:stone_pressure_plate", "minecraft:wooden_pressure_plate",
     "minecraft:redstone_torch", "minecraft:unlit_redstone_torch", "minecraft:redstone_wire", "minecraft:repeater",
     "minecraft:piston", "minecraft:sticky_piston", "minecraft:rail", "minecraft:golden_rail", "minecraft:detector_rail",
-    "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door", "minecraft:cake",
+    "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door",
     // Bedrock keeps the oak sign's two blocks under their legacy ids; only the later species carry a
     // wood prefix. Without them the scrubber reads a placed sign as modern terrain and rewrites it to
     // the item id, which is not a block at all — and a wall sign is a second block, not a state.
@@ -252,6 +269,10 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
 
 export function isBetaEntity(typeId: string): boolean {
     return BETA_ENTITY_TYPES.has(typeId);
+}
+
+export function isBetaMob(typeId: string): boolean {
+    return BETA_MOB_TYPES.has(typeId);
 }
 
 export function isBetaItem(itemId: string): boolean {

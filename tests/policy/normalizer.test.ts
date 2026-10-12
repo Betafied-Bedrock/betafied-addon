@@ -68,7 +68,11 @@ describe("Heuristic Inverse Normalizer", () => {
         it("sends every placer the era capped at one onto its pack item", () => {
             assert.equal(resolvePlacerReplacement("minecraft:cake"), "bh:cake");
             assert.equal(resolvePlacerReplacement("minecraft:iron_door"), "bh:iron_door");
-            assert.equal(resolveHeldItemReplacement("minecraft:bucket"), "bh:bucket", "the bucket places nothing, so it resolves from the capped table");
+            assert.equal(
+                resolveHeldItemReplacement("minecraft:bucket"),
+                undefined,
+                "the engine's own bucket is already the era's item, so nothing retypes it"
+            );
         });
 
         it("converts modern stone, deepslate, and copper variants", () => {

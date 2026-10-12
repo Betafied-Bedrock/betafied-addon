@@ -2,7 +2,9 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
-## Unreleased
+## 5.6 — 2026-10-12
+
+5.6 restores authentic door mechanics, unstackable utility items, unified crafting recipes, entity blob shadows, and classic visual lighting.
 
 ### Doors
 
@@ -17,6 +19,7 @@ Notable changes in each Betafied release. Version numbers match the behavior and
 - Changed oak signs, buckets, and cakes to be unstackable.
 - Added Beta-style sign placement for standing and wall signs.
 - Added Beta bucket mechanics so empty buckets scoop liquid source blocks and milk cows.
+- Added authentic multi-bite eating mechanics to placed cakes.
 - Changed sign, bucket, and cake crafting recipes to produce authentic unstackable items.
 - Fixed placed oak signs so they are properly preserved as valid Beta blocks.
 
@@ -30,6 +33,9 @@ Notable changes in each Betafied release. Version numbers match the behavior and
 
 - Added authentic circular entity blob shadows beneath mobs and players.
 - Added authentic face dimming to light source blocks like torches, glowstone, fire, and lava.
+- Added darker sand shading and ambient occlusion to match sandstone.
+- Disabled entity shadow rendering on signs to prevent artificial darkness behind text.
+- Disabled directional lighting on fences to eliminate unnatural vertical shading seams.
 - Enforced deterministic texture alignment across block faces.
 - Disabled frame interpolation on animated water, lava, and fire textures for classic stepped animation.
 - Added classic fast-graphics leaf textures with opaque black backgrounds.

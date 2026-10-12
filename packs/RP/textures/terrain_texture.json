@@ -850,6 +850,18 @@
         "bh_spruce_log_top": {
             "textures": "textures/blocks/log_spruce_top"
         },
+        "bh_cake_bottom": {
+            "textures": "textures/blocks/cake_bottom"
+        },
+        "bh_cake_inner": {
+            "textures": "textures/blocks/cake_inner"
+        },
+        "bh_cake_side": {
+            "textures": "textures/blocks/cake_side"
+        },
+        "bh_cake_top": {
+            "textures": "textures/blocks/cake_top"
+        },
         "bh_chest_side": {
             "textures": "textures/blocks/chest_side"
         },

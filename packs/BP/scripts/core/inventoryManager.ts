@@ -10,7 +10,10 @@ import {
 } from "@minecraft/server";
 import { isInventoryExempt } from "./permissions.js";
 import { reportError } from "./errorReporter.js";
-import { BH_BOW_ID, BETA_CAPPED_ITEM_IDS, BETA_CAPPED_ITEM_OF, isBetaItem, isModItem, isVanillaId } from "./betaRegistry.js";
+import {
+    BH_BOW_ID, BETA_CAPPED_ITEM_IDS, BETA_CAPPED_ITEM_OF, BETA_CAPPED_VANILLA_IDS,
+    isBetaItem, isModItem, isVanillaId
+} from "./betaRegistry.js";
 import { ARMOR_SLOTS } from "./equipmentSlots.js";
 import { normalizeItem, resolvePlacerReplacement, FOOD_CONVERSIONS } from "./normalizer.js";
 import { tickManager } from "./tickManager.js";
@@ -208,6 +211,14 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
 
     if (!isVanillaId(id)) {
         return { type: "keep" };
+    }
+
+    // A bucket is the one capped item the pack does not own, so its stack is held here instead of in an
+    // item JSON: the engine's own bucket is what fills from a source block and pours it back.
+    if (BETA_CAPPED_VANILLA_IDS.has(id)) {
+        return item.amount > 1
+            ? { type: "unstack_utility", targetId: id, totalAmount: item.amount }
+            : { type: "keep" };
     }
 
     if (id === "minecraft:bow") {

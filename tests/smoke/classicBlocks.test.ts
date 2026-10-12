@@ -294,7 +294,21 @@ describe("Classic Recipe Contract - Beta 1.7.3 fence", () => {
             "the custom crafting table is the only interface the pack's recipes belong to"
         );
     });
+
+    it("enables standard ambient occlusion and opaque shading on the fence", () => {
+        const fence = blockOf("fence");
+        const materialInstances = fence.components["minecraft:material_instances"];
+        assert.ok(materialInstances, "fence must declare material_instances");
+
+        const defaultInstance = materialInstances["*"];
+        assert.ok(defaultInstance, "fence must declare default '*' material instance");
+        assert.notEqual(defaultInstance.ambient_occlusion, false, "fence must not disable ambient occlusion (causes glowing appearance)");
+        assert.notEqual(defaultInstance.ambient_occlusion, 0, "fence must not set ambient occlusion to 0");
+        assert.equal(defaultInstance.render_method, "opaque", "fence must use opaque render method");
+        assert.equal(fence.components["minecraft:light_emission"], undefined, "fence must not emit light");
+    });
 });
+
 
 describe("Classic Block Contract - custom block names", () => {
     it("translates every custom block, not just its display name", () => {

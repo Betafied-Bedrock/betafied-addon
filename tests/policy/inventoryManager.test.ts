@@ -195,7 +195,6 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
     describe("Capped Item Unstacking", () => {
         const cappedPairs = [
             ["minecraft:oak_sign", "bh:oak_sign"],
-            ["minecraft:bucket", "bh:bucket"],
             ["minecraft:cake", "bh:cake"]
         ] as const;
 
@@ -220,6 +219,43 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
                 }
             });
         }
+
+        it("holds a vanilla bucket stack to one per slot without changing what the bucket is", () => {
+            // The engine stacks empty buckets to sixteen and its own bucket is the only item that fills
+            // from a source block, so the era's cap is the sweep's to keep rather than an item JSON's.
+            const stacked = evaluateItemAction(new ItemStack("minecraft:bucket", 3));
+
+            assert.equal(stacked.type, "unstack_utility");
+            if (stacked.type === "unstack_utility") {
+                assert.equal(stacked.targetId, "minecraft:bucket", "a retyped bucket could not be filled");
+                assert.equal(stacked.totalAmount, 3);
+            }
+
+            assert.equal(
+                evaluateItemAction(new ItemStack("minecraft:bucket", 1)).type,
+                "keep",
+                "a lone bucket stays the engine's own item"
+            );
+        });
+
+        it("spreads a swept vanilla bucket stack one per slot", () => {
+            const player = new Player();
+            player.name = "BucketSteve";
+            player.id = "bucket_steve_1";
+            player.gameMode = GameMode.Survival;
+
+            const inv = new Container(36);
+            inv.setItem(0, new ItemStack("minecraft:bucket", 3));
+            player.setComponent(EntityComponentTypes.Inventory, { container: inv });
+
+            processInventory(player);
+
+            for (const slot of [0, 1, 2]) {
+                assert.equal(inv.getItem(slot)?.typeId, "minecraft:bucket");
+                assert.equal(inv.getItem(slot)?.amount, 1, `slot ${slot} must hold one bucket`);
+            }
+            assert.equal(inv.getItem(3), undefined);
+        });
 
         it("spreads a swept vanilla sign stack one per slot", () => {
             const player = new Player();

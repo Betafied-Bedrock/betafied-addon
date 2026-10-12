@@ -235,7 +235,7 @@ an old save or a command placed — the same coexistence §4 describes for fence
 would first have to answer which family the full block belongs to, so the two families stay apart
 until someone decides that.
 
-## 10. The era's unstackables are pack items now
+## 10. The era's unstackables are pack items now, except the bucket
 
 Beta 1.7.3 capped a door, a sign, a bucket and a cake at one per slot inside the engine — `ItemDoor`,
 `ItemSign`, `ItemBucket` and `ItemReed` each set their own stack size — so none of them could stack in
@@ -246,18 +246,29 @@ read "doors stack in chests" next to "porkchops don't" — the porkchops are pac
 were not.
 
 Decided and implemented: the crafted result is a pack item — `bh:wooden_door`, `bh:iron_door`,
-`bh:oak_sign`, `bh:bucket`, `bh:cake` — carrying `minecraft:max_stack_size` 1, which the engine
-applies everywhere, so the chest half of the bug is fixed at the engine rather than by a sweep over
-other people's containers. `BETA_CAPPED_ITEM_OF` retypes every held vanilla one onto its pack item,
-splitting a stack as it converts, so the two ids cannot drift apart, and `packs/BP/items` now holds an
-item for every id in that table (asserted by a test, because a capped id with no item JSON would be a
-pickup the sweep throws away).
+`bh:oak_sign`, `bh:cake` — carrying `minecraft:max_stack_size` 1, which the engine applies everywhere,
+so the chest half of the bug is fixed at the engine rather than by a sweep over other people's
+containers. `BETA_CAPPED_ITEM_OF` retypes every held vanilla one onto its pack item, splitting a stack
+as it converts, so the two ids cannot drift apart, and `packs/BP/items` now holds an item for every id
+in that table (asserted by a test, because a capped id with no item JSON would be a pickup the sweep
+throws away).
 
-The placement rules the era applied are enforced for the sign and the bucket, which the engine cannot
-place for the pack (a custom item's `minecraft:block_placer` writes one block, never a wall sign, and
-never a source block's fluid): `interactions/signPlacement.ts` writes the standing or the wall sign the
-way `ItemSign` did, and `interactions/bucketUse.ts` fills from a still source only — the era's metadata
-0, so water on its way somewhere is still refused — and answers a cow the same way `EntityCow` did.
+The bucket is the one of the four the pack does **not** own. It was a pack item (`bh:bucket`, one per
+slot, with `interactions/bucketUse.ts` filling from a still source and milking a cow by hand) and it is
+not any more, because the item's *use* is a fluid: the engine's own bucket is what fills from a water or
+lava source and pours it back, and no custom item can be given that behaviour. With the vanilla item
+back, filling, pouring and milking a cow are all the engine's own — `packs/BP/entities/cow.json` answers
+`bucket:0` with `bucket:1` the way vanilla always did — and the era's cap is the sweep's to keep
+instead of an item JSON's: `BETA_CAPPED_VANILLA_IDS` holds `minecraft:bucket` and
+`inventoryManager.ts` splits a stack of them one per slot, since modern empty buckets stack to sixteen.
+
+What the pack gave up with it, and may want back later: the era refused a *flowing* source (metadata 0
+was a still source; the engine takes either), and the scripted milk answered any cow it was pointed at.
+Both were the reason the item existed, so the removal is the trade, not an oversight.
+
+The placement rules the era applied are still enforced for the sign, which the engine cannot place for
+the pack: a custom item's `minecraft:block_placer` writes one block, never a wall sign, so
+`interactions/signPlacement.ts` writes the standing or the wall sign the way `ItemSign` did.
 
 Still open, all of it engine-dependent and needing an in-game look:
 
@@ -278,20 +289,18 @@ Still open, all of it engine-dependent and needing an in-game look:
 - **Does the cake's `minecraft:block_placer` place on the faces `ItemReed` allowed?** Beta's cake went
   down on any face of a block, which is what the component has to reproduce; it is the one capped item
   whose placement is left entirely to the engine.
-- **Whether a filled vanilla bucket that is emptied comes back as `minecraft:bucket` or as something
-  else.** The sweep retypes whatever empty bucket the engine hands back onto `bh:bucket`, so a
-  momentary vanilla bucket is expected and fine; what needs a look is that water, lava and milk are all
-  covered, since only the empty id appears in `BETA_CAPPED_ITEM_OF`.
-- **The cake recipe's milk ingredient is still spelled the legacy way**, `{"item":
-  "minecraft:bucket", "data": 1}`. Milk buckets remain vanilla items, so the ingredient was left
-  alone; if that spelling no longer resolves, the cake is uncraftable and the ingredient needs to be
-  `minecraft:milk_bucket`.
+- **Whether the empty bucket the engine hands back after a pour is `minecraft:bucket` straight away.**
+  It has to be, now that the id means the engine's own item; a pour that returned a momentary pack item
+  would be a pickup the sweep no longer recognizes.
+- **Whether the swept bucket stack survives the offhand.** A container can be split; the offhand slot
+  cannot, and `sweepStrict` deletes what it cannot split, so an offhand stack of two buckets would lose
+  both. The same hole is open for a door or a sign, and it needs a look before it is called a bug.
 
 Smaller, and deliberate: the wooden door recipe takes the `minecraft:planks` tag, so six planks of
 mixed species craft one door where Beta wanted a single species — the tag and the difference the chest
-recipe already carries. The sign, bucket and cake recipes keep their own `bh:` identifiers and the
-`beta_crafting` tag alone rather than overriding vanilla's recipe ids, so the vanilla crafting table
-can still hand the player a vanilla stack — which the sweep then retypes and splits on pickup.
+recipe already carries. The bucket and cake recipes keep vanilla's ids and the `beta_crafting` tag
+alone, so the bucket they pay is the engine's own item and the cake pays three of them back the way
+Beta's milk buckets came back.
 
 ## 11. Mob boxes and speeds come from the recovered 1.7.3 client, with one calibrated unit
 
@@ -382,7 +391,9 @@ the same visible duplicate. Read from Mojang's sample behavior pack
   so it registered beside vanilla's rather than replacing it. The pack's is now shaped to match, with
   its own ingredient (the carved pumpkin) and the era's yield.
 - The bucket and cake recipes were named `bh:bucket` / `bh:cake` and now take vanilla's ids, matching
-  the doors.
+  the doors. The bucket recipe pays `minecraft:bucket`, the engine's own item, since the pack's copy of
+  it is gone; the cake's milk ingredient was the legacy `{"item": "minecraft:bucket", "data": 1}` and is
+  now `minecraft:milk_bucket`, which is what the engine's bucket draws from a cow.
 
 Recipes the era did not have are disabled the documented way — replacing the recipe with the same id
 and type and setting its tags to `[""]` (Bedrock wiki, `loot/recipes`) — instead of the pack's old

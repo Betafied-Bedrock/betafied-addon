@@ -4,6 +4,7 @@ import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
 import { resolveDropId } from "../core/normalizer.js";
 import { eventBus } from "../core/eventBus.js";
+import { migrateEntity } from "./entityMigration.js";
 
 const recentBrokenLeaves = new Map<string, number>();
 const recentBrokenChests = new Map<string, number>();
@@ -152,6 +153,7 @@ export function sanitizeWorldEntity(entity: Entity | undefined): void {
 eventBus.onEntitySpawn((event) => {
     try {
         sanitizeWorldEntity(event.entity);
+        migrateEntity(event.entity);
     } catch (e) {
         reportError({
             system: "entitySpawnHandler",
@@ -164,6 +166,7 @@ eventBus.onEntitySpawn((event) => {
 eventBus.onEntityLoad((event) => {
     try {
         sanitizeWorldEntity(event.entity);
+        migrateEntity(event.entity);
     } catch (e) {
         reportError({
             system: "entitySpawnHandler",

@@ -4007,8 +4007,14 @@
         "sound": "nether_brick",
         "textures": "red_nether_brick"
     },
+    "red_sand": {
+        "ambient_occlusion_exponent": 1.0,
+        "isotropic": false,
+        "sound": "sand",
+        "textures": "red_sand"
+    },
     "red_sandstone": {
-        "brightness_gamma": 0.7,
+        "ambient_occlusion_exponent": 1.0,
         "isotropic": false,
         "sound": "stone",
         "textures": {
@@ -4122,13 +4128,13 @@
         "blockshape": "invisible"
     },
     "sand": {
-        "brightness_gamma": 0.55,
+        "ambient_occlusion_exponent": 1.0,
         "isotropic": false,
         "sound": "sand",
         "textures": "sand"
     },
     "sandstone": {
-        "brightness_gamma": 0.7,
+        "ambient_occlusion_exponent": 1.0,
         "isotropic": false,
         "sound": "stone",
         "textures": {
@@ -4743,6 +4749,7 @@
         "textures": "suspicious_gravel"
     },
     "suspicious_sand": {
+        "ambient_occlusion_exponent": 1.0,
         "isotropic": false,
         "sound": "suspicious_sand",
         "textures": "suspicious_sand"

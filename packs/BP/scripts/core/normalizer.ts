@@ -204,8 +204,6 @@ export function resolveHeldItemReplacement(id: string): string | undefined {
     if (id === "minecraft:bow") {
         return BH_BOW_ID;
     }
-    // The bucket is the one capped item that places nothing, so it has no placer entry to be found
-    // through and resolves from the capped table instead.
     return resolvePlacerReplacement(id) ?? FOOD_CONVERSIONS[id] ?? BETA_CAPPED_ITEM_OF[id];
 }
 

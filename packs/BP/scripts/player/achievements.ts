@@ -9,7 +9,7 @@ import {
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { BETA_HOSTILE_TYPES, BH_CRAFTING_TABLE_ID } from "../core/betaRegistry.js";
+import { BETA_HOSTILE_TYPES, BH_CAKE_ID, BH_CRAFTING_TABLE_ID } from "../core/betaRegistry.js";
 
 
 const ACH = Object.freeze({
@@ -209,7 +209,7 @@ class AchievementSystem {
                 id.includes("golden_pickaxe") || id.includes("diamond_pickaxe")) hasStonePick = true;
             if (id === "minecraft:leather") hasLeather = true;
             if (id === "minecraft:bread" || id === "bh:bread") hasBread = true;
-            if (id === "minecraft:cake") hasCake = true;
+            if (id === BH_CAKE_ID) hasCake = true;
             if (id === "minecraft:cooked_cod" || id === "bh:cooked_cod") hasFish = true;
             if (id === "minecraft:furnace") hasFurnace = true;
             if (id === "minecraft:iron_ingot") hasIron = true;

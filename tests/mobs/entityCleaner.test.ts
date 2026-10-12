@@ -74,4 +74,22 @@ describe("EntityCleaner Batching & Lifetime Safety", () => {
         const step3 = job.next();
         assert.equal(step3.done, true);
     });
+
+    it("migrates uninitialized properties and effects on nearby Beta mobs", () => {
+        const overworld = world.getDimension("minecraft:overworld") as any;
+        const player = new Player("test_player");
+        player.dimension = overworld;
+        mockPlayers.push(player);
+
+        const cow = overworld.spawnEntity("minecraft:cow", { x: 0, y: 64, z: 0 });
+        assert.equal(cow.getProperty("betarock:shadow_span"), undefined);
+        assert.equal(cow.getEffect("invisibility"), undefined);
+
+        const job = cleanerJob();
+        while (!job.next().done) {}
+
+        assert.equal(cow.getProperty("betarock:shadow_span"), 1);
+        assert.ok(cow.getEffect("invisibility"));
+    });
 });
+

@@ -172,9 +172,11 @@ describe("Classic Recipe Contract - one crafting interface", () => {
     });
 
     it("never offers the vanilla item a pack item replaces", () => {
+        // The bucket is deliberately absent: it stays the engine's own item, so a recipe handing one
+        // back — the cake returns the three its milk came in — is the era's behaviour, not a leak.
         const replaced = new Set([
             "minecraft:chest", "minecraft:wooden_door", "minecraft:iron_door", "minecraft:sign",
-            "minecraft:oak_sign", "minecraft:bucket", "minecraft:cake"
+            "minecraft:oak_sign", "minecraft:cake"
         ]);
 
         for (const recipe of all) {

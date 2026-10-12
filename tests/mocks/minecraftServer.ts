@@ -54,7 +54,7 @@ const MOCK_UNSTACKABLE_IDS = new Set([
     "bh:apple", "bh:bread", "bh:porkchop", "bh:cooked_porkchop",
     "bh:cod", "bh:cooked_cod", "bh:golden_apple", "bh:bow",
     "minecraft:bow", "bh:wooden_door", "bh:iron_door",
-    "bh:oak_sign", "bh:bucket", "bh:cake"
+    "bh:oak_sign", "bh:cake"
 ]);
 
 export class ItemStack {
@@ -150,6 +150,15 @@ export class BlockVolume {
     }
 }
 
+const FACE_OFFSETS: Readonly<Record<string, { x: number; y: number; z: number }>> = Object.freeze({
+    Down: { x: 0, y: -1, z: 0 },
+    Up: { x: 0, y: 1, z: 0 },
+    North: { x: 0, y: 0, z: -1 },
+    South: { x: 0, y: 0, z: 1 },
+    West: { x: -1, y: 0, z: 0 },
+    East: { x: 1, y: 0, z: 0 }
+});
+
 export class MockDimension {
     readonly id: string;
     public blocks = new Map<string, any>();
@@ -192,6 +201,16 @@ export class MockDimension {
             setPermutation(perm: BlockPermutation) {
                 this.permutation = perm;
                 this.typeId = perm.type.id;
+            },
+            canPlace(_blockToPlace: string, faceToPlaceOn?: string) {
+                const step = FACE_OFFSETS[faceToPlaceOn ?? ""];
+                if (!step) return false;
+                const destination = this.dimension.getBlock({
+                    x: this.location.x + step.x,
+                    y: this.location.y + step.y,
+                    z: this.location.z + step.z
+                });
+                return destination.typeId === "minecraft:air";
             }
         };
         this.blocks.set(key, block);
@@ -533,8 +552,17 @@ export class Entity {
     propertyWrites: { identifier: string; value: boolean | number | string }[] = [];
 
     getProperty(identifier: string): boolean | number | string | undefined {
-        if (this.propertyValues.has(identifier)) return this.propertyValues.get(identifier);
-        return declaredEntityProperties.get(identifier);
+        return this.propertyValues.get(identifier);
+    }
+
+    resetProperty(identifier: string): boolean | number | string {
+        const defaultVal = declaredEntityProperties.get(identifier);
+        if (defaultVal === undefined) {
+            throw new Error(`resetProperty: ${this.typeId} has no property ${identifier}`);
+        }
+        this.propertyValues.set(identifier, defaultVal);
+        this.propertyWrites.push({ identifier, value: defaultVal });
+        return defaultVal;
     }
 
     setProperty(identifier: string, value: boolean | number | string): void {

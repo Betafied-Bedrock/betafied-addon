@@ -1,13 +1,23 @@
 /**
  * Beta 1.7.3's `ItemSign`: the underside of a block was refused, the top face put a standing sign up
  * with the placing player's rotation, and every other face hung a wall sign off the block that was
- * clicked. Bedrock keeps those as two different native blocks and the vanilla sign item places them
- * itself, so the pack's sign places its own — the numbers below are the era's, whose aux table maps
- * straight onto `ground_sign_direction` and `facing_direction`.
+ * clicked. Bedrock keeps those as two different native blocks, and the numbers below are the era's,
+ * whose aux table maps straight onto `ground_sign_direction` and `facing_direction`.
  *
- * Only the empty cell is written and only the pack's sign triggers this, so a sign never takes the
- * place of what a player built, and the interaction is cancelled just for the placements the era
- * would have made — clicking a chest while holding a sign still opens the chest.
+ * Only one of the two can be the item's, because `minecraft:block_placer` names a single block — and
+ * that block has to be the standing sign, since the engine placing it is the only thing that raises
+ * the sign editor, which no script API can open. A wall click is therefore left to place that standing
+ * sign as well, and the tick after, the cell is rehung as the era's wall sign; the editor the engine
+ * opened names that same cell, so the text the player types is written to the sign it ends up holding.
+ *
+ * The era had no sign editing to go back to: `BlockSign.onBlockActivated` answered false, so a click on
+ * a sign that was already standing only ever fell through to whatever was in hand, while the engine
+ * answers the same click with its sign editor. That editor is swallowed here, silently, unless the
+ * click is a block the engine will still put up against the sign — the one interaction the era had.
+ *
+ * Only a cell the sign can take is written, and only the pack's sign triggers this, so a sign never
+ * takes the place of what a player built, and the interaction is cancelled just for the placements the
+ * era would have made — clicking a chest while holding a sign still opens the chest.
  */
 
 import {
@@ -20,7 +30,7 @@ import {
     system,
     world
 } from "@minecraft/server";
-import type { PlayerInteractWithBlockBeforeEvent } from "@minecraft/server";
+import type { Block, ItemStack, PlayerInteractWithBlockBeforeEvent } from "@minecraft/server";
 import { BH_SIGN_ID } from "../core/betaRegistry.js";
 import { eventBus } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
@@ -29,6 +39,9 @@ const AIR_ID = "minecraft:air";
 const STANDING_SIGN_ID = "minecraft:standing_sign";
 const WALL_SIGN_ID = "minecraft:wall_sign";
 const PLACE_SOUND = "use.wood";
+
+/** The two blocks the engine opens its sign editor on. */
+const SIGN_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([STANDING_SIGN_ID, WALL_SIGN_ID]));
 
 export interface Cell {
     readonly x: number;
@@ -127,46 +140,116 @@ function plannedSign(player: Player, clicked: Cell, face: Direction): PlannedSig
     return { cell, blockId: plan.blockId, states: plan.states };
 }
 
-function placeSign(player: Player, planned: PlannedSign, dimensionId: string): void {
-    if (!player.isValid || !heldSign(player)) return;
-
+/**
+ * The wall sign the era wanted at `planned.cell`, the tick after the click — a before-event cannot
+ * touch the world, and the engine's own placement needs the click itself to raise the editor.
+ */
+function settleWallSign(player: Player, planned: PlannedSign, dimensionId: string): void {
     const dimension = world.getDimension(dimensionId);
     const target = dimension.getBlock(planned.cell);
+    if (!target) return;
 
-    // The cell is checked again because the world may have moved since the click; a sign that is no
-    // longer wanted leaves the held item in hand.
-    if (!target || target.typeId !== AIR_ID) return;
+    // The engine hung the wall sign itself, which is what the placer names on a face it can hang from.
+    if (target.typeId === WALL_SIGN_ID) return;
+
+    // Otherwise the engine put its standing sign in the cell and opened the editor on it, so the cell
+    // is rehung in place rather than rebuilt: an empty cell means the engine refused the face and the
+    // sign is still the player's to write with.
+    if (target.typeId === STANDING_SIGN_ID) {
+        target.setPermutation(BlockPermutation.resolve(planned.blockId, planned.states));
+        return;
+    }
+
+    // Anything else in the cell is a build, not a sign.
+    if (target.typeId !== AIR_ID) return;
+    if (!player.isValid || !heldSign(player)) return;
 
     dimension.setBlockPermutation(planned.cell, BlockPermutation.resolve(planned.blockId, planned.states));
     player.playSound(PLACE_SOUND, { volume: 1.0, pitch: 0.8 });
     consumeHeldSign(player);
 }
 
-eventBus.onPlayerInteractWithBlock((event: PlayerInteractWithBlockBeforeEvent) => {
-    const { block, blockFace, itemStack, player } = event;
-    if (!block || !itemStack || itemStack.typeId !== BH_SIGN_ID) return;
-    if (!heldSign(player)) return;
+/**
+ * The era's own sign, in hand. Returns whether the click was the era's at all: the underside was
+ * refused, and a cell that is taken is a click the era placed nothing on, which leaves the click to
+ * whatever else it can do — a chest still opens while a sign is held.
+ */
+function routeEraSign(
+    event: PlayerInteractWithBlockBeforeEvent,
+    player: Player,
+    block: Block,
+    face: Direction
+): boolean {
+    if (face === Direction.Down) {
+        // `ItemSign` refused the underside, and the item's own placer would take it: a standing sign
+        // hung under the block it was used on.
+        event.cancel = true;
+        return true;
+    }
 
     const clicked: Cell = { x: block.location.x, y: block.location.y, z: block.location.z };
+    const planned = plannedSign(player, clicked, face);
+    if (!planned) return false;
+
     const dimension = block.dimension;
-    const planned = plannedSign(player, clicked, blockFace);
-    if (!planned) return;
+    const open = runCatching(
+        { system: "signPlacement", operation: "readSignCell", target: `${planned.cell.x},${planned.cell.y},${planned.cell.z}` },
+        () => {
+            const target = dimension.getBlock(planned.cell);
+            return target !== undefined && target.typeId === AIR_ID;
+        }
+    );
+    if (open !== true) return false;
 
-    const target = dimension.getBlock(planned.cell);
-    if (!target || target.typeId !== AIR_ID) return;
+    // The top face belongs to the engine: it writes the block the item names with the rotation its own
+    // table gives — `standingSignDirection` above is the era's version of that same table.
+    if (planned.blockId === STANDING_SIGN_ID) return true;
 
-    event.cancel = true;
-
-    // A before-event cannot write to the world, so the sign goes up on the next tick.
+    // A wall sign cannot be: the engine places the standing sign in the cell the era hung one in, and
+    // the deferred pass rehangs it there. Cancelling this click instead would suppress the placement,
+    // and with it the editor.
     system.run(() => {
         try {
-            placeSign(player, planned, dimension.id);
+            settleWallSign(player, planned, dimension.id);
         } catch (e) {
             reportError({
                 system: "signPlacement",
-                operation: "placeSign",
+                operation: "settleWallSign",
                 target: `${planned.cell.x},${planned.cell.y},${planned.cell.z}`
             }, e);
         }
     });
+
+    return true;
+}
+
+/**
+ * Whether this click is a block placement the engine will make. A use that places nothing is the one
+ * the engine answers with the sign editor, and the era had no editor at all, so a placement is the
+ * only reason a click on a sign is kept. `canPlace` is the engine's own verdict on the block the item
+ * names against this face, and no stable member answers that question.
+ */
+function placesABlock(block: Block, face: Direction, itemStack?: ItemStack): boolean {
+    if (!itemStack) return false;
+
+    return runCatching(
+        { system: "signPlacement", operation: "canPlace", target: `${itemStack.typeId}@${block.typeId}` },
+        () => block.canPlace(itemStack.typeId, face)
+    ) ?? false;
+}
+
+eventBus.onPlayerInteractWithBlock((event: PlayerInteractWithBlockBeforeEvent) => {
+    const { block, blockFace, itemStack, player } = event;
+    if (!block) return;
+
+    // The pack's own sign in hand is the era's placement, and every click it makes is this module's.
+    if (itemStack?.typeId === BH_SIGN_ID && heldSign(player) && routeEraSign(event, player, block, blockFace)) {
+        return;
+    }
+
+    // No editing, then. The engine opens its sign editor for any click on a sign that places nothing,
+    // and the editor is the one thing this file has to keep the era from.
+    if (SIGN_BLOCK_IDS.has(block.typeId) && !placesABlock(block, blockFace, itemStack)) {
+        event.cancel = true;
+    }
 });

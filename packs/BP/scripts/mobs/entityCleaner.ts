@@ -4,6 +4,7 @@ import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
 import { resolveDropId } from "../core/normalizer.js";
 import { tickManager } from "../core/tickManager.js";
+import { migrateEntity } from "./entityMigration.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 100,
@@ -46,6 +47,8 @@ export function* cleanerJob(): Generator<void, void, unknown> {
                             dim.spawnItem(new ItemStack(finalId, amount), loc);
                         }
                     }
+                } else {
+                    migrateEntity(ent);
                 }
 
                 processed++;

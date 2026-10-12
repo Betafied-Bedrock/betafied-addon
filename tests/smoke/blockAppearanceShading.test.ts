@@ -70,4 +70,35 @@ describe("Block Appearance & Shading Contract", () => {
             assert.ok(existsSync(resolve(root, path)), `missing ${path}`);
         }
     });
+
+    it("matches Sand ambient occlusion and shading to Sandstone", () => {
+        const blocks = readJson("packs/RP/blocks.json");
+        const sandBlocks = ["sand", "red_sand", "suspicious_sand"];
+
+        for (const id of sandBlocks) {
+            const block = blocks[id];
+            assert.ok(block, `missing block definition for ${id}`);
+            assert.equal(
+                block.ambient_occlusion_exponent,
+                1.0,
+                `${id} must have ambient_occlusion_exponent set to 1.0 to match Sandstone`
+            );
+            assert.equal(
+                block.brightness_gamma,
+                undefined,
+                `${id} must not carry legacy brightness_gamma`
+            );
+        }
+
+        const sandstoneBlocks = ["sandstone", "red_sandstone"];
+        for (const id of sandstoneBlocks) {
+            const block = blocks[id];
+            assert.ok(block, `missing block definition for ${id}`);
+            assert.equal(
+                block.brightness_gamma,
+                undefined,
+                `${id} must not carry legacy brightness_gamma`
+            );
+        }
+    });
 });

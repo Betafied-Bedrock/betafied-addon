@@ -14,8 +14,7 @@
         ],
         "key": {
             "A": {
-                "item": "minecraft:bucket",
-                "data": 1
+                "item": "minecraft:milk_bucket"
             },
             "B": {
                 "item": "minecraft:sugar"
@@ -37,7 +36,7 @@
                 "item": "bh:cake"
             },
             {
-                "item": "bh:bucket",
+                "item": "minecraft:bucket",
                 "count": 3
             }
         ]
