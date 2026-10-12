@@ -12,11 +12,7 @@ import { runCatching } from "../core/errorReporter.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
 import { isBetaItem, isVanillaId } from "../core/betaRegistry.js";
 
-// Beta 1.7.3 ItemArmor.damageReduceAmountArray is indexed by slot, not by material: a fresh
-// leather piece absorbs exactly as much as a fresh diamond piece of the same slot. The tier only
-// scales maxDurability (maxDamageArray[slot] * 3 << tier), so better armor lasts longer rather
-// than protecting more. The material-specific point table (leather 7, gold 11, chain 12, iron 15,
-// diamond 20) is the post-1.9 overhaul and never applied to 1.7.3.
+// Beta 1.7.3 base armor points are slot-indexed rather than material-indexed.
 const ARMOR_POINTS_BY_SLOT: Readonly<Record<string, number>> = Object.freeze({
     helmet: 3,
     cap: 3,
@@ -72,9 +68,6 @@ export function getBaseArmorPoints(typeId: string): number {
     const colonIdx = typeId.indexOf(":");
     const baseName = colonIdx >= 0 ? typeId.substring(colonIdx + 1) : typeId;
 
-    // A vanilla id that reaches this point is not authentic Beta armor (netherite, turtle), so it
-    // gets no points; the slot lookup also serves third-party addon armor, which cannot be
-    // enumerated here. Applying it to a stripped vanilla id would contradict the registry.
     if (isVanillaId(typeId) && !isBetaItem(typeId)) return 0;
 
     return slotArmorPoints(baseName);

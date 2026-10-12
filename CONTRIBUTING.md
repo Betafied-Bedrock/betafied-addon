@@ -61,7 +61,7 @@ npm install
 
 ### 3. Install Regolith Filters
 
-Betafied uses Regolith filters (such as `ts_transpiler` and `agents_md_strip`) to process TypeScript and package add-ons:
+Betafied uses Regolith filters (such as `ts_transpiler`) to process TypeScript add-ons:
 
 ```bash
 npm run install-filters

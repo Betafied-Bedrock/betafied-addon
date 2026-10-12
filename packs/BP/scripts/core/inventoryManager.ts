@@ -10,7 +10,7 @@ import {
 } from "@minecraft/server";
 import { isInventoryExempt } from "./permissions.js";
 import { reportError } from "./errorReporter.js";
-import { BH_BOW_ID, isBetaItem, isModItem, isVanillaId } from "./betaRegistry.js";
+import { BH_BOW_ID, BETA_CAPPED_ITEM_IDS, BETA_CAPPED_ITEM_OF, isBetaItem, isModItem, isVanillaId } from "./betaRegistry.js";
 import { ARMOR_SLOTS } from "./equipmentSlots.js";
 import { normalizeItem, resolvePlacerReplacement, FOOD_CONVERSIONS } from "./normalizer.js";
 import { tickManager } from "./tickManager.js";
@@ -19,24 +19,12 @@ import { eventBus } from "./eventBus.js";
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 1,
     PLAYERS_PER_TICK: 2,
-    // The engine announces an inventory change, so the sweep no longer has to assume every player's
-    // inventory moved on every tick. These two intervals are the safety nets behind that signal: the
-    // item-change event reports the main inventory and hotbar but not the equipment slots, and neither
-    // net has to be fast because it only backstops a signal that already fired immediately.
     EQUIPMENT_SWEEP_INTERVAL: 5,
     FULL_SWEEP_INTERVAL: 20,
     MESSAGE_COOLDOWN: 60,
     REMOVE_MSG: "§c[Betafied] §7That item doesn't exist in Beta 1.7.3!",
     ENCHANT_MSG: "§c[Betafied] §7Enchantments removed! Beta 1.7.3 had no enchanting."
 });
-
-const UNSTACKABLE_UTILITIES: Readonly<Set<string>> = Object.freeze(new Set([
-    "minecraft:wooden_door",
-    "minecraft:iron_door",
-    "minecraft:oak_sign",
-    "minecraft:bucket",
-    "minecraft:cake"
-]));
 
 const BH_FOOD_IDS: ReadonlySet<string> = Object.freeze(new Set(Object.values(FOOD_CONVERSIONS)));
 
@@ -54,16 +42,11 @@ const EQUIPMENT_SLOTS: readonly EquipmentSlot[] = Object.freeze([
 
 type SlotKey = number | EquipmentSlot;
 
-/**
- * The inventory indexes its slots by number and the equipment by slot name, but the sweep does the same
- * work to either, so it is written once against this and the container is chosen once per player.
- */
 interface SlotAccessor {
     readonly keys: readonly SlotKey[];
     readonly label: string;
     get(key: SlotKey): ItemStack | undefined;
     set(key: SlotKey, item: ItemStack | undefined): void;
-    /** Only the inventory can split a stack; an equipped stack is cleared instead. */
     split?(key: SlotKey, targetId: string, amount: number): void;
 }
 
@@ -71,8 +54,6 @@ function inventorySlots(player: Player): SlotAccessor | undefined {
     const container = player.getComponent(EntityComponentTypes.Inventory)?.container;
     if (!container) return undefined;
 
-    // `size` is a live native getter, and this sweep runs for every player every tick; reading it per
-    // iteration made the loop condition itself a native call.
     const keys = Array.from({ length: container.size }, (_, index) => index);
 
     return {
@@ -108,11 +89,6 @@ function sweepPlacers(accessor?: SlotAccessor): void {
     }
 }
 
-/**
- * The exempt half of the equipment sweep, split out so it can be polled on its own cadence: the
- * item-change event never reports the equipment slots, so they still need a tick-based poll while the
- * main inventory does not.
- */
 export function processExemptInventory(player: Player): void {
     sweepPlacers(inventorySlots(player));
     processExemptEquipment(player);
@@ -122,9 +98,6 @@ export function processExemptEquipment(player: Player): void {
     sweepPlacers(equipmentSlots(player));
 }
 
-// Players whose inventory the engine reported as changed since the last sweep. Reading all 36 slots of
-// every player on every tick was the single largest cost in the server tick profile once the chunk
-// scrubber was fixed; the engine already knows when an inventory moves, so the sweep rides that.
 const dirtyInventories = new Set<string>();
 
 export function markInventoryDirty(playerId: string): void {
@@ -138,7 +111,6 @@ function sweepPlayer(player: Player, fullSweep: boolean, equipmentSweep: boolean
 
     previousExemptionState.set(player.id, isExempt);
 
-    // A full sweep already covers the equipment slots, so it subsumes the equipment cadence.
     const dirty = dirtyInventories.delete(player.id);
     const sweepAll = dirty || exemptionFlipped || fullSweep;
 
@@ -148,8 +120,6 @@ function sweepPlayer(player: Player, fullSweep: boolean, equipmentSweep: boolean
         return;
     }
 
-    // A player who just lost the tag gets their message cooldown cleared, so the first item the sweep
-    // removes tells them why instead of staying silent.
     if (wasExempt) msgCooldowns.delete(player.id);
 
     if (sweepAll) processInventory(player);
@@ -161,9 +131,6 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
     const fullSweep = tick % CONFIG.FULL_SWEEP_INTERVAL === 0;
     const equipmentSweep = tick % CONFIG.EQUIPMENT_SWEEP_INTERVAL === 0;
 
-    // Enumerating players and reading each gamemode is itself native work, so an idle tick - nothing
-    // reported dirty and no cadence due - returns before either call, rather than running them only
-    // to find no inventory to look at.
     if (!fullSweep && !equipmentSweep && dirtyInventories.size === 0) return;
 
     let processed = 0;
@@ -190,7 +157,7 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
 export function processPlayers(): void {
     const job = inventorySweepJob();
     while (!job.next().done) {
-        // Drain synchronously for test harnesses or explicit sweeps
+        // Drain synchronously
     }
 }
 
@@ -251,15 +218,23 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
 
     const placerTarget = resolvePlacerReplacement(id);
     if (placerTarget) {
+        // A door, a sign or a cake carries the era's limit of one in its own JSON, so a vanilla stack
+        // has to come apart as it retypes; every other placer target keeps its count.
+        if (item.amount > 1 && BETA_CAPPED_ITEM_IDS.has(placerTarget)) {
+            return { type: "unstack_utility", targetId: placerTarget, totalAmount: item.amount };
+        }
         return { type: "replace", item: new ItemStack(placerTarget, item.amount) };
+    }
+
+    const cappedItem = BETA_CAPPED_ITEM_OF[id];
+    if (cappedItem !== undefined) {
+        return item.amount > 1
+            ? { type: "unstack_utility", targetId: cappedItem, totalAmount: item.amount }
+            : { type: "replace", item: new ItemStack(cappedItem, item.amount) };
     }
 
     if (FOOD_CONVERSIONS[id]) {
         return { type: "unstack_food", convertedId: FOOD_CONVERSIONS[id], totalAmount: item.amount };
-    }
-
-    if (UNSTACKABLE_UTILITIES.has(id) && item.amount > 1) {
-        return { type: "unstack_utility", targetId: id, totalAmount: item.amount };
     }
 
     const norm = normalizeItem(id);
@@ -337,8 +312,6 @@ function sweepStrict(player: Player, accessor?: SlotAccessor): { removed: boolea
                 break;
             case "unstack_food":
             case "unstack_utility":
-                // Beta forbade stacking these, so the excess is split out where the slot allows it and
-                // dropped where it does not, rather than left as the stack the era never had.
                 if (!accessor.split) {
                     accessor.set(key, undefined);
                     removed = true;
@@ -360,16 +333,10 @@ function reportSweep(player: Player, { removed, stripped }: { removed: boolean; 
 }
 
 export function processInventory(player: Player): void {
-    // The inventory half reports first on purpose: the message cooldown is per player, so this keeps
-    // the inventory's message the one that reaches the player when both halves trip.
     reportSweep(player, sweepStrict(player, inventorySlots(player)));
     processEquipment(player);
 }
 
-/**
- * The strict half of the equipment sweep, split out so the equipment slots can be polled on their own
- * cadence while the main inventory rides the item-change event.
- */
 export function processEquipment(player: Player): void {
     reportSweep(player, sweepStrict(player, equipmentSlots(player)));
 }

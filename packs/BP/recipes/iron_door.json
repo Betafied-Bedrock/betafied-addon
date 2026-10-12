@@ -2,10 +2,8 @@
   "format_version": "1.20.10",
   "minecraft:recipe_shaped": {
     "description": {
-    "identifier": "bh:iron_door"
+      "identifier": "minecraft:iron_door"
     },
-
-    
     "tags": [ "beta_crafting" ],
     "pattern": [
       "##",
@@ -17,14 +15,14 @@
         "item": "minecraft:iron_ingot"
       }
     },
-	"unlock": [
-        {
-          "item": "minecraft:iron_ingot"
-        }
+    "unlock": [
+      {
+        "item": "minecraft:iron_ingot"
+      }
     ],
     "result": {
-      "item": "minecraft:iron_door",
-      "count": 3
+      "item": "bh:iron_door",
+      "count": 1
     }
   }
 }

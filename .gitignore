@@ -24,6 +24,7 @@ GEMINI.md
 .superpowers/
 docs/
 scorecard.png
+packs/**/*.md
 
 # Local offline documentation corpus (scripts/fetch-reference-docs.sh)
 reference-docs/

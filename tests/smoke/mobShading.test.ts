@@ -24,6 +24,8 @@ const MOB_CONTROLLERS: Record<string, string> = {
     "controller.render.slime_armor": "packs/RP/entity/slime.entity.json",
     "controller.render.spider": "packs/RP/entity/spider.entity.json",
     "controller.render.squid": "packs/RP/entity/squid.entity.json",
+    "controller.render.wolf": "packs/RP/entity/wolf.entity.json",
+    "controller.render.wolf.v2": "packs/RP/entity/wolf.entity.json",
     "controller.render.zombie": "packs/RP/entity/zombie.entity.json",
     "controller.render.zombie_pigman": "packs/RP/entity/zombie_pigman.entity.json"
 };
@@ -66,9 +68,10 @@ describe("Beta Mob Shading - resource pack contract", () => {
                 assert.ok(required in definition, `${identifier} must keep its vanilla ${required} mapping`);
             }
 
-            const multiplier = Number(definition.light_color_multiplier);
+            const rawMultiplier = String(definition.light_color_multiplier);
+            const isDarkened = rawMultiplier.includes("0.8") || Number(rawMultiplier) < 1;
             assert.ok(
-                Number.isFinite(multiplier) && multiplier < 1,
+                isDarkened,
                 `${identifier} must darken directional shading (got ${definition.light_color_multiplier})`
             );
 
@@ -79,10 +82,73 @@ describe("Beta Mob Shading - resource pack contract", () => {
         }
     });
 
+    it("darkens wolves further when wet in water or rain", () => {
+        const wolf = controllers()["controller.render.wolf"];
+        assert.ok(wolf, "controller.render.wolf must be defined");
+        assert.ok(
+            String(wolf.light_color_multiplier).includes("is_in_water_or_rain"),
+            "wolf must darken when wet"
+        );
+    });
+
+    it("shades the player with UI paperdoll protection and disables on-fire overlay", () => {
+        const shipped = controllers();
+        const requiredControllers = [
+            "controller.render.player.first_person",
+            "controller.render.player.third_person",
+            "controller.render.player.first_person_spectator",
+            "controller.render.player.third_person_spectator",
+            "controller.render.player.map"
+        ];
+
+        for (const id of requiredControllers) {
+            assert.ok(shipped[id], `missing player render controller: ${id}`);
+        }
+
+        const thirdPerson = shipped["controller.render.player.third_person"];
+        assert.ok(
+            String(thirdPerson.light_color_multiplier).includes("is_in_ui"),
+            "third person player must protect paperdoll from darkening in UI"
+        );
+        assert.ok(
+            String(thirdPerson.on_fire_color?.a).includes("is_in_ui"),
+            "third person player must disable on-fire overlay outside UI"
+        );
+    });
+
+    it("shades minecarts, custom minecarts, arrows, and fishing hooks without hurt or fire tints", () => {
+        const shipped = controllers();
+        const customControllers = readJson("packs/RP/render_controllers/custom_minecart.render_controller.json").render_controllers;
+
+        const vehiclesAndProjectiles = [
+            shipped["controller.render.minecart"],
+            shipped["controller.render.arrow"],
+            shipped["controller.render.fishing_hook"],
+            customControllers["controller.render.custom_minecart_default"],
+            customControllers["controller.render.custom_minecart_fueled"]
+        ];
+
+        for (const controller of vehiclesAndProjectiles) {
+            assert.ok(controller, "vehicle/projectile controller must exist");
+            assert.ok(
+                String(controller.light_color_multiplier).includes("0.8") || Number(controller.light_color_multiplier) < 1,
+                "must darken directional shading"
+            );
+            assert.ok(
+                Number(controller.is_hurt_color?.a) < 0,
+                "must suppress hurt tint"
+            );
+            assert.ok(
+                Number(controller.on_fire_color?.a) < 0,
+                "must suppress fire tint"
+            );
+        }
+    });
+
     it("removes the orange on-fire model overlay the way Java does", () => {
         for (const [identifier, controller] of Object.entries(controllers())) {
-            // The creeper keeps an expression here so its flash overlay survives the override.
-            if (identifier === "controller.render.creeper") continue;
+            // The creeper and player use expressions here.
+            if (identifier === "controller.render.creeper" || identifier.startsWith("controller.render.player.")) continue;
 
             assert.ok(
                 Number(controller.on_fire_color?.a) < 0,

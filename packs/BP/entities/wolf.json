@@ -1,8 +1,12 @@
 {
-  "format_version": "1.13.0",
+  "format_version": "1.21.70",
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:wolf",
+      "properties": {
+          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.5, "client_sync": true },
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.4, "client_sync": true }
+      },
       "is_spawnable": true,
       "is_summonable": true,
       "is_experimental": false
@@ -168,6 +172,17 @@
 
 
     "components": {
+      "minecraft:renders_when_invisible": {},
+      "minecraft:spell_effects": {
+        "add_effects": [
+          {
+            "effect": "invisibility",
+            "duration": "infinite",
+            "visible": false
+          }
+        ]
+      },
+      "minecraft:is_hidden_when_invisible": {},
       "minecraft:nameable": {
       },
       "minecraft:type_family": {
@@ -178,7 +193,7 @@
         "suffocate_time": 0
       },
       "minecraft:collision_box": {
-        "width": 0.6,
+        "width": 0.8,
         "height": 0.8
       },
       "minecraft:health": {
@@ -195,7 +210,7 @@
         ]
       },
       "minecraft:movement": {
-        "value": 0.3
+        "value": 0.46
       },
       "minecraft:navigation.walk": {
         "can_path_over_water": true,
@@ -248,7 +263,6 @@
       },
       "minecraft:behavior.melee_attack": {
         "priority": 5,
-        "target_dist": 1.2,
         "track_target": true,
         "reach_multiplier": 1.0
       },

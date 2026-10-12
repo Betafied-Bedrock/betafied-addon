@@ -4,7 +4,7 @@
     "description": {
       "identifier": "minecraft:fence"
     },
-    "tags": ["crafting_table", "beta_crafting"],
+    "tags": ["beta_crafting"],
     "pattern": [
       "SSS",
       "SSS"

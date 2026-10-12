@@ -3,6 +3,7 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:player",
+            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow_player" },
             "materials": {
                 "default": "entity_alphatest",
                 "cape": "entity_alphatest",
@@ -93,7 +94,8 @@
                     "};"
                 ],
                 "animate": [
-                    "root"
+                    "root",
+                    "bh_entity_shadow"
                 ],
                 "variables": {
                     "variable.fp_melee_spear_use_attachable_rotation_z": "public",
@@ -106,6 +108,7 @@
                 "should_update_effects_offscreen": "1.0"
             },
             "animations": {
+                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "root": "controller.animation.player.root",
                 "base_controller": "controller.animation.player.base",
                 "hudplayer": "controller.animation.player.hudplayer",

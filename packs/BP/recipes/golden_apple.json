@@ -4,7 +4,7 @@
     "description": {
       "identifier": "minecraft:golden_apple"
     },
-    "tags": ["crafting_table"],
+    "tags": ["beta_crafting"],
     "unlock": [
       { "item": "minecraft:apple" }
     ],

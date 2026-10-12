@@ -235,6 +235,181 @@ an old save or a command placed — the same coexistence §4 describes for fence
 would first have to answer which family the full block belongs to, so the two families stay apart
 until someone decides that.
 
+## 10. The era's unstackables are pack items now
+
+Beta 1.7.3 capped a door, a sign, a bucket and a cake at one per slot inside the engine — `ItemDoor`,
+`ItemSign`, `ItemBucket` and `ItemReed` each set their own stack size — so none of them could stack in
+a chest either. They kept stacking anyway, because that limit only ever existed for the pack's own
+items (whose item JSON the engine reads) while those four are vanilla items a pack cannot redeclare.
+The inventory sweep split those stacks in a *player's* slots and nowhere else, which is why the report
+read "doors stack in chests" next to "porkchops don't" — the porkchops are pack items and the doors
+were not.
+
+Decided and implemented: the crafted result is a pack item — `bh:wooden_door`, `bh:iron_door`,
+`bh:oak_sign`, `bh:bucket`, `bh:cake` — carrying `minecraft:max_stack_size` 1, which the engine
+applies everywhere, so the chest half of the bug is fixed at the engine rather than by a sweep over
+other people's containers. `BETA_CAPPED_ITEM_OF` retypes every held vanilla one onto its pack item,
+splitting a stack as it converts, so the two ids cannot drift apart, and `packs/BP/items` now holds an
+item for every id in that table (asserted by a test, because a capped id with no item JSON would be a
+pickup the sweep throws away).
+
+The placement rules the era applied are enforced for the sign and the bucket, which the engine cannot
+place for the pack (a custom item's `minecraft:block_placer` writes one block, never a wall sign, and
+never a source block's fluid): `interactions/signPlacement.ts` writes the standing or the wall sign the
+way `ItemSign` did, and `interactions/bucketUse.ts` fills from a still source only — the era's metadata
+0, so water on its way somewhere is still refused — and answers a cow the same way `EntityCow` did.
+
+Still open, all of it engine-dependent and needing an in-game look:
+
+- **Does `minecraft:block_placer` place a two-block door?** The component's contract is "place a
+  block", and the era's `ItemDoor` wrote both halves itself, so `interactions/doorPlacement.ts`
+  completes the pair from whichever half the engine left. If the engine places both halves on its own,
+  that completion is a no-op and can be deleted; if it places only the lower half, the completion is
+  what makes the item usable at all. A door left half-built because the cell above was taken is
+  deliberately left standing: that block is not the pack's to delete.
+- **Does `playerPlaceBlockBefore` fire for a `block_placer` placement?** Beta's top-face-only rule is
+  enforced there. If the event does not fire for a custom item, a door can land on a side face and the
+  completion would then hang a top half over it with nothing underneath.
+- **Does a script-placed sign open the editor for the player who placed it?** Beta's `ItemSign` called
+  `EntityPlayer.func_4048_a(sign)` on the newly written tile entity, so the editor opened with the
+  placement. No script API opens it, so the pack's sign cannot reproduce that half; the editor is
+  reached by clicking the sign afterwards instead. If the engine ever opens the editor for a
+  script-written sign, the double-open that would cause needs checking.
+- **Does the cake's `minecraft:block_placer` place on the faces `ItemReed` allowed?** Beta's cake went
+  down on any face of a block, which is what the component has to reproduce; it is the one capped item
+  whose placement is left entirely to the engine.
+- **Whether a filled vanilla bucket that is emptied comes back as `minecraft:bucket` or as something
+  else.** The sweep retypes whatever empty bucket the engine hands back onto `bh:bucket`, so a
+  momentary vanilla bucket is expected and fine; what needs a look is that water, lava and milk are all
+  covered, since only the empty id appears in `BETA_CAPPED_ITEM_OF`.
+- **The cake recipe's milk ingredient is still spelled the legacy way**, `{"item":
+  "minecraft:bucket", "data": 1}`. Milk buckets remain vanilla items, so the ingredient was left
+  alone; if that spelling no longer resolves, the cake is uncraftable and the ingredient needs to be
+  `minecraft:milk_bucket`.
+
+Smaller, and deliberate: the wooden door recipe takes the `minecraft:planks` tag, so six planks of
+mixed species craft one door where Beta wanted a single species — the tag and the difference the chest
+recipe already carries. The sign, bucket and cake recipes keep their own `bh:` identifiers and the
+`beta_crafting` tag alone rather than overriding vanilla's recipe ids, so the vanilla crafting table
+can still hand the player a vanilla stack — which the sweep then retypes and splits on pickup.
+
+## 11. Mob boxes and speeds come from the recovered 1.7.3 client, with one calibrated unit
+
+Thirteen entity files were corrected against the 1.7.3 sources recovered into the gitignored corpus at
+`reference-docs/beta-1.7.3`, and `tests/smoke/entityDimensions.test.ts` now pins each number to the line
+it was read from. The boxes that were wrong, and the era's own value for each:
+
+| Entity | Beta's box | Was | Now | Source |
+| --- | --- | --- | --- | --- |
+| chicken | 0.3 x 0.4 | 0.6 x 0.8 | 0.3 x 0.4 | `EntityChicken.java:15` |
+| wolf | 0.8 x 0.8 | 0.6 x 0.8 | 0.8 x 0.8 | `EntityWolf.java:18` |
+| spider | 1.4 x 0.9 | 1.1 x 0.7 | 1.4 x 0.9 | `EntitySpider.java:7` |
+| zombie, skeleton, pigman | 0.6 x 1.8 | 0.6 x 1.9 | 0.6 x 1.8 | `Entity.java:86-87`, no override |
+| slime, sizes 1/2/4 | 0.6 x size | 0.52 x size | 0.6 x size | `EntitySlime.java:24` |
+| ghast | 4.0 x 4.0 | 4.02 x 4.0 | 4.0 x 4.0 | `EntityGhast.java:16` |
+
+Pig, cow, sheep, squid, creeper and the player already matched. A mob that never calls `setSize` is a
+0.6 x 1.8 humanoid, which is why the undead are now shorter than Bedrock's 1.9.
+
+Speeds are a translation rather than a copy, because Beta has one ground factor for every living
+entity: `EntityLiving.moveEntityWithHeading` passes `0.1F * var9` (1.0 on a normal block) into
+`Entity.moveFlying` (`Entity.java:611`), which scales the input by `factor / max(magnitude, 1)`, and
+`EntityCreature.updatePlayerActionState` sets `moveForward = moveSpeed` (`EntityCreature.java:69`). A
+mob's speed is therefore its `moveSpeed` as a share of the walking player's -- 0.5 for the zombie and
+pigman, 0.7 by default, 0.8 for the spider, 1.1 for the wolf, which Beta clamps back to a full stride.
+Bedrock documents `minecraft:movement` only as "base movement speed", so the unit is calibrated on the
+mob both editions define as *half the walking player*: Bedrock's own zombie is 0.23, making one Beta
+unit 0.46 (`0.23 / 0.5`) -- the same figure Java's AI movement term (`0.1 / 0.216`) produces -- and
+every other value is `0.46 x moveSpeed`.
+
+A mob's engine speed is `movement x speed_multiplier` (Microsoft's intended reading; the interaction
+itself is undocumented), so the multipliers that were discounting a stroll -- 0.8 on the pig, cow,
+sheep, zombie, creeper and spider, and 1.25 on the creeper's and the skeleton's attacks -- were
+flattened to 1, because Beta had a single speed for wandering and chasing alike. Two states keep a
+multiplier because Beta genuinely had a second speed: `zombie_pigman.melee_attack` is 1.9
+(`EntityPigZombie.java:19` raises `moveSpeed` to 0.95 while it has a target, against its own 0.5), and
+the five `mount_pathing` multipliers were left exactly as they were.
+
+**Needs an in-game look, and it is one number.** The 0.46 anchor cannot be confirmed offline: nothing
+in the documentation says what Bedrock's movement value means physically, and the two derivations above
+agree only because both editions share the zombie's number. Walking a pig beside a walking player
+settles it. If the mobs now read as too fast or too slow, `WALKING_PLAYER_UNITS` in the test is the one
+place to change, since every declared speed is derived from it.
+
+Still open:
+
+- **A mob's eye height cannot be declared.** Beta's is `height * 0.85` (`EntityLiving.java:89`), `height
+  * 0.8` for the wolf (`EntityWolf.java:221`) and 1.62 for the player's camera
+  (`EntityPlayer.java:44,152`; the player's own `getEyeHeight` answers 0.12F, which is not a camera).
+  Bedrock's entity component list has nothing that sets a mob's eye height, and how the head location a
+  script reads is computed is undocumented, so these values live in the test file and nowhere else.
+- **Two mobs are not `moveSpeed`-driven and keep vanilla's movement value**: the squid drifts under its
+  own code (`EntitySquid.java:127`) and the ghast steers by waypoint impulses of 0.1 every 2-6 ticks
+  (`EntityGhast.java:37-46`), so no scalar describes either. The ghast's *box* is Beta's now; its motion
+  is not.
+- **A ridden mob's speed is not translated.** Beta copies the rider's own input into the mount, so a
+  saddled pig travels at its *rider's* walking speed (0.46 here) rather than at its own 0.322. The
+  `mount_pathing` multipliers keep vanilla's values, and how Bedrock splits rider input from mob speed
+  is not checkable offline.
+- **Health was left alone, deliberately.** Three values disagree with the era's: this pack's sheep is 8
+  where `EntityLiving`'s default of 10 stood, its spider 16 and its zombie 22 where `EntityMob` sets 20.
+  Boxes and speeds were the scope here; a health table is a separate gameplay decision.
+
+## 12. One crafting interface: the custom table, and the workbench that has to stay on vanilla's tag
+
+Decided and implemented: every recipe the pack registers serves the `beta_crafting` tag of
+`bh:crafting_table` and nothing else. `crafting_table` is the tag the *vanilla* crafting table and the
+player's 2x2 inventory grid both read (they cannot be separated — Bedrock wiki, `loot/recipes`), so a
+recipe that carried both was two entries for one craft, which is what the duplicates were: the
+crafting table registered three times, the jack-o'-lantern twice, and the any-log-to-oak-planks
+conversion twice.
+
+**The one exception is the crafting table itself.** `crafting_table_bh.json` keeps both tags, because
+the 2x2 inventory grid is the only place a survival player can make their first workbench, and it is
+the only recipe in the pack that serves that grid. Every other recipe is `beta_crafting` alone. If the
+pack ever hands out a workbench some other way, that recipe can drop back to one tag.
+
+Several recipes were also not overriding what they claimed to. A pack recipe replaces vanilla's only
+when the identifier **and** the recipe type both match; otherwise it is registered beside it, which is
+the same visible duplicate. Read from Mojang's sample behavior pack
+(`github.com/Mojang/bedrock-samples`, `behavior_pack/recipes`):
+
+- Vanilla's chest recipe id is `minecraft:Chest_recipeId`, not `minecraft:chest`, so the chest recipe
+  left vanilla's chest craftable next to `bh:chest`.
+- Vanilla's sign recipe id is `minecraft:sign_oak` and it pays three signs, so `bh:sign_oak` left the
+  vanilla three-sign recipe in place.
+- Vanilla's jack-o'-lantern recipe is *shaped* (carved pumpkin over a torch); the pack's was shapeless,
+  so it registered beside vanilla's rather than replacing it. The pack's is now shaped to match, with
+  its own ingredient (the carved pumpkin) and the era's yield.
+- The bucket and cake recipes were named `bh:bucket` / `bh:cake` and now take vanilla's ids, matching
+  the doors.
+
+Recipes the era did not have are disabled the documented way — replacing the recipe with the same id
+and type and setting its tags to `[""]` (Bedrock wiki, `loot/recipes`) — instead of the pack's old
+grid of an unobtainable ingredient. That is `gold_nugget.json`, `iron_nugget.json`,
+`cut_sandstone.json` (vanilla's `minecraft:smooth_sandstone` recipe, which pays cut sandstone) and the
+two vanilla workbench ids.
+
+Needs an in-game look, because recipe registration is engine-side:
+
+- **Is exactly one entry shown per craft at the custom table?** The pack's own test can only prove one
+  registration per craft and one interface per recipe; whether the recipe book renders it once is the
+  game's answer.
+- **Do the `[""]` disables actually take?** The wiki documents the empty tag as the way to disable a
+  recipe that a lower pack already defined; each of those five files matches vanilla's id and type, so
+  they should replace rather than add. If they do not, the nuggets and cut sandstone come back and need
+  the older unobtainable-ingredient trick instead.
+- **Are there more vanilla workbench ids than the two the pack knows?** Mojang's samples define
+  `minecraft:WorkBench_recipeId`; `minecraft:WorkBench_recipeId_from_oak` appears in the `/recipe`
+  command's unlockable list but has no sample file, and the samples show no per-species workbench
+  recipes. If the engine does have more, each unoverridden one is another crafting-table entry in the
+  2x2 grid.
+
+Also deliberate: the pack's recipes are no longer available at a vanilla crafting table that survives
+in an existing world, and the player's 2x2 grid now offers only the workbench. That is the point of a
+single interface — the modern recipe set is not a second way to reach the era's items — but it does
+change what an existing world can craft without the pack's table.
+
 ## Why this file exists
 
 The failure mode these items share is the one worth guarding against: a rule was written down in one

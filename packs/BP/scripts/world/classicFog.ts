@@ -26,8 +26,7 @@ export function* fogJob(): Generator<void, void, unknown> {
 
             if (dim === OVERWORLD_ID) {
                 if (!hasFog.has(name)) {
-                    // `/fog` is the only way to stack a custom fog: the script API exposes no fog
-                    // equivalent, so this is the one place a command is the right tool.
+                    // Script API lacks native fog controls; /fog command is required.
                     player.runCommand(`fog @s push classic_water:default_fog ${CONFIG.FOG_ID}`);
                     hasFog.add(name);
                 }

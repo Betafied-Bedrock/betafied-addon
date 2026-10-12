@@ -158,7 +158,6 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             updatePlayerArmorDisplay(player as any, true);
             assert.equal(player.commandsRun.length, 1);
 
-            // Second call with same armor should not run command
             updatePlayerArmorDisplay(player as any, false);
             assert.equal(player.commandsRun.length, 1);
         });
@@ -195,16 +194,13 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
                 getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
             });
 
-            // In survival, displays 8 armor points
             updatePlayerArmorDisplay(player as any, true);
             assert.equal(player.commandsRun[player.commandsRun.length - 1], 'titleraw @s title {"rawtext":[{"text":"_a8"}]}');
 
-            // Switch to creative mode
             player.gameMode = GameMode.Creative;
             updatePlayerArmorDisplay(player as any, false);
             assert.equal(player.commandsRun[player.commandsRun.length - 1], 'titleraw @s title {"rawtext":[{"text":"_a0"}]}');
 
-            // Switch back to survival mode
             player.gameMode = GameMode.Survival;
             updatePlayerArmorDisplay(player as any, false);
             assert.equal(player.commandsRun[player.commandsRun.length - 1], 'titleraw @s title {"rawtext":[{"text":"_a8"}]}');

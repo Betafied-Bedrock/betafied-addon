@@ -3,6 +3,7 @@
   "minecraft:client_entity": {
     "description": {
       "identifier": "minecraft:skeleton",
+      "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
       "min_engine_version": "1.8.0",
       "materials": {
         "default": "skeleton"
@@ -88,7 +89,8 @@
         },
         {
           "skeleton_attack": "controller.animation.skeleton.attack"
-        }
+        },
+        { "bh_entity_shadow": "controller.animation.betarock.entity_shadow" }
       ],
       "render_controllers": [
         "controller.render.skeleton"

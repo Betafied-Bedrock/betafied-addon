@@ -35,9 +35,6 @@ export class JobRunner {
         this.activeJobs = new Set<number>();
     }
 
-    /**
-     * Queues a generator to step across ticks, tracking its handle until completion.
-     */
     public run(
         generator: Generator<void, void, void>,
         options?: JobOptions
@@ -68,9 +65,6 @@ export class JobRunner {
         return started;
     }
 
-    /**
-     * Slices an iterable across ticks, processing `batchSize` items per tick.
-     */
     public forEach<T>(
         items: Iterable<T>,
         handler: (item: T, index: number) => void,
@@ -80,31 +74,19 @@ export class JobRunner {
         return this.run(gen, options);
     }
 
-    /**
-     * Checks if a job handle is actively being tracked by this runner.
-     */
     public has(jobId: number): boolean {
         return this.activeJobs.has(jobId);
     }
 
-    /**
-     * Cancels a tracked job and untracks its handle.
-     */
     public clear(jobId: number): void {
         this.activeJobs.delete(jobId);
         JobRunner.clear(jobId);
     }
 
-    /**
-     * Alias for clear: cancels a tracked job and untracks its handle.
-     */
     public cancel(jobId: number): void {
         this.clear(jobId);
     }
 
-    /**
-     * Cancels all jobs currently tracked by this runner instance.
-     */
     public clearAll(): void {
         for (const id of this.activeJobs) {
             JobRunner.clear(id);
@@ -112,14 +94,10 @@ export class JobRunner {
         this.activeJobs.clear();
     }
 
-    /** Number of jobs currently being stepped across ticks. */
     public get activeCount(): number {
         return this.activeJobs.size;
     }
 
-    /**
-     * Standalone static runner: steps a generator with error containment and cleanup.
-     */
     public static run(
         generator: Generator<void, void, void>,
         options?: JobOptions
@@ -137,9 +115,6 @@ export class JobRunner {
         return typeof started === "number" ? started : -1;
     }
 
-    /**
-     * Standalone static batch processor: time-slices an iterable across ticks.
-     */
     public static forEach<T>(
         items: Iterable<T>,
         handler: (item: T, index: number) => void,
@@ -149,9 +124,6 @@ export class JobRunner {
         return JobRunner.run(gen, options);
     }
 
-    /**
-     * Safely cancels a Bedrock job by handle via `system.clearJob`.
-     */
     public static clear(jobId: number): void {
         if (jobId < 0) return;
         runCatching(
@@ -162,9 +134,6 @@ export class JobRunner {
         );
     }
 
-    /**
-     * Adapts an iterable into a generator yielding every `batchSize` items.
-     */
     public static *batch<T>(
         items: Iterable<T>,
         handler: (item: T, index: number) => void,

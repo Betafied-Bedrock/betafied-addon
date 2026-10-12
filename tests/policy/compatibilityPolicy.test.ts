@@ -106,7 +106,7 @@ describe("Inventory normalization agrees with the world tables where it should",
     it("converts modern woods, doors, fences and slabs to beta equivalents", () => {
         assert.equal(converted("minecraft:cherry_fence"), "bh:fence");
         assert.equal(converted("minecraft:cherry_slab"), "bh:wooden_slab");
-        assert.equal(converted("minecraft:mangrove_door"), "minecraft:wooden_door");
+        assert.equal(converted("minecraft:mangrove_door"), "bh:wooden_door");
         assert.equal(converted("minecraft:birch_boat"), "minecraft:boat");
     });
 

@@ -63,18 +63,15 @@ describe("EntityCleaner Batching & Lifetime Safety", () => {
 
         const job = cleanerJob();
 
-        // Step 1: processes 20 entities
         const step1 = job.next();
         assert.equal(step1.done, false);
 
-        // Player disconnects while generator is yielded
         player.isValid = false;
 
-        // Step 2: resumes, detects player invalid, breaks out safely
         const step2 = job.next();
-        assert.equal(step2.done, false); // outer player yield
+        assert.equal(step2.done, false);
 
         const step3 = job.next();
-        assert.equal(step3.done, true); // completes
+        assert.equal(step3.done, true);
     });
 });

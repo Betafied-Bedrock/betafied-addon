@@ -1,0 +1,25 @@
+{
+    "format_version": "1.10.0",
+    "animation_controllers": {
+        "controller.animation.betarock.entity_shadow": {
+            "initial_state": "idle",
+            "states": {
+                "idle": {
+                    "transitions": [
+                        {
+                            "shadow": "query.life_time >= 0.0"
+                        }
+                    ]
+                },
+                "shadow": {
+                    "particle_effects": [
+                        {
+                            "effect": "bh_entity_shadow",
+                            "pre_effect_script": "variable.shadow_span = query.property('betarock:shadow_span'); variable.shadow_alpha = query.property('betarock:shadow_alpha');"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

@@ -288,13 +288,10 @@ describe("Classic Recipe Contract - Beta 1.7.3 fence", () => {
         );
         assert.equal(recipe.result.item, "bh:fence", "a crafted fence must already be the custom block");
         assert.equal(recipe.result.count, 2, "Beta crafted two fences from six sticks");
-        assert.ok(
-            recipe.tags.includes("crafting_table"),
-            "the vanilla table has to offer the Beta result too"
-        );
-        assert.ok(
-            recipe.tags.includes("beta_crafting"),
-            "the custom crafting table serves this tag and must keep offering it"
+        assert.deepEqual(
+            recipe.tags,
+            ["beta_crafting"],
+            "the custom crafting table is the only interface the pack's recipes belong to"
         );
     });
 });

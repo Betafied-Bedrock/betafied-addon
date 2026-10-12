@@ -8,10 +8,8 @@ import {
 
 describe("Main Integration Harness - Bedrock Server Script Loading", () => {
     it("imports main.ts and initializes all subsystems without throwing", async () => {
-        // Dynamic import to execute main.ts within the mocked environment
         await import("../../packs/BP/scripts/main.js");
 
-        // Verify event subscriptions were registered
         assert.ok(
             registeredBeforeEvents.size > 0,
             "Expected beforeEvents to have registered handlers"
@@ -21,7 +19,6 @@ describe("Main Integration Harness - Bedrock Server Script Loading", () => {
             "Expected afterEvents to have registered handlers"
         );
 
-        // Verify specific critical events
         assert.ok(
             registeredAfterEvents.has("entitySpawn"),
             "Expected entitySpawn listener from entitySpawnHandler"
@@ -43,13 +40,11 @@ describe("Main Integration Harness - Bedrock Server Script Loading", () => {
             "Expected container access listeners so the double chest can mirror its halves"
         );
 
-        // Verify recurring background jobs were scheduled
         assert.ok(
             scheduledIntervals.length >= 1,
             `Expected master tickManager interval, got ${scheduledIntervals.length}`
         );
 
-        // Verify key subsystems registered with central tickManager
         const { tickManager } = await import("../../packs/BP/scripts/core/tickManager.js");
         assert.equal(tickManager.isRegistered("inventoryManager"), true, "inventoryManager must be registered with tickManager");
         assert.equal(tickManager.isRegistered("entityCleaner"), true, "entityCleaner must be registered with tickManager");

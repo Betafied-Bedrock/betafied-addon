@@ -2,35 +2,93 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
-## 5.5 — 2026-10-11
+## 5.6 — 2026-10-12
 
-5.5 restores Beta's doubled slabs and its pre-1.9 armor math, and stops a double chest from reshuffling its contents when the lid closes.
+5.6 introduces authentic doors with punch-to-toggle interaction, one-per-slot utility items (signs, buckets, and cakes), unified crafting table recipes, circular entity blob shadows, and classic visual lighting and texture parity.
 
-### Beta Parity
+### Doors
 
-- Added the era's doubled slabs: a `bh:` single placed against a matching one assembles `bh:double_*_slab` as a full block in the lower cell. The merged block is never a holdable item, matching Beta, and mining it pays the two halves back.
-- Changed armor protection to Beta's slot-indexed table — a helmet is 3 points, a chestplate 8, leggings 6 and boots 3, whatever the material — with the tier scaling only durability. Leather now protects point for point with diamond, and post-Beta netherite and turtle armor still count for nothing.
+- Added `bh:wooden_door` and `bh:iron_door`: the era's door items, capped at one per slot by their own item JSON, so the engine itself keeps a door out of a stack in a chest instead of a sweep cleaning up afterwards. Each one places the vanilla `minecraft:wooden_door` / `minecraft:iron_door` block and wears the vanilla door texture.
+- Added punch-to-toggle interaction for wooden doors, allowing players to open and close them with left-click attacks as well as interactions, while iron doors remain redstone-operated.
+- Changed the door recipes to override vanilla's `minecraft:wooden_door` and `minecraft:iron_door` recipes, so the custom crafting table offers the Beta result instead of a vanilla door; the wooden door recipe now takes the plank tag, and the iron door pays Beta's single door rather than three.
+- Changed held vanilla doors to retype onto the `bh:` items during the inventory sweep, spreading a modern stack one per slot; a door broken out of the world, dropped by a mob or handed over by another addon lands on the same item.
+- Added Beta's placement rule to the crafted doors: a door goes down on the top face only, and the half the engine did not place is written from the half it did.
 
-### Double Chests
+### Unstackable utilities
 
-- Fixed a double chest sliding whole stacks up its own half as the lid closed; a stack keeps the slot the player left it in, and only falls back to the lowest free slot when that slot is already taken.
+- Added `bh:oak_sign`, `bh:bucket` and `bh:cake`, the rest of the era's one-per-slot items: each carries `minecraft:max_stack_size` 1 in its own item JSON, so a sign, a bucket or a cake can no longer stack in a chest the way the doors used to. The cake places the vanilla `minecraft:cake` block; the sign and the bucket place nothing of their own.
+- Added Beta's sign placement: a sign goes up on the top face as a standing sign turned to the placer's rotation, and against any of the four sides as a wall sign. Both are written by `interactions/signPlacement.ts`, because one block placer cannot cover the era's two sign blocks, and the interaction is cancelled only for the clicks that actually place a sign.
+- Added Beta's bucket filling: the empty `bh:bucket` lifts a water or lava source and takes it with it, matching the metadata-0 rule that made an infinite pool work, and a cow answers it with a milk bucket.
+- Changed the sign, bucket and cake recipes to yield the pack items, to take vanilla's own recipe ids (`minecraft:sign_oak`, `minecraft:bucket`, `minecraft:cake`) so vanilla's version is replaced rather than offered beside them, and — for the cake — to hand its three empty buckets back as `bh:bucket`.
+- Changed held vanilla signs, buckets and cakes to retype onto the pack items during the inventory sweep, spreading a modern stack one per slot; each pack item wears the vanilla texture and is named in the language file.
+- Fixed a placed oak sign reading as modern terrain: Bedrock keeps the oak sign's two blocks under the legacy `minecraft:standing_sign` / `minecraft:wall_sign` ids, which the block registry now recognizes, so a sign is no longer rewritten to an item id the scrubber cannot place.
+
+### Crafting
+
+- Changed every recipe the pack registers to a single interface: the `beta_crafting` tag of the custom crafting table. The second copy of each recipe that existed for the vanilla table and the player's 2x2 grid is gone, so a craft appears once, at the pack's table.
+- Removed the recipes that duplicated another recipe of the pack: the crafting table was registered three times (two vanilla-id overrides plus the pack's own), the jack-o'-lantern twice, and the any-log-to-oak-planks conversion twice.
+- Fixed the chest and oak sign recipes naming themselves ids vanilla does not use — `minecraft:chest` beside vanilla's real `minecraft:Chest_recipeId`, and `bh:sign_oak` beside `minecraft:sign_oak` — which left vanilla's own recipe live next to the pack's. A recipe now replaces vanilla's only when its identifier and recipe type both match, which is also why the jack-o'-lantern recipe became shaped: vanilla's is shaped, so a shapeless recipe with the same id is registered alongside it instead of replacing it.
+- Changed the recipes the era did not have to the documented empty tag (`[""]`) instead of an unobtainable-ingredient grid: golden nuggets, iron nuggets, cut sandstone and both vanilla crafting-table recipe ids are now suppressed by replacing the recipe itself and offering it nowhere.
+- Kept one deliberate exception: the crafting table recipe still serves `crafting_table` as well, because that tag is what the player's 2x2 inventory grid reads. Without it no survival player could craft the pack's table in the first place.
+- Fixed `furnace_minecart.json` carrying a byte-order mark, which strict JSON readers reject.
+
+### Visual parity & shading
+
+- Added authentic circular entity blob shadows to mobs and players using particle controllers.
+- Added authentic face dimming on Beta light source blocks including torches, redstone torches, glowstone, jack-o'-lanterns, fire, and lava.
+- Enforced deterministic texture UV alignment across block faces.
+- Disabled frame interpolation on flipbook texture animations (water, lava, fire) for authentic stepped frame playback.
+- Added fast graphics opaque black-backed leaf textures.
 
 ### Tooling
 
-- Changed the printed release steps and the generated GitHub release notes to address the authenticated GitHub user instead of a personal handle.
+- Added `scripts/pruneContentLogs.mjs` and `npm run logs:prune` to automatically clean up accumulated Bedrock content logs.
+- Added automated smoke test contracts for block appearance, entity shadows, and recipe interfaces.
+
+## 5.5 — 2026-10-11
+
+5.5 restores Beta-style double slabs and armor protection, and fixes double chests moving items around when they close.
+
+### Beta parity
+
+- Added Beta-style double slabs.
+- Changed matching `bh:` slabs placed together to combine into the corresponding `bh:double_*_slab`.
+- Changed double slabs to occupy the lower block as a full block.
+- Changed armor protection to use Beta's slot-based values instead of modern material-based protection.
+- Changed helmets to provide 3 armor points.
+- Changed chestplates to provide 8 armor points.
+- Changed leggings to provide 6 armor points.
+- Changed boots to provide 3 armor points.
+- Changed armor material to affect durability only, so leather and diamond provide the same protection when worn in the same slot.
+
+### Double chests
+
+- Fixed double chests moving stacks to different slots when the lid closed.
+- Changed chest merging so items remain in the slot the player left them in.
+- Changed occupied-slot conflicts to fall back to the lowest available free slot instead of reshuffling the rest of the chest.
+
+### Tooling
+
+- Changed printed release instructions to use the currently authenticated GitHub account instead of a hard-coded personal handle.
+- Changed generated GitHub release notes to use the authenticated GitHub account as well.
 
 ## 5.4.1 — 2026-10-10
 
-5.4.1 is a fix-up for drop conversion and creeper behavior, restoring two details Beta got right.
+5.4.1 is a small fix-up release for mob behavior and item drops.
 
-### Beta Parity
+### Beta parity
 
-- Added Beta pig loot tables, capping porkchops at Beta's 0-2 and returning the saddle from a saddled pig.
-- Changed the creeper to chase without landing a melee hit, matching Beta's explosion-only attack.
+- Added Beta-style pig loot tables.
+- Changed pig porkchop drops to a maximum of 2.
+- Changed saddled pigs to drop their saddle on death.
+- Changed creepers to chase the player without dealing a melee hit.
+- Restored creepers to explosion-only damage behavior.
 
-### Drop Conversion
+### Drop conversion
 
-- Fixed a converted drop that exceeded the target item's stack limit respawning as one oversized stack the player could not split or consume; it now splits into stack-sized entities.
+- Fixed converted drops exceeding the target item's maximum stack size.
+- Changed oversized converted drops to split into valid stack-sized item entities.
+- Fixed cases where an oversized converted stack could not be split or consumed normally.
 
 ## 5.4 — 2026-10-10
 

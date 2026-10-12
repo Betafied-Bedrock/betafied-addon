@@ -18,9 +18,6 @@ interface FoodConfig {
     returnContainer?: string;
 }
 
-// Health is Beta gameplay and lives here; which vanilla foods become which `bh:` item is the
-// normalizer's conversion table. The membership of `FOOD_ITEMS` is derived from that table rather
-// than re-listed, so a food the sweep retypes can never be one this module forgets to feed.
 const FOOD_HEALTH: Readonly<Record<string, FoodConfig>> = Object.freeze({
     "bh:apple": { health: 4 },
     "bh:bread": { health: 5 },
@@ -32,8 +29,7 @@ const FOOD_HEALTH: Readonly<Record<string, FoodConfig>> = Object.freeze({
     "bh:cooked_porkchop": { health: 8 }
 });
 
-// Mushroom stew is authentic Beta but the engine consumes it natively, so it is never retyped and is
-// the one food the conversion table does not name.
+// Engine consumes mushroom stew natively, so it bypasses normalizer conversion.
 const NATIVE_FOODS: Readonly<Record<string, FoodConfig>> = Object.freeze({
     "minecraft:mushroom_stew": { health: 10, returnContainer: "minecraft:bowl" }
 });

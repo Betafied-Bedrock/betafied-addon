@@ -2,15 +2,14 @@ import { Direction } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { BETA_FLOOR_Y, BETA_HEIGHT_LIMIT, OVERWORLD_ID } from "../core/betaConstants.js";
 
-// Beta's world stopped at bedrock on Y=0. The scrubber seals the sub-zero column, and this veto
-// keeps anything that slips past the cap - a command, an unscrubbed chunk - from opening the void.
+// Beta 1.7.3 bedrock floor veto at Y=0.
 eventBus.onPlayerBreakBlockBefore((event) => {
     try {
         if (event.block.location.y < BETA_FLOOR_Y && event.block.dimension.id === OVERWORLD_ID) {
             event.cancel = true;
         }
     } catch {
-        // Boundary safety
+        // Ignore boundary errors
     }
 });
 
@@ -26,7 +25,7 @@ eventBus.onPlayerInteractWithBlock((event) => {
             player.sendMessage("§cHeight limit for building is 128 blocks");
         }
     } catch {
-        // Boundary safety
+        // Ignore boundary errors
     }
 });
 
@@ -38,6 +37,6 @@ eventBus.onPlayerPlaceBlock((event) => {
             player.sendMessage("§cHeight limit for building is 128 blocks");
         }
     } catch {
-        // Boundary safety
+        // Ignore boundary errors
     }
 });

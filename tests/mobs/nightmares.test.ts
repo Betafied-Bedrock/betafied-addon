@@ -49,7 +49,6 @@ describe("Nightmares Spatial Job Tracking & Cancellation", () => {
             typeId: "minecraft:bed"
         } as any;
 
-        // First interaction starts job
         handleBedInteraction(player, bedBlock);
 
         const bedKey = "minecraft:overworld:10,64,10";
@@ -58,10 +57,8 @@ describe("Nightmares Spatial Job Tracking & Cancellation", () => {
         assert.ok(record.jobId !== undefined, "jobId tracked");
         const activeJobId = record.jobId;
 
-        // Verify job is running in job runner
         assert.ok(nightmareJobRunner.has(activeJobId), "job registered in nightmareJobRunner");
 
-        // Second interaction (e.g. getting out of bed / interacting again)
         handleBedInteraction(player, bedBlock);
 
         assert.equal(bedInteractions.has(bedKey), false, "record deleted on second interaction");

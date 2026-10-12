@@ -22,19 +22,15 @@ test("JobRunner cooperative time-slicing & lifecycle", async (t) => {
 
         assert.deepEqual(steps, [], "job does not run synchronously on registration");
 
-        // Tick 1
         (system as any).advanceTicks(1);
         assert.deepEqual(steps, [1]);
 
-        // Tick 2
         (system as any).advanceTicks(1);
         assert.deepEqual(steps, [1, 2]);
 
-        // Tick 3
         (system as any).advanceTicks(1);
         assert.deepEqual(steps, [1, 2, 3]);
 
-        // Tick 4 - completed, no extra steps
         (system as any).advanceTicks(1);
         assert.deepEqual(steps, [1, 2, 3]);
     });
@@ -49,15 +45,12 @@ test("JobRunner cooperative time-slicing & lifecycle", async (t) => {
             { batchSize: 2 }
         );
 
-        // Tick 1: first batch of 2 items
         (system as any).advanceTicks(1);
         assert.deepEqual(processed, ["a", "b"]);
 
-        // Tick 2: second batch of 2 items
         (system as any).advanceTicks(1);
         assert.deepEqual(processed, ["a", "b", "c", "d"]);
 
-        // Tick 3: remaining item
         (system as any).advanceTicks(1);
         assert.deepEqual(processed, ["a", "b", "c", "d", "e"]);
     });
@@ -141,12 +134,10 @@ test("JobRunner cooperative time-slicing & lifecycle", async (t) => {
 
         assert.equal(runner.activeCount, 1);
 
-        // Tick 1
         (system as any).advanceTicks(1);
         assert.equal(caughtError, null);
         assert.equal(finalized, false);
 
-        // Tick 2: throws
         (system as any).advanceTicks(1);
         assert.ok((caughtError as any) instanceof Error);
         assert.equal((caughtError as any).message, "Simulated failure in job step");
