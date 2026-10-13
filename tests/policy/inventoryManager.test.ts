@@ -639,6 +639,24 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
         });
     });
 
+    describe("Sugar Cane Identity", () => {
+        it("keeps the era's reeds id in the inventory", () => {
+            // Bedrock's block and Beta's own item id are both `minecraft:reeds`; anything that read
+            // it as a modern id deleted the cane a player had just harvested.
+            assert.equal(evaluateItemAction(new ItemStack("minecraft:reeds", 64)).type, "keep");
+        });
+
+        it("retypes Bedrock's second sugar cane id onto reeds instead of deleting it", () => {
+            const action = evaluateItemAction(new ItemStack("minecraft:sugar_cane", 5));
+
+            assert.equal(action.type, "replace");
+            if (action.type === "replace") {
+                assert.equal(action.item.typeId, "minecraft:reeds");
+                assert.equal(action.item.amount, 5, "the whole stack must ride across");
+            }
+        });
+    });
+
     describe("Inventory Sweep Generator Time-Slicing", () => {
         it("yields every 2 players during a multi-player sweep", () => {
             mockPlayers.length = 0;

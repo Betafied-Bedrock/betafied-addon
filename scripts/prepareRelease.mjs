@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Start a release in one command.
+ * Start a release in one command, once the maintainer has approved the drafted notes.
  *
  * Everything between "cut a release" and "the notes are written" is mechanical and easy to
  * get wrong by hand: the version lives in four files with three different shapes, and the
@@ -258,16 +258,18 @@ function packageInstallers(tag) {
 function printNextSteps(tag) {
   console.log(`
 Next steps:
-  1. Write the '## ${tag}' section in CHANGELOG.md, replacing ${RELEASE_NOTES_PLACEHOLDER}.
+  1. Draft the '## ${tag}' section and get it approved by the maintainer before writing or
+     committing anything. The approval covers the rest of these steps, so it is asked for once.
+  2. Write the approved '## ${tag}' section in CHANGELOG.md, replacing ${RELEASE_NOTES_PLACEHOLDER}.
      Match the published GitHub style: a one-line summary, then '### Section' headings of
      '- Added/Changed/Fixed/Removed' bullets. Each bullet must be a single, concise sentence
      describing the feature for players (strictly user-facing, no file paths or developer details).
-  2. npm run check                       # write the notes first; the suite requires the section
-  3. git add -A && git commit            # 'Betafied ${tag}: <summary>', as the authenticated GitHub user, no agent trailer
-  4. git tag -a ${tag} -m "Betafied ${tag}: <summary>"
-  5. git push origin HEAD && git push origin ${tag}
-  6. npm run release -- --dry-run        # read the notes before publishing
-  7. npm run release
+  3. npm run check                       # write the notes first; the suite requires the section
+  4. git add -A && git commit            # 'Betafied ${tag}: <summary>', as the authenticated GitHub user, no agent trailer
+  5. git tag -a ${tag} -m "Betafied ${tag}: <summary>"
+  6. git push origin HEAD && git push origin ${tag}
+  7. npm run release -- --dry-run        # read the notes before publishing
+  8. npm run release
 `);
 }
 

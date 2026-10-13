@@ -251,7 +251,9 @@ so the chest half of the bug is fixed at the engine rather than by a sweep over 
 containers. `BETA_CAPPED_ITEM_OF` retypes every held vanilla one onto its pack item, splitting a stack
 as it converts, so the two ids cannot drift apart, and `packs/BP/items` now holds an item for every id
 in that table (asserted by a test, because a capped id with no item JSON would be a pickup the sweep
-throws away).
+throws away). The doors stay in the table even though the crafted item is the pack's: a `bh:` door is a
+`minecraft:block_placer` for the era's vanilla block, so a broken door drops the vanilla item and this
+retype is what keeps that drop at the era's one per slot.
 
 The bucket is the one of the four the pack does **not** own. It was a pack item (`bh:bucket`, one per
 slot, with `interactions/bucketUse.ts` filling from a still source and milking a cow by hand) and it is
@@ -281,6 +283,11 @@ Still open, all of it engine-dependent and needing an in-game look:
 - **Does `playerPlaceBlockBefore` fire for a `block_placer` placement?** Beta's top-face-only rule is
   enforced there. If the event does not fire for a custom item, a door can land on a side face and the
   completion would then hang a top half over it with nothing underneath.
+- **Do the era's other use blocks swallow a held sign the same way a door does?** The era asked the
+  clicked block's own use first (`ItemInWorldManager.onItemUse`), so a chest, a furnace, a cake and a
+  workbench answered the click before `ItemSign` was reached, and no sign went down against any of
+  them. `BETA_USE_CONSUMING_BLOCK_IDS` holds the doors and the trapdoor, where the engine is known to
+  consume the click; the others join it once the same consumption is seen in game.
 - **Does a script-placed sign open the editor for the player who placed it?** Beta's `ItemSign` called
   `EntityPlayer.func_4048_a(sign)` on the newly written tile entity, so the editor opened with the
   placement. No script API opens it, so the pack's sign cannot reproduce that half; the editor is
@@ -367,16 +374,31 @@ Still open:
 ## 12. One crafting interface: the custom table, and the workbench that has to stay on vanilla's tag
 
 Decided and implemented: every recipe the pack registers serves the `beta_crafting` tag of
-`bh:crafting_table` and nothing else. `crafting_table` is the tag the *vanilla* crafting table and the
-player's 2x2 inventory grid both read (they cannot be separated — Bedrock wiki, `loot/recipes`), so a
-recipe that carried both was two entries for one craft, which is what the duplicates were: the
-crafting table registered three times, the jack-o'-lantern twice, and the any-log-to-oak-planks
-conversion twice.
+`bh:crafting_table`, apart from the two that also serve the player's 2x2 inventory grid (below).
+`crafting_table` is the tag the *vanilla* crafting table and the player's 2x2 inventory grid both read
+(they cannot be separated — Bedrock wiki, `loot/recipes`). Several crafts had been registered by more
+than one file, and 5.6 collapsed each onto one: the crafting table was registered by three files, the
+jack-o'-lantern by two, and the log-to-planks craft by two.
 
-**The one exception is the crafting table itself.** `crafting_table_bh.json` keeps both tags, because
-the 2x2 inventory grid is the only place a survival player can make their first workbench, and it is
-the only recipe in the pack that serves that grid. Every other recipe is `beta_crafting` alone. If the
-pack ever hands out a workbench some other way, that recipe can drop back to one tag.
+**Five recipes keep both tags: the crafts Beta 1.7.3 could make in the player's 2x2 grid.**
+`crafting_table_bh.json` is the only place a survival player can make their first workbench, and
+`logs_to_oak.json` is the only way to get the planks that workbench costs, so those two are the
+bootstrap and the pack cannot lose either: collapsing the planks craft onto `beta_crafting` alone made
+the pair a deadlock, planks needing the table and the table needing four planks. `lit_pumpkin.json`,
+`sandstone.json` and `furnace_minecart.json` join them because Beta's own patterns fit a 2x2 square —
+`A`/`B`, `##`/`##`, `A`/`B` (`CraftingManager.java` in the recovered client) — and 5.6 took all three
+out of the inventory, deleting the jack-o'-lantern's grid recipe and narrowing the other two with the
+rest of the table's. All five keep `beta_crafting` as well, so they are still the pack's recipes at the
+pack's table, and a test checks that each one's shape really fits 2x2. Every other recipe is
+`beta_crafting` alone.
+
+The rest of Beta's 2x2 crafts are still table-only, which predates 5.6 and is a separate decision, not a
+bug: sticks, torches, the snow/clay/brick/glowstone blocks, sugar, wool from string and the sixteen wool
+dye baths, the flower and bone-meal dyes and the dye mixes, flint and steel, the lever, the redstone
+torch, the stone and wooden pressure plates, the button, the sticky piston and the chest minecart —
+whose vanilla grid recipe wants a `minecraft:chest` the sweep has already retyped onto `bh:chest`, so
+the grid cannot make one at all. Beta served both grids from one `CraftingManager`, so every one of
+these was an inventory craft there. Restoring them means deciding what the pack's grid is for.
 
 Several recipes were also not overriding what they claimed to. A pack recipe replaces vanilla's only
 when the identifier **and** the recipe type both match; otherwise it is registered beside it, which is
@@ -405,7 +427,9 @@ Needs an in-game look, because recipe registration is engine-side:
 
 - **Is exactly one entry shown per craft at the custom table?** The pack's own test can only prove one
   registration per craft and one interface per recipe; whether the recipe book renders it once is the
-  game's answer.
+  game's answer. The two recipes that carry both tags put the question at the pack's table as well —
+  the workbench and the log-to-planks craft are each shared with the 2x2 grid — so a second entry in
+  the recipe book there would be visible twice over.
 - **Do the `[""]` disables actually take?** The wiki documents the empty tag as the way to disable a
   recipe that a lower pack already defined; each of those five files matches vanilla's id and type, so
   they should replace rather than add. If they do not, the nuggets and cut sandstone come back and need
@@ -416,10 +440,33 @@ Needs an in-game look, because recipe registration is engine-side:
   recipes. If the engine does have more, each unoverridden one is another crafting-table entry in the
   2x2 grid.
 
-Also deliberate: the pack's recipes are no longer available at a vanilla crafting table that survives
-in an existing world, and the player's 2x2 grid now offers only the workbench. That is the point of a
+Also deliberate: no pack recipe except those five is available at a vanilla crafting table that
+survives in an existing world, and the player's 2x2 grid offers only them. That is the point of a
 single interface — the modern recipe set is not a second way to reach the era's items — but it does
 change what an existing world can craft without the pack's table.
+
+## 13. Resolved: sugar cane is `minecraft:reeds`, never `minecraft:sugar_cane`
+
+Both tables registered the era's sugar cane as `minecraft:sugar_cane`, which is not the id the game
+uses. Bedrock's block is `minecraft:reeds` (its only state is `age`), the era's item is `minecraft:reeds`
+— Mojang's own `sugar.json` and `paper.json` recipes still name it — and `minecraft:sugar_cane` is a
+second, later item id for the same plant. The mismatch was invisible where it was most expensive:
+`resolveDropId("minecraft:reeds")` answered *remove*, so a broken cane was deleted at `entityLoad` (the
+chunk-loading pass, which is why the cane vanished as a player walked up to it), the drop entity was
+deleted again by the cleaner's 32-block sweep, and the inventory sweep reported the era's own item as
+nonexistent. Only the block path was masked, by a hand-written `"minecraft:reeds"` entry in the
+scrubber's exclude list.
+
+`minecraft:reeds` now sits in both `BETA_ITEM_IDS` and `BETA_BLOCK_IDS`, the scrubber's duplicate entry
+is gone so the registry owns the fact, and `normalizer.ITEM_ID_ALIASES` folds `minecraft:sugar_cane`
+back onto it rather than deleting a stack that carries the newer id.
+
+**Same shape, still open:** the scrubber's exclude list is a hand-maintained table of Bedrock's legacy
+spellings for blocks the registry names the Java way — `deadbush`, `web`, `mob_spawner`,
+`unpowered_repeater`/`powered_repeater`, `stone_block_slab`, `brick_block`. Only the block pass is
+covered by it; the item side of those ids (a picked-up cobweb, say) falls through `normalizeItem` to
+*remove*. Deciding this means either registering the Bedrock spellings beside the Java ones, or
+accepting the deletions and deleting the scrubber's list with them.
 
 ## Why this file exists
 

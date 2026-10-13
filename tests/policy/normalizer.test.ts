@@ -11,7 +11,7 @@ import {
 describe("Heuristic Inverse Normalizer", () => {
     describe("Item Normalization", () => {
         it("keeps authentic Beta items unchanged", () => {
-            const betaItems = ["minecraft:iron_sword", "minecraft:diamond_pickaxe", "minecraft:bread", "minecraft:coal"];
+            const betaItems = ["minecraft:iron_sword", "minecraft:diamond_pickaxe", "minecraft:bread", "minecraft:coal", "minecraft:reeds"];
             for (const item of betaItems) {
                 assert.deepEqual(normalizeItem(item), { action: "keep" });
             }
@@ -42,6 +42,13 @@ describe("Heuristic Inverse Normalizer", () => {
             for (const item of modded) {
                 assert.deepEqual(normalizeItem(item), { action: "keep" }, `Expected ${item} to be left to its own addon`);
             }
+        });
+
+        it("folds Bedrock's second sugar cane id back onto the era's reeds", () => {
+            // The block and the era's item are `minecraft:reeds`; `minecraft:sugar_cane` is the id a
+            // broken cane can carry, and reading it as post-Beta deleted the drop on chunk load.
+            assert.deepEqual(normalizeItem("minecraft:sugar_cane"), { action: "convert", targetId: "minecraft:reeds" });
+            assert.deepEqual(normalizeEntityDrop("minecraft:sugar_cane"), { action: "convert", targetId: "minecraft:reeds" });
         });
 
         it("converts modern wood items to authentic oak equivalents via pattern heuristics", () => {
@@ -107,6 +114,7 @@ describe("Heuristic Inverse Normalizer", () => {
             assert.deepEqual(normalizeBlock("minecraft:stone"), { action: "keep" });
             assert.deepEqual(normalizeBlock("minecraft:oak_log"), { action: "keep" });
             assert.deepEqual(normalizeBlock("minecraft:netherrack"), { action: "keep" });
+            assert.deepEqual(normalizeBlock("minecraft:reeds"), { action: "keep" });
         });
 
         it("strips the Nether's modern blocks and ores back to Beta terrain", () => {

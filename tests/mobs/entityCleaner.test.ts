@@ -1,5 +1,6 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { EntityComponentTypes, ItemStack } from "@minecraft/server";
 import { cleanerJob } from "../../packs/BP/scripts/mobs/entityCleaner.js";
 import { mockPlayers, resetMocks, world, Player } from "../mocks/minecraftServer.js";
 
@@ -75,6 +76,23 @@ describe("EntityCleaner Batching & Lifetime Safety", () => {
         assert.equal(step3.done, true);
     });
 
+    it("keeps a dropped sugar cane stack beside a player", () => {
+        const overworld = world.getDimension("minecraft:overworld") as any;
+        const player = new Player("test_player");
+        player.dimension = overworld;
+        mockPlayers.push(player);
+
+        const cane = overworld.spawnEntity("minecraft:item", { x: 2, y: 64, z: 2 });
+        cane.setComponent(EntityComponentTypes.Item, { itemStack: new ItemStack("minecraft:reeds", 3) });
+
+        const job = cleanerJob();
+        while (!job.next().done) {}
+
+        // The sweep runs on every loaded entity within 32 blocks of a player, so an unrecognized id
+        // is deleted exactly as the player walks up to the stack on the ground.
+        assert.equal(cane.isRemoved, false, "a reeds drop must survive the nearby-entity sweep");
+    });
+
     it("migrates uninitialized properties and effects on nearby Beta mobs", () => {
         const overworld = world.getDimension("minecraft:overworld") as any;
         const player = new Player("test_player");
@@ -82,6 +100,7 @@ describe("EntityCleaner Batching & Lifetime Safety", () => {
         mockPlayers.push(player);
 
         const cow = overworld.spawnEntity("minecraft:cow", { x: 0, y: 64, z: 0 });
+        cow.setComponent("minecraft:is_hidden_when_invisible", {});
         assert.equal(cow.getProperty("betarock:shadow_span"), undefined);
         assert.equal(cow.getEffect("invisibility"), undefined);
 
