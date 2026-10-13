@@ -33,6 +33,24 @@ const VANILLA_RECIPES: Readonly<Record<string, { id: string; type: string }>> = 
 const DISABLED = "";
 const BETA_TABLE = "beta_crafting";
 
+/**
+ * The crafts that must also serve the player's 2x2 inventory grid. Beta 1.7.3 had one
+ * `CraftingManager` behind both grids, so every recipe whose pattern fit a 2x2 square was an
+ * inventory craft there; `crafting_table` is the only tag the grid reads and it cannot be separated
+ * from a vanilla workbench that survives in an existing world. Each of these also fits 2x2 itself,
+ * which the test below checks — a pattern that does not would never appear in the grid anyway.
+ *
+ * The workbench and the planks are also the survival bootstrap: a log makes the planks in the grid,
+ * and four of those planks make the table the rest of the pack crafts at.
+ */
+const INVENTORY_GRID_RECIPES: readonly string[] = Object.freeze([
+    "crafting_table_bh.json",
+    "logs_to_oak.json",
+    "lit_pumpkin.json",
+    "sandstone.json",
+    "furnace_minecart.json"
+]);
+
 interface Recipe {
     readonly file: string;
     readonly type: string;
@@ -89,23 +107,58 @@ function outputOf(recipe: any): string {
         .join("+");
 }
 
+/** Whether a recipe's own shape fits the player's 2x2 inventory grid. */
+function fitsInventoryGrid(recipe: Recipe): boolean {
+    if (recipe.type === "shapeless") return recipe.signature.split(",").length <= 4;
+
+    const [pattern] = recipe.signature.split("|");
+    const rows = pattern.split("/");
+    return rows.length <= 2 && Math.max(...rows.map(row => row.length)) <= 2;
+}
+
 describe("Classic Recipe Contract - one crafting interface", () => {
     const all = recipes();
 
     it("registers the pack's recipes for the custom crafting table and nothing else", () => {
         const strays = all
             .filter(recipe => recipe.tags.includes("crafting_table"))
-            .map(recipe => recipe.file);
+            .map(recipe => recipe.file)
+            .sort();
 
-        // The workbench is the one exception: `crafting_table` is the tag the player's 2x2 inventory
-        // grid serves, and without a live workbench recipe there the pack's table could never be made
-        // in survival. It carries both tags, so it is still the pack's table recipe too.
-        assert.deepEqual(strays, ["crafting_table_bh.json"]);
+        // The list reads in bootstrap order; the comparison is by membership.
+        assert.deepEqual(strays, [...INVENTORY_GRID_RECIPES].sort());
+    });
+
+    it("keeps the crafts Beta could make in the inventory grid reachable there", () => {
+        for (const file of INVENTORY_GRID_RECIPES) {
+            const recipe = all.find(r => r.file === file);
+
+            assert.ok(recipe, `${file} is missing`);
+            assert.deepEqual(
+                recipe.tags,
+                ["crafting_table", BETA_TABLE],
+                `${file} must serve the inventory grid beside the pack's table`
+            );
+            assert.equal(
+                fitsInventoryGrid(recipe),
+                true,
+                `${file} is listed as an inventory-grid craft but its shape cannot fit a 2x2 grid`
+            );
+        }
+
+        // The two a new world cannot lose: no planks means no workbench, and without the workbench
+        // the pack's table cannot be made at all.
+        const planks = all.find(r => r.file === "logs_to_oak.json");
+        assert.equal(planks?.signature, "#minecraft:logs", "planks must come from any log the player holds");
+        assert.equal(planks?.output, "minecraft:oak_planks:0");
+
+        const workbench = all.find(r => r.file === "crafting_table_bh.json");
+        assert.equal(workbench?.output, "bh:crafting_table:0");
     });
 
     it("keeps every other pack recipe on the custom table alone", () => {
         for (const recipe of all) {
-            if (recipe.file === "crafting_table_bh.json") continue;
+            if (INVENTORY_GRID_RECIPES.includes(recipe.file)) continue;
             // Cooking recipes belong to the furnace, campfire and smoker interfaces, not to a
             // crafting grid, so the pack's table has nothing to say about them.
             if (recipe.type !== "shaped" && recipe.type !== "shapeless") continue;

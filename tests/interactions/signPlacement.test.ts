@@ -270,6 +270,97 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
         });
     });
 
+    describe("blocks whose own use answered the click first", () => {
+        function placedBlock(
+            typeId: string,
+            states: Record<string, boolean | number | string>,
+            cell: { x: number; y: number; z: number }
+        ) {
+            const block = dimension().getBlock(cell);
+            block.setPermutation(BlockPermutation.resolve(typeId, states));
+            return block;
+        }
+
+        it("leaves a wall click on a door to the engine, which is what toggles it", () => {
+            const dim = dimension();
+            const door = placedBlock("minecraft:wooden_door", { open_bit: false, upper_block_bit: false }, { x: 32, y: 64, z: 32 });
+            const hanging = dim.getBlock({ x: 32, y: 64, z: 31 });
+            hanging.setType("minecraft:air");
+
+            const player = signHolder();
+            const event = clickEvent(door, Direction.North, player);
+            eventBus.dispatch("playerInteractWithBlock", event);
+            settle();
+
+            assert.equal(event.cancel, false, "the era's door use is the click, so the engine has to keep it");
+            assert.equal(hanging.typeId, "minecraft:air", "an untyped sign would be a sign nobody can write on");
+            assert.ok(heldItem(player), "a sign the era never placed stays in hand");
+        });
+
+        it("leaves the top face of a door to the same use", () => {
+            const dim = dimension();
+            const door = placedBlock("minecraft:wooden_door", { open_bit: false, upper_block_bit: true }, { x: 34, y: 64, z: 34 });
+            const above = dim.getBlock({ x: 34, y: 65, z: 34 });
+            above.setType("minecraft:air");
+
+            const player = signHolder();
+            const event = clickEvent(door, Direction.Up, player);
+            eventBus.dispatch("playerInteractWithBlock", event);
+            settle();
+
+            assert.equal(event.cancel, false);
+            assert.equal(above.typeId, "minecraft:air");
+            assert.ok(heldItem(player));
+        });
+
+        it("swallows no part of a trapdoor click, not even the underside rule", () => {
+            const dim = dimension();
+            const hatch = placedBlock("minecraft:trapdoor", { open_bit: false }, { x: 36, y: 65, z: 36 });
+            const below = dim.getBlock({ x: 36, y: 64, z: 36 });
+            below.setType("minecraft:air");
+
+            const player = signHolder();
+            const event = clickEvent(hatch, Direction.Down, player);
+            eventBus.dispatch("playerInteractWithBlock", event);
+            settle();
+
+            assert.equal(event.cancel, false, "cancelling would swallow the toggle the era left in place");
+            assert.equal(below.typeId, "minecraft:air");
+            assert.ok(heldItem(player));
+        });
+
+        it("stands down on an iron door too, which the era answered without toggling", () => {
+            const dim = dimension();
+            const door = placedBlock("minecraft:iron_door", { open_bit: false, upper_block_bit: false }, { x: 38, y: 64, z: 38 });
+            const hanging = dim.getBlock({ x: 38, y: 64, z: 37 });
+            hanging.setType("minecraft:air");
+
+            const player = signHolder();
+            const event = clickEvent(door, Direction.North, player);
+            eventBus.dispatch("playerInteractWithBlock", event);
+            settle();
+
+            assert.equal(event.cancel, false);
+            assert.equal(hanging.typeId, "minecraft:air");
+            assert.ok(heldItem(player));
+        });
+
+        it("still hangs the pack's sign off the blocks the era placed one on", () => {
+            const dim = dimension();
+            const stone = dim.getBlock({ x: 40, y: 64, z: 40 });
+            const hanging = dim.getBlock({ x: 40, y: 64, z: 39 });
+            hanging.setType("minecraft:air");
+
+            const player = signHolder();
+            const event = clickEvent(stone, Direction.North, player);
+            eventBus.dispatch("playerInteractWithBlock", event);
+            settle();
+
+            assert.equal(hanging.typeId, "minecraft:wall_sign", "an ordinary block still takes the sign");
+            assert.equal(heldItem(player), undefined);
+        });
+    });
+
     describe("the era's missing sign editor", () => {
         const EDITHANDS = "editor_seeker";
 

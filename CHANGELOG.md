@@ -2,6 +2,31 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.6.1 — 2026-10-13
+
+A fix-up release for 5.6: sugar cane keeps its identity, signs stay out of the way of doors, the inventory grid regains the crafts that fit it, and mobs already in a world are no longer left invisible.
+
+### Sugar cane
+
+- Fixed harvested and broken sugar cane so it keeps its identity instead of being deleted, which had made cane vanish as players walked up to it.
+
+### Signs
+
+- Fixed signs placed against doors and trapdoors so the block's own use answers the click, as in Beta, instead of leaving a sign nobody can type on.
+
+### Crafting
+
+- Fixed logs so they craft into planks in the player's 2x2 inventory grid again, which the first workbench depends on.
+- Restored the jack-o'-lantern, sandstone, and furnace minecart crafts to the player's 2x2 inventory grid, which 5.6 had moved onto the custom crafting table.
+
+### Mobs
+
+- Fixed existing mobs in a loaded world so they keep their normal appearance instead of turning fully invisible.
+
+### Tooling
+
+- Added automatic posting of new releases to the project's Discord changelog channel.
+
 ## 5.6 — 2026-10-12
 
 5.6 restores authentic door mechanics, unstackable utility items, unified crafting recipes, entity blob shadows, and classic visual lighting.

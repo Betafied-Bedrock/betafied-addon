@@ -34,10 +34,25 @@ export const BETA_DOOR_BLOCK_IDS: ReadonlySet<string> = Object.freeze(
 );
 
 /**
+ * The blocks whose own use answered a click before the held item was ever asked. Beta 1.7.3's
+ * `ItemInWorldManager.onItemUse` ran `Block.onBlockActivated` first and stopped there when it answered
+ * true, which a door and a trapdoor always did — so a sign held against one was never placed, and the
+ * sign editor never opened. The engine consumes that same click, so the pack's sign placement has to
+ * stand down on these blocks instead of writing the sign the engine left unwritten.
+ */
+export const BETA_USE_CONSUMING_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
+    "minecraft:wooden_door",
+    "minecraft:iron_door",
+    "minecraft:trapdoor"
+]));
+
+/**
  * Vanilla ids the era capped at one that the pack has to own, because the engine keeps its own stack
  * size for an item it defines natively: the two doors (`ItemDoor`), the sign (`ItemSign`) and the cake
  * (`ItemReed`). Each maps onto the pack item that replaces it, so a chest, a drop and a hotbar all end
- * up holding the same capped id.
+ * up holding the same capped id. The doors are in the table because their placeable block stays
+ * vanilla: a `bh:` door is a `minecraft:block_placer` for the era's block, so breaking it hands back
+ * the vanilla item, which only the retype turns into the pack's capped one.
  *
  * `ItemBucket` capped the same way and is the one the pack does not own: filling from a source block
  * and pouring it back is the engine's own bucket behaviour, which a pack item cannot be given, so that
@@ -152,7 +167,7 @@ export const BETA_ITEM_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:coal", "minecraft:charcoal", "minecraft:diamond", "minecraft:iron_ingot", "minecraft:gold_ingot",
     "minecraft:stick", "minecraft:bowl", "minecraft:string", "minecraft:feather", "minecraft:gunpowder",
     "minecraft:wheat_seeds", "minecraft:wheat", "minecraft:flint", "minecraft:leather", "minecraft:brick",
-    "minecraft:clay_ball", "minecraft:sugar_cane", "minecraft:paper", "minecraft:book", "minecraft:slime_ball",
+    "minecraft:clay_ball", "minecraft:reeds", "minecraft:paper", "minecraft:book", "minecraft:slime_ball",
     "minecraft:egg", "minecraft:glowstone_dust", "minecraft:bone", "minecraft:sugar", "minecraft:redstone",
     "minecraft:lapis_lazuli", "minecraft:ink_sac", "minecraft:cocoa_beans", "minecraft:bone_meal",
     "minecraft:red_dye", "minecraft:green_dye", "minecraft:purple_dye", "minecraft:cyan_dye",
@@ -243,7 +258,9 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:oak_sapling", "minecraft:birch_sapling", "minecraft:spruce_sapling",
     "minecraft:oak_planks", "minecraft:birch_planks", "minecraft:spruce_planks",
     "minecraft:dandelion", "minecraft:poppy", "minecraft:brown_mushroom", "minecraft:red_mushroom",
-    "minecraft:cactus", "minecraft:sugar_cane", "minecraft:wheat", "minecraft:carved_pumpkin", "minecraft:pumpkin",
+    // Bedrock never renamed sugar cane: the block and the item are both `minecraft:reeds`, while
+    // `minecraft:sugar_cane` is the id the normalizer converts back onto it.
+    "minecraft:cactus", "minecraft:reeds", "minecraft:wheat", "minecraft:carved_pumpkin", "minecraft:pumpkin",
     "minecraft:lit_pumpkin", "minecraft:jack_o_lantern", "minecraft:short_grass", "minecraft:fern", "minecraft:dead_bush", "minecraft:cobweb",
     "minecraft:oak_stairs", "minecraft:cobblestone_stairs", "minecraft:stone_stairs",
     "minecraft:oak_slab", "minecraft:cobblestone_slab", "minecraft:stone_slab", "minecraft:smooth_stone_slab", "minecraft:sandstone_slab",

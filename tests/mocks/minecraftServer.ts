@@ -515,7 +515,8 @@ export const EntityComponentTypes = Object.freeze({
     Variant: "minecraft:variant",
     Movement: "minecraft:movement",
     Color: "minecraft:color",
-    Riding: "minecraft:riding"
+    Riding: "minecraft:riding",
+    IsHiddenWhenInvisible: "minecraft:is_hidden_when_invisible"
 });
 
 export const ItemComponentTypes = Object.freeze({
@@ -592,6 +593,10 @@ export class Entity {
 
     getComponent(typeId: string): any {
         return this.components.get(typeId);
+    }
+
+    hasComponent(typeId: string): boolean {
+        return this.components.has(typeId);
     }
 
     setComponent(typeId: string, component: any): void {

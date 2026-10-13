@@ -235,6 +235,18 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         assert.deepEqual(cobble.permutationCalls, []);
     });
 
+    it("leaves the era's sugar cane standing", () => {
+        const cane = recordingBlock("minecraft:reeds", { age: 3 });
+
+        scrub(scrubDimension(new Map<string, RecordedBlock>([["6,64,6", cane]])));
+
+        // Betafied's terrain is grown rather than generated, so the fine pass is the only thing that
+        // can reach a cane the world already holds; a reeds block missing from the allowlist read as
+        // modern terrain and was erased as the player walked up to it.
+        assert.deepEqual(cane.setTypeCalls, [], "sugar cane must survive the fine pass");
+        assert.deepEqual(cane.permutationCalls, []);
+    });
+
     it("still converts convertible modern blocks rather than deleting them", () => {
         const andesite = recordingBlock("minecraft:andesite");
         const dim = scrubDimension(new Map<string, RecordedBlock>([["2,64,2", andesite]]));

@@ -64,7 +64,8 @@ function buildUntouchedFilter(): BlockFilter {
     const candidates = new Set<string>([
         "minecraft:air",
         ...BETA_BLOCK_IDS,
-        "minecraft:reeds",
+        // Bedrock's legacy spellings for era blocks the registry names the Java way: the fine pass
+        // would otherwise read a cobweb or a dead bush as modern terrain and erase it.
         "minecraft:deadbush",
         "minecraft:web",
         "minecraft:mob_spawner",

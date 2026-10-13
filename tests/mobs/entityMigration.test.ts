@@ -31,6 +31,7 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
     it("applies missing infinite invisibility effect without particles to suppress native shadow", () => {
         const cow = new Entity();
         cow.typeId = "minecraft:cow";
+        cow.setComponent("minecraft:is_hidden_when_invisible", {});
 
         assert.equal(cow.getEffect("invisibility"), undefined);
 
@@ -40,6 +41,18 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
         assert.ok(effect, "invisibility effect should be applied");
         assert.equal(effect.duration, 20000000);
         assert.equal(effect.showParticles, false);
+    });
+
+    it("leaves the invisibility off an entity that predates the render half of the swap", () => {
+        const cow = new Entity();
+        cow.typeId = "minecraft:cow";
+
+        migrateEntity(cow);
+
+        // A permanent invisibility is only a shadow removal on an entity the current definition also
+        // keeps drawn; on one that predates it the effect is the whole of what a player sees.
+        assert.equal(cow.getEffect("invisibility"), undefined);
+        assert.equal(cow.getProperty("betarock:shadow_span"), 1, "the properties are still migrated");
     });
 
     it("is idempotent and leaves already-migrated entities untouched", () => {
@@ -52,6 +65,21 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
         // Second pass
         migrateEntity(cow);
         assert.equal(cow.propertyWrites.length, writeCount, "no additional property writes on migrated entity");
+    });
+
+    it("keeps a migrated entity a no-op once the render half arrives", () => {
+        const cow = new Entity();
+        cow.typeId = "minecraft:cow";
+
+        migrateEntity(cow);
+        cow.setComponent("minecraft:is_hidden_when_invisible", {});
+
+        migrateEntity(cow);
+        assert.ok(cow.getEffect("invisibility"), "the effect lands as soon as the swap can carry it");
+
+        const applied = cow.getEffect("invisibility");
+        migrateEntity(cow);
+        assert.deepEqual(cow.getEffect("invisibility"), applied, "and is not re-added afterwards");
     });
 
     it("future-proof: seamlessly applies custom property rules to unmigrated mobs", () => {

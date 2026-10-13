@@ -15,6 +15,15 @@ const ORE_DROP_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:raw_gold": "minecraft:gold_ore"
 });
 
+/**
+ * Exact ids Bedrock exposes under a second name for one item the era knew by one. Sugar cane is the
+ * case that bit: the world still holds `minecraft:reeds`, but a drop carries `minecraft:sugar_cane`,
+ * so an id the pack never registered reads as post-Beta and the drop is deleted at load.
+ */
+const ITEM_ID_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+    "minecraft:sugar_cane": "minecraft:reeds"
+});
+
 export function normalizeEntityDrop(itemId: string): NormalizationResult {
     const oreReplacement = ORE_DROP_CONVERSIONS[itemId];
     if (oreReplacement) {
@@ -104,6 +113,11 @@ function matchWoodItem(bareId: string): NormalizationResult | null {
 }
 
 export function normalizeItem(itemId: string): NormalizationResult {
+    const alias = ITEM_ID_ALIASES[itemId];
+    if (alias !== undefined) {
+        return { action: "convert", targetId: alias };
+    }
+
     if (isBetaItem(itemId)) {
         return { action: "keep" };
     }

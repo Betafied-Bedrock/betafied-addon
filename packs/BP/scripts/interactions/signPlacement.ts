@@ -18,6 +18,9 @@
  * Only a cell the sign can take is written, and only the pack's sign triggers this, so a sign never
  * takes the place of what a player built, and the interaction is cancelled just for the placements the
  * era would have made — clicking a chest while holding a sign still opens the chest.
+ *
+ * A door or a trapdoor is even less this module's: the era let the block's own use answer the click
+ * before the sign was ever offered, so nothing goes down against one — `BETA_USE_CONSUMING_BLOCK_IDS`.
  */
 
 import {
@@ -31,7 +34,7 @@ import {
     world
 } from "@minecraft/server";
 import type { Block, ItemStack, PlayerInteractWithBlockBeforeEvent } from "@minecraft/server";
-import { BH_SIGN_ID } from "../core/betaRegistry.js";
+import { BETA_USE_CONSUMING_BLOCK_IDS, BH_SIGN_ID } from "../core/betaRegistry.js";
 import { eventBus } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 
@@ -180,6 +183,12 @@ function routeEraSign(
     block: Block,
     face: Direction
 ): boolean {
+    // The era asked the block's own use first, so a door or a trapdoor answered the click and the sign
+    // stayed in hand. The engine consumes that same click, which is why nothing is written here: the
+    // deferred pass would otherwise find an empty cell the engine never refused and hang an untyped
+    // sign off the door.
+    if (BETA_USE_CONSUMING_BLOCK_IDS.has(block.typeId)) return false;
+
     if (face === Direction.Down) {
         // `ItemSign` refused the underside, and the item's own placer would take it: a standing sign
         // hung under the block it was used on.

@@ -1,4 +1,4 @@
-import { Entity } from "@minecraft/server";
+import { Entity, EntityComponentTypes } from "@minecraft/server";
 import { isBetaMob } from "../core/betaRegistry.js";
 import { runCatching } from "../core/errorReporter.js";
 
@@ -13,6 +13,16 @@ export interface EntityEffectRule {
     readonly duration: number;
     readonly showParticles: boolean;
     readonly targetTypes?: ReadonlySet<string>;
+    /**
+     * The component an entity has to carry before this effect may be installed on it.
+     *
+     * The mob shadow swap is two halves: a permanent invisibility, which removes the engine's own
+     * shadow decal, and the components that keep the mob itself drawn through it. A script can only
+     * ever supply the first half, so an entity that predates the definition — one the engine did not
+     * build from the current components — would be left invisible instead of shadowless. Adding the
+     * effect to it is worse than leaving it alone, so the effect waits for its other half.
+     */
+    readonly requireComponent?: string;
 }
 
 export const BETA_ENTITY_PROPERTY_RULES: readonly EntityPropertyRule[] = Object.freeze([
@@ -20,8 +30,16 @@ export const BETA_ENTITY_PROPERTY_RULES: readonly EntityPropertyRule[] = Object.
     { identifier: "betarock:shadow_alpha" }
 ]);
 
+// `is_hidden_when_invisible` is the half the Script API can see — there is no component type for
+// `renders_when_invisible`, and the shadow smoke test pins all three to every Beta mob, so its
+// presence is what tells this pass the entity was built with the swap.
 export const BETA_ENTITY_EFFECT_RULES: readonly EntityEffectRule[] = Object.freeze([
-    { effectType: "invisibility", duration: 20000000, showParticles: false }
+    {
+        effectType: "invisibility",
+        duration: 20000000,
+        showParticles: false,
+        requireComponent: EntityComponentTypes.IsHiddenWhenInvisible
+    }
 ]);
 
 export function migrateEntity(
@@ -61,6 +79,8 @@ export function migrateEntity(
             operation: "migrateEffect",
             target: `${entity.typeId}:${rule.effectType}`
         }, () => {
+            if (rule.requireComponent && !entity.hasComponent(rule.requireComponent)) return;
+
             if (!entity.getEffect(rule.effectType)) {
                 entity.addEffect(rule.effectType, rule.duration, {
                     showParticles: rule.showParticles

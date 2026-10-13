@@ -62,6 +62,22 @@ describe("Drop conversion - picked-up items match their stack", () => {
         assert.equal(spawned[0]?.amount, 3, "whole stack rides across the respawn");
     });
 
+    it("keeps a sugar cane drop instead of deleting it", () => {
+        const { entity, spawned, removed } = brokenDrop("minecraft:reeds", 2);
+        eventBus.dispatch("entitySpawn", { entity });
+
+        assert.equal(removed(), false, "the era's reeds must not be read as a banned drop");
+        assert.equal(spawned.length, 0, "an already-final reeds stack needs no respawn");
+    });
+
+    it("lands Bedrock's second sugar cane id on the era's reeds", () => {
+        const { entity, spawned, removed } = brokenDrop("minecraft:sugar_cane");
+        eventBus.dispatch("entitySpawn", { entity });
+
+        assert.equal(removed(), true, "the alias entity is replaced rather than kept");
+        assert.equal(spawned[0]?.typeId, "minecraft:reeds", "the ground stack must be the id the era knew");
+    });
+
     it("leaves an already-normalized bh drop untouched", () => {
         const { entity, spawned, removed } = brokenDrop("bh:oak_log", 2);
         eventBus.dispatch("entitySpawn", { entity });

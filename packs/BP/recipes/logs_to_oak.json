@@ -5,6 +5,7 @@
           "identifier": "bh:logs_to_oak"
       },
       "tags": [
+          "crafting_table",
           "beta_crafting"
       ],
       "ingredients": [

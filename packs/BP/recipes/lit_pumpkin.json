@@ -5,6 +5,7 @@
       "identifier": "minecraft:lit_pumpkin"
     },
     "tags": [
+      "crafting_table",
       "beta_crafting"
     ],
     "pattern": [
