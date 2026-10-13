@@ -1,0 +1,68 @@
+name: Announce release on Discord
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to announce (re-posts the announcement, for testing)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# No `username` or `avatar_url` is set on the payload on purpose: Discord then renders the
+# message with the name and icon configured on the webhook itself instead of a GitHub identity.
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DISCORD_WEBHOOK: ${{ secrets.CHANGELOG_WEBHOOK }}
+    steps:
+      # The embed images are uploaded with the message rather than linked, so the announcement
+      # never depends on an expiring Discord CDN URL. The ref is pinned to the default branch
+      # because a release event otherwise checks out the tag, which need not carry the images.
+      - name: Check out the embed images
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Build the Discord payload from the release notes
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > release.json
+
+          jq '{
+            content: null,
+            embeds: [
+              { color: null, image: { url: "attachment://changelog.png" } },
+              {
+                title: ("Betafied - " + .tag_name),
+                description: ((((.body // "") | gsub("\r\n"; "\n")) | sub("[[:space:]]+$"; "")) + "\n\n## [DOWNLOAD](" + .html_url + ")"),
+                color: null,
+                image: { url: "attachment://divider.png" }
+              }
+            ],
+            attachments: []
+          }' release.json > payload.json
+
+      - name: Post to the Discord changelog webhook
+        run: |
+          set -euo pipefail
+          if [ -z "${DISCORD_WEBHOOK}" ]; then
+            echo "::error::The CHANGELOG_WEBHOOK repository secret is not set."
+            exit 1
+          fi
+          # `payload_json=<file` sends the file's *contents* as a form field; `@file` sends it as
+          # an uploaded file part, which Discord files away as an attachment and renders no embeds.
+          curl --fail-with-body --silent --show-error \
+            --form "payload_json=<payload.json" \
+            --form "files[0]=@assets/discord/changelog.png;type=image/png" \
+            --form "files[1]=@assets/discord/divider.png;type=image/png" \
+            "${DISCORD_WEBHOOK}"
