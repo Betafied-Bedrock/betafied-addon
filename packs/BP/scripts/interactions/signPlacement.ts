@@ -28,7 +28,6 @@ import {
     Direction,
     EntityComponentTypes,
     EquipmentSlot,
-    GameMode,
     Player,
     system,
     world
@@ -37,6 +36,7 @@ import type { Block, ItemStack, PlayerInteractWithBlockBeforeEvent } from "@mine
 import { BETA_USE_CONSUMING_BLOCK_IDS, BH_SIGN_ID } from "../core/betaRegistry.js";
 import { eventBus } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
+import { consumeHeldItem } from "../core/heldItem.js";
 
 const AIR_ID = "minecraft:air";
 const STANDING_SIGN_ID = "minecraft:standing_sign";
@@ -98,21 +98,6 @@ function heldSign(player: Player): boolean {
         ?.getEquipment(EquipmentSlot.Mainhand)?.typeId === BH_SIGN_ID;
 }
 
-function consumeHeldSign(player: Player): void {
-    if (player.getGameMode() === GameMode.Creative) return;
-
-    const equippable = player.getComponent(EntityComponentTypes.Equippable);
-    const held = equippable?.getEquipment(EquipmentSlot.Mainhand);
-    if (!equippable || !held || held.typeId !== BH_SIGN_ID) return;
-
-    if (held.amount > 1) {
-        held.amount -= 1;
-        equippable.setEquipment(EquipmentSlot.Mainhand, held);
-    } else {
-        equippable.setEquipment(EquipmentSlot.Mainhand, undefined);
-    }
-}
-
 interface PlannedSign {
     readonly cell: Cell;
     readonly blockId: string;
@@ -169,7 +154,7 @@ function settleWallSign(player: Player, planned: PlannedSign, dimensionId: strin
 
     dimension.setBlockPermutation(planned.cell, BlockPermutation.resolve(planned.blockId, planned.states));
     player.playSound(PLACE_SOUND, { volume: 1.0, pitch: 0.8 });
-    consumeHeldSign(player);
+    consumeHeldItem(player, (typeId) => typeId === BH_SIGN_ID);
 }
 
 /**

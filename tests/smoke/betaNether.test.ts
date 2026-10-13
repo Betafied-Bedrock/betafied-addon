@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { NETHER_BIOME_IDS, buildNetherBiome } from "../../scripts/lib/betaBiomes.mjs";
+import { compareText } from "../support/text.js";
 
 describe("Beta 1.7.3 Nether Contract", () => {
     const root = process.cwd();
@@ -20,8 +21,8 @@ describe("Beta 1.7.3 Nether Contract", () => {
             .filter(b => (b.components?.["minecraft:tags"]?.tags ?? []).includes("nether"));
 
         assert.deepEqual(
-            netherBiomes.map(b => b.description.identifier).sort(),
-            NETHER_BIOME_IDS.map(id => `minecraft:${id}`).sort(),
+            netherBiomes.map(b => b.description.identifier).sort(compareText),
+            NETHER_BIOME_IDS.map(id => `minecraft:${id}`).sort(compareText),
             "The Nether must be the five vanilla biomes overridden, with no custom-only biome"
         );
     });

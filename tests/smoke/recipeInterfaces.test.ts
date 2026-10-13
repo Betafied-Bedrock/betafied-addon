@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { compareText } from "../support/text.js";
 
 const root = process.cwd();
 const recipeDir = resolve(root, "packs/BP/recipes");
@@ -63,7 +64,7 @@ interface Recipe {
 function recipes(): Recipe[] {
     const found: Recipe[] = [];
 
-    for (const file of readdirSync(recipeDir).sort()) {
+    for (const file of readdirSync(recipeDir).sort(compareText)) {
         if (!file.endsWith(".json")) continue;
 
         const definition = JSON.parse(readFileSync(resolve(recipeDir, file), "utf-8").replace(/^\uFEFF/, ""));
@@ -89,7 +90,7 @@ function signatureOf(recipe: any): string {
     if (recipe.pattern) {
         const key = Object.entries(recipe.key ?? {})
             .map(([letter, ingredient]: [string, any]) => `${letter}=${ingredient.item ?? `#${ingredient.tag}`}`)
-            .sort()
+            .sort(compareText)
             .join(",");
         return `${recipe.pattern.join("/")}|${key}`;
     }
@@ -123,10 +124,10 @@ describe("Classic Recipe Contract - one crafting interface", () => {
         const strays = all
             .filter(recipe => recipe.tags.includes("crafting_table"))
             .map(recipe => recipe.file)
-            .sort();
+            .sort(compareText);
 
         // The list reads in bootstrap order; the comparison is by membership.
-        assert.deepEqual(strays, [...INVENTORY_GRID_RECIPES].sort());
+        assert.deepEqual(strays, [...INVENTORY_GRID_RECIPES].sort(compareText));
     });
 
     it("keeps the crafts Beta could make in the inventory grid reachable there", () => {

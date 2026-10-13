@@ -13,16 +13,15 @@ import {
     EntityComponentTypes,
     resetMocks,
     scheduledTimeouts,
-    system,
-    world
+    system
 } from "@minecraft/server";
+import { dimension } from "../support/world.js";
 
 const CAKE_ID = "bh:cake";
-const OVERWORLD = "minecraft:overworld";
 
 function cakeCell(bites = 0) {
-    const dimension = world.getDimension(OVERWORLD);
-    const block = dimension.getBlock({ x: 0, y: 64, z: 0 });
+    const dim = dimension();
+    const block = dim.getBlock({ x: 0, y: 64, z: 0 });
     block.setPermutation(BlockPermutation.resolve(CAKE_ID, { [CAKE_BITES_STATE]: bites }));
     return block;
 }
@@ -195,8 +194,8 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
         });
 
         it("reads a cake whose bite state never got written as unbitten", () => {
-            const dimension = world.getDimension(OVERWORLD);
-            const block = dimension.getBlock({ x: 4, y: 64, z: 4 });
+            const dim = dimension();
+            const block = dim.getBlock({ x: 4, y: 64, z: 4 });
             block.setPermutation(BlockPermutation.resolve(CAKE_ID));
             const { player } = eater(10);
 
@@ -219,8 +218,8 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
         });
 
         it("leaves every other block alone", () => {
-            const dimension = world.getDimension(OVERWORLD);
-            const stone = dimension.getBlock({ x: 8, y: 64, z: 8 });
+            const dim = dimension();
+            const stone = dim.getBlock({ x: 8, y: 64, z: 8 });
             stone.setPermutation(BlockPermutation.resolve("minecraft:stone"));
             const { player } = eater(10);
 

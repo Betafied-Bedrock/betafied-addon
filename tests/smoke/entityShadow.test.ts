@@ -7,6 +7,7 @@ import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
 } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { compareText, versionAtLeast } from "../support/text.js";
 
 /**
  * Entity shadows, as Beta 1.7.3's renderer draws them.
@@ -208,16 +209,6 @@ function particleFile(typeId: string): string {
 
 function particleId(typeId: string): string {
     return typeId === PLAYER_TYPE ? PLAYER_PARTICLE_ID : MOB_PARTICLE_ID;
-}
-
-/** Whether a dotted format version is at least `minimum`: 1.21.60 is, 1.8.0 is not. */
-function versionAtLeast(declared: string, minimum: string): boolean {
-    const mine = declared.split(".").map(Number);
-    const theirs = minimum.split(".").map(Number);
-    for (let i = 0; i < 3; i++) {
-        if ((mine[i] ?? 0) !== (theirs[i] ?? 0)) return (mine[i] ?? 0) > (theirs[i] ?? 0);
-    }
-    return true;
 }
 
 function components(path: string): Record<string, any> {
@@ -471,7 +462,6 @@ describe("Entity shadows - how each client entity runs it", () => {
         // "query.property: property does not exist, consider using query.has_property." instead.
         for (const typeId of betaRoster()) {
             const definition = readJson(clientEntityPath(typeId));
-            const description = definition["minecraft:client_entity"].description;
             const wired = wiredController(definition) !== undefined;
             if (!wired) continue;
 
@@ -660,7 +650,7 @@ describe("Entity shadows - one emitter, forever", () => {
         assert.deepEqual(Object.keys(all), [CONTROLLER], "one controller serves every entity");
 
         const controller = all[CONTROLLER];
-        assert.deepEqual(Object.keys(controller.states).sort(), ["idle", "shadow"]);
+        assert.deepEqual(Object.keys(controller.states).sort(compareText), ["idle", "shadow"]);
 
         // An emitter starts when a state is entered, so the decal lives in a state the controller
         // moves into -- a state's own particle_effects are not something to rely on firing.

@@ -708,4 +708,36 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             mockPlayers.length = 0;
         });
     });
+
+    describe("Dispatch order between item classes", () => {
+        // These pin precedence rather than the individual outcomes: each one fails if a classifier is
+        // reordered, which is the regression the per-class tables above cannot catch.
+        it("routes the pack bow through the pack classifier before the conversion tables", () => {
+            const enchanted = new ItemStack("bh:bow", 1);
+            enchanted.setComponent(ItemComponentTypes.Enchantable, {
+                getEnchantments: () => [{ type: "power", level: 3 }]
+            });
+
+            const action = evaluateItemAction(enchanted);
+
+            assert.equal(action.type, "strip_enchantments");
+            if (action.type === "strip_enchantments") {
+                assert.equal(action.item.typeId, "bh:bow");
+            }
+        });
+
+        it("retypes a stacked vanilla bow whole instead of splitting it like the pack bow", () => {
+            const action = evaluateItemAction(new ItemStack("minecraft:bow", 4));
+
+            assert.equal(action.type, "replace");
+            if (action.type === "replace") {
+                assert.equal(action.item.typeId, "bh:bow");
+                assert.equal(action.item.amount, 4, "a vanilla bow is retyped, never unstacked");
+            }
+        });
+
+        it("keeps a lone unenchanted pack bow rather than falling through to the tables", () => {
+            assert.equal(evaluateItemAction(new ItemStack("bh:bow", 1)).type, "keep");
+        });
+    });
 });

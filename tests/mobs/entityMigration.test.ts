@@ -1,13 +1,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { Entity, resetMocks, declaredEntityProperties } from "../mocks/minecraftServer.js";
-import {
-    migrateEntity,
-    BETA_ENTITY_PROPERTY_RULES,
-    BETA_ENTITY_EFFECT_RULES,
-    type EntityPropertyRule,
-    type EntityEffectRule
-} from "../../packs/BP/scripts/mobs/entityMigration.js";
+import { migrateEntity, type EntityPropertyRule } from "../../packs/BP/scripts/mobs/entityMigration.js";
 
 describe("EntityMigration - Future-Proof Entity Property & Effect Migration", () => {
     beforeEach(() => {

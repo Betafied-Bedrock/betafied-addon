@@ -6,6 +6,7 @@ import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
 } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { compareText } from "../support/text.js";
 
 /**
  * Beta 1.7.3's entity sizes and ground speeds, against the files that declare them.
@@ -311,9 +312,9 @@ describe("entity dimensions and speed", () => {
         // Two pigman ids share one definition file, so the roster maps onto fewer files than ids.
         const covered = [...new Set(roster().map(definitionFile))]
             .filter((file) => file !== "slime")
-            .sort();
+            .sort(compareText);
         assert.deepEqual(
-            Object.keys(BETA_EYE_HEIGHT).sort(),
+            Object.keys(BETA_EYE_HEIGHT).sort(compareText),
             covered,
             "every Beta mob has to have an eye height recorded, and nothing else"
         );

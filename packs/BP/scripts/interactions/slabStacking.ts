@@ -1,15 +1,13 @@
 import {
     BlockPermutation,
     Direction,
-    EntityComponentTypes,
-    EquipmentSlot,
-    GameMode,
     Player,
     system,
     world
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
+import { consumeHeldItem } from "../core/heldItem.js";
 
 interface Cell {
     readonly x: number;
@@ -39,21 +37,6 @@ export function canMergePlacedSlab(permutationToPlaceId: string, belowBlockTypeI
     return DOUBLE_SLAB_OF[permutationToPlaceId] !== undefined && belowBlockTypeId === permutationToPlaceId;
 }
 
-function consumeHeldSlab(player: Player): void {
-    if (player.getGameMode() === GameMode.Creative) return;
-
-    const equippable = player.getComponent(EntityComponentTypes.Equippable);
-    const held = equippable?.getEquipment(EquipmentSlot.Mainhand);
-    if (!equippable || !held) return;
-
-    if (held.amount > 1) {
-        held.amount -= 1;
-        equippable.setEquipment(EquipmentSlot.Mainhand, held);
-    } else {
-        equippable.setEquipment(EquipmentSlot.Mainhand, undefined);
-    }
-}
-
 function scheduleSlabDoubling(
     dimensionId: string,
     cell: Cell,
@@ -75,7 +58,7 @@ function scheduleSlabDoubling(
             }
 
             if (player.isValid) {
-                consumeHeldSlab(player);
+                consumeHeldItem(player, (typeId) => typeId === slabId);
             }
         } catch (e) {
             reportError({

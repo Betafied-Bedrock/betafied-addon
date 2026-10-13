@@ -15,15 +15,9 @@ import {
     ItemStack,
     Player,
     resetMocks,
-    scheduledTimeouts,
-    world
+    scheduledTimeouts
 } from "@minecraft/server";
-
-const OVERWORLD = "minecraft:overworld";
-
-function dimension() {
-    return world.getDimension(OVERWORLD);
-}
+import { dimension } from "../support/world.js";
 
 function signHolder(gameMode: string = GameMode.Survival): Player {
     const player = new Player("sign_placer", "SignPlacer");

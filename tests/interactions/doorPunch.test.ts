@@ -7,11 +7,10 @@ import {
     Direction,
     Player,
     resetMocks,
-    system,
-    world
+    system
 } from "@minecraft/server";
+import { dimension } from "../support/world.js";
 
-const OVERWORLD = "minecraft:overworld";
 const WOODEN_DOOR_ID = "minecraft:wooden_door";
 
 const CLOSED_LOWER_STATES = Object.freeze({
@@ -27,10 +26,6 @@ const CLOSED_UPPER_STATES = Object.freeze({
     open_bit: false,
     upper_block_bit: true
 });
-
-function dimension() {
-    return world.getDimension(OVERWORLD);
-}
 
 function spawnDoorInWorld(cell: { x: number; y: number; z: number }, open: boolean = false) {
     const dim = dimension();

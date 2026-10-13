@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { compareText } from "../support/text.js";
 
 const root = process.cwd();
 
@@ -76,7 +77,7 @@ describe("Classic Block Contract - Beta 1.7.3 chest", () => {
         }
 
         assert.deepEqual(
-            chest.permutations.map((p: any) => p.condition.match(/== '(\w+)'/)?.[1]).sort(),
+            chest.permutations.map((p: any) => p.condition.match(/== '(\w+)'/)?.[1]).sort(compareText),
             ["east", "north", "west"],
             "the base components already draw the south-facing latch"
         );
