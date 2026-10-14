@@ -14,22 +14,19 @@ build/
 *.mctemplate
 *.mcworld
 
-# AI & Agent configurations, prompts, and planning artifacts
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-.agents/
-.claude/
-.codex/
-.desloppify/
-.freebuff/
-.superpowers/
-docs/
+# AI & Agent configurations, prompts, and planning artifacts are excluded per-clone from
+# .git/info/exclude rather than here. Some agent read tooling refuses to return any path this
+# file matches, so an entry here makes the instruction corpus unreadable to the agent that is
+# required to load it, and a directory exclusion cannot be carved back out with a negation.
+# `.githooks/pre-commit` refuses to commit them regardless. See docs/agents/README.md.
 scorecard.png
 packs/**/*.md
 
-# Local offline documentation corpus (scripts/fetch-reference-docs.sh)
-reference-docs/
+# The local documentation corpus (scripts/fetch-reference-docs.mjs) is excluded per-clone from
+# .git/info/exclude rather than here, for the same read-tooling reason as the agent
+# configuration above. Its one exception stays ignored here: the recovered Beta 1.7.3 client
+# tree carries decompiled Mojang source, jars and assets that must never be published.
+reference-docs/beta-1.7.3/
 
 # Private deployment tooling (push builds and uploads to the hosted server). Kept out of
 # the public repo so contributors never need server credentials; split into its own project

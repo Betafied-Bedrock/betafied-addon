@@ -1,8 +1,10 @@
 #!/bin/sh
-# Agent tooling and instruction files must never enter history, at any depth.
+# Agent tooling, instruction files and the local documentation corpus must never enter history,
+# at any depth. These paths are excluded per-clone from .git/info/exclude, which is not tracked,
+# so this hook is the guard that still holds in a clone where that file was never set up.
 set -eu
 
-deny='^(\.agents/|\.claude/|\.codex/|\.superpowers/|\.desloppify/|\.scratch/|\.freebuff/|docs/agents/|docs/superpowers/|CLAUDE\.md$)|(^|/)AGENTS\.md$|^packs/.*\.md$'
+deny='^(\.agents/|\.claude/|\.codex/|\.superpowers/|\.desloppify/|\.scratch/|\.freebuff/|docs/|reference-docs/)|(^|/)AGENTS\.md$|(^|/)(CLAUDE|GEMINI)\.md$|^packs/.*\.md$'
 
 blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E "$deny" || true)
 

@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * Materialises an offline, greppable copy of Bedrock's two authoritative documentation
- * sources. Both are public Git repos, so we clone the source markdown directly instead of
- * scraping rendered HTML.
+ * Materialises an offline, greppable copy of Bedrock's authoritative documentation sources,
+ * plus the official sample packs. All are public Git repos, so we clone the source files
+ * directly instead of scraping rendered HTML.
  *
- * The output directory is gitignored: it is a local search corpus, not a build input.
- * Re-running this script refreshes it in place. Ported from bash so `npm run docs:fetch`
+ * The output directories are excluded from git per-clone (see .git/info/exclude) rather than
+ * from .gitignore, which some agent read tooling refuses: the corpus is a local search input,
+ * not a build input, and agents have to be able to open it. Re-running this script refreshes
+ * it in place. Ported from bash so `npm run docs:fetch`
  * works in a Windows shell; Git itself is the only external requirement.
  */
 import { execFileSync } from "node:child_process";
@@ -20,13 +22,30 @@ const DEST = path.join(ROOT, "reference-docs");
 // are the bulk of these repos and contribute nothing to search.
 const EXTENSIONS = ["md", "json", "ts", "js", "yaml", "yml", "txt", "csv"];
 
+// `subtrees` narrows the sparse checkout; omitting it takes text files from the whole repo.
 const SOURCES = [
-  { name: "bedrock-wiki", url: "https://github.com/Bedrock-OSS/bedrock-wiki", branch: "wiki", subtree: "docs" },
+  {
+    name: "bedrock-wiki",
+    url: "https://github.com/Bedrock-OSS/bedrock-wiki",
+    branch: "wiki",
+    subtrees: ["docs"],
+  },
   {
     name: "minecraft-creator",
     url: "https://github.com/MicrosoftDocs/minecraft-creator",
     branch: "main",
-    subtree: "creator",
+    subtrees: ["creator"],
+  },
+  {
+    name: "bedrock-samples",
+    url: "https://github.com/Mojang/bedrock-samples",
+    branch: "main",
+    subtrees: ["resource_pack", "behavior_pack"],
+  },
+  {
+    name: "minecraft-samples",
+    url: "https://github.com/microsoft/minecraft-samples",
+    branch: "main",
   },
 ];
 
@@ -66,9 +85,11 @@ function listFiles(dir, filter = () => true) {
   return out.sort();
 }
 
-function fetchOne({ name, url, branch, subtree }) {
+function fetchOne({ name, url, branch, subtrees }) {
   const dir = path.join(DEST, name);
-  const patterns = EXTENSIONS.map((ext) => `/${subtree}/**/*.${ext}`);
+  const patterns = subtrees
+    ? subtrees.flatMap((subtree) => EXTENSIONS.map((ext) => `/${subtree}/**/*.${ext}`))
+    : EXTENSIONS.map((ext) => `/**/*.${ext}`);
 
   if (fs.existsSync(path.join(dir, ".git"))) {
     console.log(`updating ${name} (${branch})`);
@@ -110,9 +131,9 @@ function writeIndex() {
   ];
   for (const { name } of SOURCES) {
     lines.push(`## ${name}`, "");
-    for (const rel of listFiles(path.join(DEST, name), (file) => file.endsWith(".md"))) {
-      lines.push(`* ${rel}`);
-    }
+    const docs = listFiles(path.join(DEST, name), (file) => file.endsWith(".md"));
+    if (docs.length === 0) lines.push("* No markdown in this tree; search it with `rg --no-ignore`.");
+    else for (const rel of docs) lines.push(`* ${rel}`);
     lines.push("");
   }
   fs.writeFileSync(path.join(DEST, "INDEX.md"), `${lines.join("\n")}\n`);
