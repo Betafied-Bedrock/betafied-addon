@@ -12,11 +12,9 @@ import {
     EquipmentSlot,
     ItemStack,
     Player,
-    resetMocks,
-    world
+    resetMocks
 } from "@minecraft/server";
-
-const OVERWORLD = "minecraft:overworld";
+import { dimension } from "../support/world.js";
 
 const LOWER_STATES = Object.freeze({
     direction: 1,
@@ -24,10 +22,6 @@ const LOWER_STATES = Object.freeze({
     open_bit: false,
     upper_block_bit: false
 });
-
-function dimension() {
-    return world.getDimension(OVERWORLD);
-}
 
 function placeLowerHalf(cell: { x: number; y: number; z: number }) {
     const dim = dimension();

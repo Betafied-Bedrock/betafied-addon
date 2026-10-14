@@ -1,5 +1,3 @@
-/** World block replacement policy mapping modern terrain blocks to Beta 1.7.3 equivalents. */
-
 import type { Entity } from "@minecraft/server";
 import { BH_CAKE_ID, isBetaEntity, isVanillaId, TERRAIN_PLANK_SPECIES } from "./betaRegistry.js";
 import { normalizeEntityDrop } from "./normalizer.js";
@@ -28,7 +26,6 @@ export function assessEntityCompatibility(typeId: string, droppedItemTypeId?: st
     return { allowed: true };
 }
 
-/** External addon entity tags exempt from drop and cleanup gates. */
 export const FOREIGN_OWNED_TAGS: readonly string[] = Object.freeze([
     "far:item_display",
     "far:shop_display"
@@ -113,10 +110,6 @@ export const BLOCK_BULK_REPLACEMENTS: readonly [string, string][] = [
     ...TERRAIN_PLANK_SPECIES.map((species): [string, string] => [`minecraft:${species}_planks`, "minecraft:planks"])
 ];
 
-/**
- * The two-block grasses Beta never knew. The modern bone-meal spread plants these beside the
- * single-block grass, so the interaction sweep and the scrubber refer to the same list.
- */
 export const POST_BETA_TALL_PLANTS: readonly string[] = Object.freeze([
     "minecraft:tall_grass",
     "minecraft:large_fern"
@@ -124,10 +117,6 @@ export const POST_BETA_TALL_PLANTS: readonly string[] = Object.freeze([
 
 export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     ...Object.fromEntries(POST_BETA_TALL_PLANTS.map((id): [string, string] => [id, "minecraft:air"])),
-    // The one era block here that the pack has taken over: a cake the pack placed before it owned the
-    // block is still vanilla terrain, and its eat is the engine's own, so the cell is rewritten as the
-    // pack's cake. The bite counter is not carried across — the cell comes back whole (see
-    // BETA_POLICY_GAPS §10) — because the two id's bite states are numbered 0-6 and 0-5.
     "minecraft:cake": BH_CAKE_ID,
     "minecraft:seagrass": "minecraft:water",
     "minecraft:kelp": "minecraft:water",

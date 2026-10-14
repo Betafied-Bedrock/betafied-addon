@@ -142,7 +142,7 @@
         ]
       },
       "minecraft:movement": {
-        "value": 0.322
+        "value": 0.245
       },
       "minecraft:navigation.walk": {
         "can_path_over_water": false,

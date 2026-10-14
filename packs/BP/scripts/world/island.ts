@@ -1,5 +1,6 @@
 import { world } from "@minecraft/server";
 import { tickManager } from "../core/tickManager.js";
+import { teleportQuietly } from "../core/quietTeleport.js";
 import { reportError } from "../core/errorReporter.js";
 import { END_ID, END_KEY } from "../core/betaConstants.js";
 
@@ -57,7 +58,7 @@ export function islandJob(): void {
         const end = world.getDimension(END_KEY);
 
         if (player.dimension.id !== END_ID) {
-            player.teleport(CONFIG.FINAL_POS, { dimension: end });
+            teleportQuietly(player, CONFIG.FINAL_POS, { dimension: end });
         }
 
         try {
@@ -71,7 +72,7 @@ export function islandJob(): void {
             const dz = loc.z - CONFIG.FINAL_POS.z;
 
             if (dx * dx + dz * dz > CONFIG.MAX_RADIUS_SQR || loc.y < CONFIG.MIN_Y) {
-                player.teleport(CONFIG.FINAL_POS, { dimension: end });
+                teleportQuietly(player, CONFIG.FINAL_POS, { dimension: end });
             }
         } catch (e) {
             reportError({

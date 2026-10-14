@@ -7,20 +7,12 @@ import {
     BH_IRON_DOOR_ID,
     BH_WOODEN_DOOR_ID
 } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { versionAtLeast } from "../support/text.js";
 
 const root = process.cwd();
 
 function readJson(path: string): any {
     return JSON.parse(readFileSync(path, "utf-8"));
-}
-
-function versionAtLeast(version: string, floor: string): boolean {
-    const parts = (value: string) => value.split(".").map(Number);
-    const [major, minor, patch] = parts(version);
-    const [minMajor, minMinor, minPatch] = parts(floor);
-    if (major !== minMajor) return major > minMajor;
-    if (minor !== minMinor) return minor > minMinor;
-    return patch >= minPatch;
 }
 
 const doors = [

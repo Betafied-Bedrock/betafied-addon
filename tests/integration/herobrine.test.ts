@@ -6,11 +6,13 @@ import {
     mockPlayers,
     mockEntities,
     world,
+    system,
     Player,
     CommandPermissionLevel
 } from "../mocks/minecraftServer.js";
 import { tickManager } from "../../packs/BP/scripts/core/tickManager.js";
 import {
+    MIN_REST_TICKS,
     forceAppearance,
     hasActiveSighting
 } from "../../packs/BP/scripts/mobs/herobrine.js";
@@ -44,6 +46,14 @@ function sweepUntilResolved(limit: number): void {
 
 function sweepTicks(limit: number): void {
     for (let i = 0; i < limit; i++) {
+        tickManager.step();
+    }
+}
+
+/** Runs the engine clock and the master scheduler together, so gap timers see the ticks the scheduler does. */
+function advanceTicks(ticks: number): void {
+    for (let i = 0; i < ticks; i++) {
+        system.advanceTicks(1);
         tickManager.step();
     }
 }
@@ -201,5 +211,35 @@ describe("Herobrine Appearance Integration", () => {
         resetMocks();
         assert.equal(forceAppearance(), false);
         assert.equal(hasActiveSighting(), false);
+    });
+
+    it("holds the automatic sweep off for the rest period after a sighting ends", () => {
+        const originalRandom = Math.random;
+        // Freeze the RNG so the roll gate, the spot picker and the gap picker are all deterministic.
+        Math.random = () => 0;
+
+        try {
+            resetMocks();
+            layOpenGround();
+            const player = spawnTestPlayer();
+
+            assert.equal(forceAppearance(), true);
+            const [entity] = [...mockEntities.values()];
+
+            // Walking into him is what arms the rest period on the scheduled path.
+            player.location = { ...entity.location };
+            sweepUntilResolved(60);
+            assert.equal(hasActiveSighting(), false, "close range should end the sighting");
+
+            player.location = { x: 0.5, y: 64, z: 0.5 };
+            advanceTicks(MIN_REST_TICKS - 6000);
+            assert.equal(mockEntities.size, 1, "no second apparition inside the rest period");
+
+            advanceTicks(6000 + 60);
+            assert.equal(mockEntities.size, 2, "the sweep should be free to appear again once the rest elapses");
+            assert.equal([...mockEntities.values()][1].typeId, "bh:herobrine");
+        } finally {
+            Math.random = originalRandom;
+        }
     });
 });

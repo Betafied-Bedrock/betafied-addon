@@ -1,14 +1,3 @@
-/**
- * Beta 1.7.3's doors, as `ItemDoor` placed them: the item went down only on the top face of a block,
- * and it wrote the lower and the upper half in one go. A custom item can only ask the engine for a
- * single block (`minecraft:block_placer`), so the crafted `bh:` doors are governed here — the era's
- * placement rule is enforced before the engine acts, and the missing half is written after it does.
- *
- * The half the engine placed keeps whatever orientation it chose; the partner is copied from it, so
- * this never has to derive a facing. A door the engine placed whole (its own `minecraft:*_door` items
- * still do) is left alone, because it already carries both halves.
- */
-
 import { Block, BlockPermutation, Direction, EntityComponentTypes, EquipmentSlot, world } from "@minecraft/server";
 import type { Player, PlayerPlaceBlockBeforeEvent } from "@minecraft/server";
 import { BETA_DOOR_BLOCK_IDS, BETA_DOOR_BLOCK_OF } from "../core/betaRegistry.js";
@@ -28,12 +17,6 @@ export interface DoorCompletion {
     readonly upperStates: Record<string, boolean | number | string>;
 }
 
-/**
- * The states for the half the engine did not place, or undefined when there is nothing to write: the
- * block is not a door half, it is already the upper half, or the cell above is taken — which is a
- * placement the era would have refused outright, and a block the engine has already placed is not
- * ours to delete.
- */
 export function planDoorCompletion(
     typeId: string,
     states: Readonly<Record<string, boolean | number | string>>,
@@ -48,10 +31,6 @@ export function planDoorCompletion(
     return { upperStates: { ...states, [upperBit]: true } };
 }
 
-/**
- * Intrinsic door states are written bare (`upper_block_bit`) in the creator reference, but the engine
- * reports them under whichever spelling it holds, so the key comes off the half that was placed.
- */
 function upperBitKey(states: Readonly<Record<string, boolean | number | string>>): string | undefined {
     if (UPPER_BIT in states) return UPPER_BIT;
     return Object.keys(states).find(name => name.endsWith(`:${UPPER_BIT}`));
@@ -62,10 +41,6 @@ function heldDoorItem(player: Player): boolean {
     return held !== undefined && BETA_DOOR_BLOCK_OF[held.typeId] !== undefined;
 }
 
-/**
- * Beta's door would not go up against a wall: `ItemDoor.onItemUse` answered false for every face but
- * the top one, leaving the item in the player's hand.
- */
 function enforceTopFaceOnly(event: PlayerPlaceBlockBeforeEvent): void {
     if (!event.permutationToPlace) return;
     if (!BETA_DOOR_BLOCK_IDS.has(event.permutationToPlace.type.id)) return;

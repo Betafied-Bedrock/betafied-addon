@@ -247,6 +247,26 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         assert.deepEqual(cane.permutationCalls, []);
     });
 
+    it("leaves an extended piston standing", () => {
+        const base = recordingBlock("minecraft:piston", { facing_direction: 1 });
+        const head = recordingBlock("minecraft:piston_arm_collision", { facing_direction: 1 });
+        const stickyHead = recordingBlock("minecraft:sticky_piston_arm_collision", { facing_direction: 1 });
+
+        scrub(scrubDimension(new Map<string, RecordedBlock>([
+            ["4,64,4", base],
+            ["5,64,4", head],
+            ["9,64,9", stickyHead]
+        ])));
+
+        // This engine renders Beta's piston extension (block 34) as a block of its own, so the base
+        // alone is a headless — broken — piston. A piston left extended at logout lost its head to
+        // the sweep on the chunk load that followed.
+        assert.deepEqual(head.setTypeCalls, [], "an extended piston head must survive the fine pass");
+        assert.deepEqual(head.permutationCalls, []);
+        assert.deepEqual(stickyHead.setTypeCalls, [], "a sticky piston head must survive the fine pass");
+        assert.deepEqual(base.setTypeCalls, [], "the piston base must survive the fine pass");
+    });
+
     it("still converts convertible modern blocks rather than deleting them", () => {
         const andesite = recordingBlock("minecraft:andesite");
         const dim = scrubDimension(new Map<string, RecordedBlock>([["2,64,2", andesite]]));

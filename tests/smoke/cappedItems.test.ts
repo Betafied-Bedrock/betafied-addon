@@ -12,21 +12,13 @@ import {
     BH_SIGN_ID,
     BH_WOODEN_DOOR_ID
 } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { versionAtLeast } from "../support/text.js";
 
 const root = process.cwd();
 
 function readJson(path: string): any {
     // One legacy recipe still carries an editor's byte-order mark; JSON.parse refuses it.
     return JSON.parse(readFileSync(path, "utf-8").replace(/^\uFEFF/, ""));
-}
-
-function versionAtLeast(version: string, floor: string): boolean {
-    const parts = (value: string) => value.split(".").map(Number);
-    const [major, minor, patch] = parts(version);
-    const [minMajor, minMinor, minPatch] = parts(floor);
-    if (major !== minMajor) return major > minMajor;
-    if (minor !== minMinor) return minor > minMinor;
-    return patch >= minPatch;
 }
 
 /** A shaped or shapeless recipe yields one stack or a list of them. */

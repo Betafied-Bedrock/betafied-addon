@@ -83,7 +83,7 @@
         "priority": 3
       },
       "minecraft:movement": {
-        "value": 0.23
+        "value": 0.175
       },
       "minecraft:movement.basic": {},
       "minecraft:behavior.random_stroll": {
@@ -100,6 +100,9 @@
       },
       "minecraft:behavior.float": {
         "priority": 0
+      },
+      "minecraft:behavior.hurt_by_target": {
+        "priority": 1
       },
       "minecraft:behavior.nearest_attackable_target": {
         "priority": 2,

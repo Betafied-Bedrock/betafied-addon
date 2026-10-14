@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { BETA_BLOCK_IDS, BH_CAKE_ID, isBetaBlock } from "../../packs/BP/scripts/core/betaRegistry.js";
 import { BLOCK_FINE_REPLACEMENTS } from "../../packs/BP/scripts/core/compatibilityPolicy.js";
+import { compareText } from "../support/text.js";
 
 const root = process.cwd();
 
@@ -180,7 +181,7 @@ describe("Classic Block Contract - Beta 1.7.3 cake", () => {
         for (const bone of geometry.bones.filter((entry: any) => entry.cubes)) {
             const faces = bone.cubes[0].uv;
             assert.deepEqual(
-                Object.keys(faces).sort(),
+                Object.keys(faces).sort(compareText),
                 ["down", "east", "north", "south", "up", "west"],
                 `${bone.name} must map every face`
             );

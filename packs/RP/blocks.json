@@ -34,7 +34,7 @@
         "textures": "acacia_sign"
     },
     "acacia_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "acacia_leaves_carried",
         "isotropic": false,
         "sound": "grass",
@@ -394,11 +394,18 @@
         "textures": "birch_sign"
     },
     "birch_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "oak_leaves_carried",
         "isotropic": false,
         "sound": "grass",
-        "textures": "oak_leaves"
+        "textures": {
+            "down": "oak_leaves_bottom",
+            "east": "oak_leaves_east_west",
+            "north": "oak_leaves_north_south",
+            "south": "oak_leaves_north_south",
+            "up": "oak_leaves",
+            "west": "oak_leaves_east_west"
+        }
     },
     "birch_log": {
         "isotropic": false,
@@ -1505,7 +1512,7 @@
         "textures": "darkoak_sign"
     },
     "dark_oak_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "big_oak_leaves_carried",
         "isotropic": false,
         "sound": "grass",
@@ -2495,7 +2502,7 @@
         "textures": "jungle_sign"
     },
     "jungle_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "jungle_leaves_carried",
         "isotropic": false,
         "sound": "grass",
@@ -2598,14 +2605,14 @@
         "blockshape": "invisible"
     },
     "leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "leaves_carried",
         "isotropic": false,
         "sound": "grass",
         "textures": "leaves"
     },
     "leaves2": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "leaves_carried2",
         "isotropic": false,
         "sound": "grass",
@@ -3077,7 +3084,7 @@
         "textures": "mangrove_sign"
     },
     "mangrove_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "mangrove_leaves_carried",
         "sound": "grass",
         "textures": "mangrove_leaves"
@@ -3328,11 +3335,18 @@
         "textures": "sign"
     },
     "oak_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "oak_leaves_carried",
         "isotropic": false,
         "sound": "grass",
-        "textures": "oak_leaves"
+        "textures": {
+            "down": "oak_leaves_bottom",
+            "east": "oak_leaves_east_west",
+            "north": "oak_leaves_north_south",
+            "south": "oak_leaves_north_south",
+            "up": "oak_leaves",
+            "west": "oak_leaves_east_west"
+        }
     },
     "oak_log": {
         "isotropic": false,
@@ -4395,11 +4409,18 @@
         "textures": "spruce_sign"
     },
     "spruce_leaves": {
-        "brightness_gamma": 0.8,
+        "ambient_occlusion_exponent": 0.25,
         "carried_textures": "spruce_leaves_carried",
         "isotropic": false,
         "sound": "grass",
-        "textures": "spruce_leaves"
+        "textures": {
+            "down": "spruce_leaves_bottom",
+            "east": "spruce_leaves_east_west",
+            "north": "spruce_leaves_north_south",
+            "south": "spruce_leaves_north_south",
+            "up": "spruce_leaves",
+            "west": "spruce_leaves_east_west"
+        }
     },
     "spruce_log": {
         "isotropic": false

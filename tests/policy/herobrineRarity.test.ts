@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+    MIN_REST_TICKS,
+    SIGHTING_CHANCE,
     facingYaw,
     isWithinLookCone,
     pickRollDelayTicks,
@@ -8,6 +10,8 @@ import {
 } from "../../packs/BP/scripts/mobs/herobrine.js";
 
 const FAR_SIGHTING_CASES = 4000;
+const RATE_SAMPLES = 2000;
+const TICKS_PER_HOUR = 20 * 60 * 60;
 const FORWARD = { x: 0, y: 0, z: 1 };
 
 /** Direction sitting `degrees` off the +Z axis, in the horizontal plane. */
@@ -49,7 +53,7 @@ describe("Herobrine Appearance Policy", () => {
         it("keeps the first window quiet", () => {
             for (let i = 0; i < 1000; i++) {
                 const delay = pickRollDelayTicks(true);
-                assert.ok(delay >= 6000 && delay <= 18000, `first delay ${delay} out of window`);
+                assert.ok(delay >= 24000 && delay <= 72000, `first delay ${delay} out of window`);
             }
         });
 
@@ -57,10 +61,29 @@ describe("Herobrine Appearance Policy", () => {
             const seen = new Set<number>();
             for (let i = 0; i < 1000; i++) {
                 const delay = pickRollDelayTicks(false);
-                assert.ok(delay >= 1200 && delay <= 7200, `later delay ${delay} out of window`);
+                assert.ok(delay >= 12000 && delay <= 36000, `later delay ${delay} out of window`);
                 seen.add(delay);
             }
             assert.ok(seen.size > 900, "later windows should be spread across the range, not fixed");
+        });
+    });
+
+    describe("sighting rate", () => {
+        it("holds a bare minimum of eight hours between sightings", () => {
+            const restHours = MIN_REST_TICKS / TICKS_PER_HOUR;
+            assert.ok(restHours >= 8, `rest period of ${restHours}h is under the eight-hour floor`);
+        });
+
+        it("makes a sighting a rare event, the better part of a day apart", () => {
+            let total = 0;
+            for (let i = 0; i < RATE_SAMPLES; i++) total += pickRollDelayTicks(false);
+            const meanGapTicks = total / RATE_SAMPLES;
+            const expectedHours = (MIN_REST_TICKS + meanGapTicks / SIGHTING_CHANCE) / TICKS_PER_HOUR;
+
+            assert.ok(
+                expectedHours >= 16 && expectedHours <= 26,
+                `expected most of a day between sightings, got ${expectedHours.toFixed(1)}h`
+            );
         });
     });
 

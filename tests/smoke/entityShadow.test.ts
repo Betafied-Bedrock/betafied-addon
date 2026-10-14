@@ -7,99 +7,9 @@ import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
 } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { compareText, versionAtLeast } from "../support/text.js";
 
-/**
- * Entity shadows, as Beta 1.7.3's renderer draws them.
- *
- * The feature is a texture, two particles, one controller and the numbers each entity declares --
- * there is no script behind it, and this file exists to pin the three shape rules the engine is
- * unforgiving about, because all three reached a build before they were understood:
- *
- *  1. A billboard `direction` subsection is not usable at all. The reference names two modes,
- *     `derive_from_velocity` and `custom_direction`, and this engine rejects both -- its content log
- *     reads `particle_appearance_billboard | ParticleAppearanceBillboardComponent | The 'direction'
- *     sub section is not using a valid mode!` for `{"mode": "custom", ...}` and for
- *     `{"mode": "custom_direction", ...}` alike. A rejected direction leaves the orientation
- *     unresolved, and with `direction_z` that collapses the quad to nothing: the shadows disappeared
- *     from the world entirely. A decal therefore declares no direction at all and takes its plane
- *     from the emitter's own frame.
- *  2. A controller state starts a *new* emitter every time it is entered, and the reference ends a
- *     state's effects when that state is left: "a list of particle effects to be started upon state
- *     entry, and for those particle effects to be automatically ended when leaving the state... they
- *     will be terminated at state exit" (ParticleEntityIntegration). A state that flips on a physical
- *     query therefore restarts the decal over and over. A mob's decal has nothing to restart for, so
- *     its emitting state is reached once, from an initial state that draws nothing and has no way
- *     back. Nothing restarts a decal here: not a physical query, not the view (rule 6).
- *  3. Molang variables a `pre_effect_script` sets are readable from the *appearance* subsection but
- *     not from the position ones. `variable.shadow_lift` in `emitter_shape_point` and
- *     `particle_motion_parametric` logged
- *     `unhandled request for unknown variable 'variable.shadow_lift'` every frame of every decal --
- *     millions of lines -- and evaluated to zero. The position of a decal is therefore written with
- *     literals, or with one of the few entity queries a particle resolves (rule 5).
- *  4. A query is enabled by the *file's own* format version, and one a file's version does not know
- *     evaluates to zero with nothing in the content log to say so. `query.is_local_player` needs
- *     1.19.60 while the player's particle declared 1.10.0, so the lift that brings the local
- *     player's decal down from the camera never happened: the decal stayed on the camera and the
- *     maintainer saw their own shadow in first *and* third person.
- *  5. A particle's Molang target resolves only a handful of entity queries, and asking it for one it
- *     does not know is worse than getting zero. `query.above_top_solid(x, z)` is documented for
- *     entities and is not among them: from a particle the engine logs
- *     `particles/entity_shadow.json | ... | relative_position | 0.02 + query.above_top_solid(...)`,
- *     `unrecognized token: query.above_top_solid` and `Failed to resolve query query.` (2026-10-12
- *     11:41:35), and the damage spreads past the expression that failed --
- *     `particle_motion_parametric` is dropped, so the decal falls back to the emitter's origin and
- *     z-fights the ground it should sit above, and the tint falls back to opaque, so every decal
- *     turns pitch black. Pinning a decal to the ground is therefore not something a particle can do
- *     in this build; only queries seen to resolve here belong in one.
- *  6. A decal is drawn for every player *except the one looking through it*: the local player sees
- *     none of their own shadow in either view, and still sees everyone else's. That gate sits in the
- *     particle, multiplying the opacity by `1.0 - query.is_local_player`, because the particle is
- *     where the query has been shown to resolve -- this file's eye-height lift already depends on it --
- *     while a controller at 1.10.0 is precisely the situation rule 4 describes.
- *
- * The numbers themselves come from the 1.7.3 client, whose sources and assets were recovered into
- * the local corpus at `reference-docs/beta-1.7.3` (gitignored, like the rest of `reference-docs/`):
- *
- *  - `Render.doRenderShadowAndFire` (Render.java:237) draws a shadow only under fancy graphics and
- *    only for a renderer whose `shadowSize` (`Render.java:9`) is above zero, with
- *    `alpha = (1 - distanceSquared / 256) * field_194_c`; `field_194_c` is 1.0 for every entity.
- *    `RenderManager.func_851_a` (RenderManager.java:125) is the *squared* distance to the camera, so
- *    a shadow is gone past sixteen blocks, and the entity's own opacity is *multiplied* by that
- *    falloff rather than reduced by a fixed share of it.
- *  - `Render.renderShadowOnBlock` (Render.java:135) paints the decal on the block's top face plus
- *    1/64 and gives it `((shadowAlpha - (entityCenterY - blockY) / 2) * 0.5) * light`. For an entity
- *    standing there, `entityCenterY - blockY` is half its height, so the full-light, zero-distance
- *    alpha is `0.5 - height / 8` -- the second number each entity declares.
- *  - Its UVs run `(entity - vertex) / 2 / shadowSize + 0.5` (Render.java:159-162), so the sprite Java
- *    maps spans `2 * shadowSize` of world space: the decal quad is *twice* the renderer constant.
- *    That sprite is `misc/shadow.png`, byte-identical to this pack's
- *    `textures/particle/entity_shadow.png` (one SHA-256), and its disc is nearly solid -- fully
- *    opaque out to 29 of the sprite's 32 pixels of half-width, half alpha at 30 and nothing at 31 --
- *    so the shape Java lays on the ground is `2 * 0.9375 * shadowSize`, about `1.875 * shadowSize`,
- *    across.
- *  - A decal therefore declares the renderer constant itself, because Bedrock's billboard `size` is a
- *    *radius* and not a width: Microsoft's particle tutorial reads "the width and height of this plane
- *    can be defined, where each value is the radius. This means that setting the size to 1 by 1 would
- *    make it 2 by 2 blocks". A radius of `shadowSize` draws a quad of `2 * shadowSize` -- Java's own
- *    sprite -- so the disc inside it lands at the width Java drew. That declaration has now held three
- *    different numbers: `shadowSize` (a halving made from a maintainer's eye, with no source), then
- *    `2 * shadowSize` (this file reading `size` as the quad's full width instead of its radius), and
- *    back to `shadowSize` when the doubled decals reached the game and the maintainer reported them as
- *    "at least double the size of what they should be". The radius convention is the fact that
- *    separates the two readings, and it is the one to re-read before touching a span.
- *  - `Entity.getShadowSize` (Entity.java:869) is `height / 2`, and the renderer sizes come from the
- *    constructors in `RenderManager.java:27-41`.
- *
- * What a client still cannot reproduce, and this pack therefore does not:
- *
- *  - the `getLightBrightness` multiplier and the `> 3` light test around it, so a decal here is as
- *    dark in a dark room as in daylight, where Beta faded it out and skipped it entirely;
- *  - `block.renderAsNormalBlock()`, so a decal can cover a slab, a stair or farmland that Beta
- *    clipped;
- *  - the `fancyGraphics` switch, so a fast-graphics client draws decals Beta would not have.
- */
 const LEGACY_ROSTER_IDS: Readonly<Record<string, string>> = Object.freeze({
-    // Bedrock renamed the pigman and kept the old id working; the pack ships the old definition.
     "minecraft:zombified_piglin": "minecraft:zombie_pigman"
 });
 
@@ -148,6 +58,10 @@ const CONTROLLER_FILE = "packs/RP/animation_controllers/entity_shadow.animation_
 const MOB_PARTICLE_FILE = "packs/RP/particles/entity_shadow.json";
 const PLAYER_PARTICLE_FILE = "packs/RP/particles/entity_shadow_player.json";
 const TEXTURE_FILE = "packs/RP/textures/particle/entity_shadow.png";
+const RENDER_CONTROLLERS_DIR = "packs/RP/render_controllers";
+
+/** The query that tells a render controller whether to draw the entity at all. */
+const INVISIBILITY_QUERY = "query.is_invisible";
 
 const CONTROLLER = "controller.animation.betarock.entity_shadow";
 const EFFECT_ALIAS = "bh_entity_shadow";
@@ -159,6 +73,23 @@ const PLAYER_TYPE = "minecraft:player";
 const LOCAL_PLAYER_QUERY = "query.is_local_player";
 const FIRST_PERSON_QUERY = "query.is_first_person";
 const DISTANCE_QUERY = "query.distance_from_camera";
+
+/**
+ * The entities that may not carry the swap at all, and keep Bedrock's own shadow.
+ *
+ * The wiki's recipe is two components -- the invisibility effect, which is what removes the engine's
+ * own shadow, and `renders_when_invisible`, which keeps the model drawn through it -- and the pack
+ * added a third to every mob: `minecraft:is_hidden_when_invisible`, documented as "The entity can hide
+ * from hostile mobs while invisible". That is the pair vanilla's wandering trader uses to stand in the
+ * open at night, and it is not a rendering detail. On the player it turned the swap into a permanent
+ * aggro shield: every hostile mob's `nearest_attackable_target` answered "no" to an entity that is
+ * always invisible, so zombies and skeletons walked past until they were hit and only retaliation --
+ * a sight-free path -- landed. `target_invisible_multiplier` (0.7, times the target's armor coverage)
+ * makes the effect itself cost most of a mob's range as well, so the player cannot keep the swap in any
+ * shape: there is no per-entity shadow control to fall back on, only a tiny collision box, a
+ * RenderDragon-dead material and an undocumented `banner_pole` model, and none of those suits a player.
+ */
+const KEEPS_ENGINE_SHADOW: ReadonlySet<string> = new Set([PLAYER_TYPE]);
 
 /** The entity queries that have been seen to resolve inside a particle, and no others. */
 const PARTICLE_QUERIES: readonly string[] = Object.freeze([DISTANCE_QUERY, LOCAL_PLAYER_QUERY]);
@@ -210,16 +141,6 @@ function particleId(typeId: string): string {
     return typeId === PLAYER_TYPE ? PLAYER_PARTICLE_ID : MOB_PARTICLE_ID;
 }
 
-/** Whether a dotted format version is at least `minimum`: 1.21.60 is, 1.8.0 is not. */
-function versionAtLeast(declared: string, minimum: string): boolean {
-    const mine = declared.split(".").map(Number);
-    const theirs = minimum.split(".").map(Number);
-    for (let i = 0; i < 3; i++) {
-        if ((mine[i] ?? 0) !== (theirs[i] ?? 0)) return (mine[i] ?? 0) > (theirs[i] ?? 0);
-    }
-    return true;
-}
-
 function components(path: string): Record<string, any> {
     return readJson(path).particle_effect.components;
 }
@@ -234,6 +155,33 @@ function positionExpressions(path: string): string[] {
 
 function controllers(): Record<string, any> {
     return readJson(CONTROLLER_FILE).animation_controllers;
+}
+
+/** Every render controller the pack ships, keyed by identifier, across the whole folder. */
+function renderControllers(): Record<string, any> {
+    const found: Record<string, any> = {};
+    for (const file of readdirSync(resolve(root, RENDER_CONTROLLERS_DIR))) {
+        if (!file.endsWith(".json")) continue;
+        Object.assign(found, readJson(`${RENDER_CONTROLLERS_DIR}/${file}`).render_controllers ?? {});
+    }
+    return found;
+}
+
+/** Every `nearest_attackable_target` a definition declares, wherever it sits -- component groups too. */
+function targetGoals(node: unknown, found: unknown[] = []): unknown[] {
+    if (node === null || typeof node !== "object") return found;
+
+    for (const [key, value] of Object.entries<any>(node)) {
+        if (key === "minecraft:behavior.nearest_attackable_target") found.push(value);
+        targetGoals(value, found);
+    }
+
+    return found;
+}
+
+/** Whether any of a definition's target goals names the player family. */
+function huntsThePlayer(definition: unknown): boolean {
+    return targetGoals(definition).some((goal) => /"value": ?"player"/.test(JSON.stringify(goal)));
 }
 
 /**
@@ -384,6 +332,19 @@ describe("Entity shadows - what each entity declares", () => {
             const path = entityPath(typeId);
             const components_ = readJson(path)["minecraft:entity"].components;
 
+            // The player is the one entity the swap cannot serve, asserted as an absence from the side
+            // that fails silently: putting it back would still render, still take hits and log nothing.
+            if (KEEPS_ENGINE_SHADOW.has(typeId)) {
+                for (const component of [
+                    "minecraft:spell_effects",
+                    "minecraft:renders_when_invisible",
+                    "minecraft:is_hidden_when_invisible"
+                ]) {
+                    assert.equal(components_[component], undefined, `${path} may not carry ${component}`);
+                }
+                continue;
+            }
+
             // Declarative, so nothing has to keep it applied: the engine draws no shadow for an
             // invisible entity, and `renders_when_invisible` is what keeps the mob itself visible.
             assert.deepEqual(
@@ -415,6 +376,55 @@ describe("Entity shadows - what each entity declares", () => {
             );
         }
     });
+
+    it("keeps a swapped mob drawn, whatever its render controller asks", () => {
+        // The swap holds every Beta mob permanently invisible, so the model only reaches the screen
+        // because `renders_when_invisible` stops the engine culling it -- a controller that reads
+        // `query.is_invisible` undraws the mob that could still hit you. Vanilla's spider controller
+        // does exactly that, with `Material.invisible`, and it is what made spiders invisible.
+        const shipped = renderControllers();
+        const offenders: string[] = [];
+
+        for (const typeId of betaRoster()) {
+            if (KEEPS_ENGINE_SHADOW.has(typeId)) continue;
+
+            const description = readJson(clientEntityPath(typeId))["minecraft:client_entity"].description;
+            for (const identifier of description.render_controllers ?? []) {
+                const controller = shipped[identifier];
+                // Vanilla's own controller: not a definition this pack can or needs to correct.
+                if (!controller) continue;
+
+                if (JSON.stringify(controller.materials ?? {}).includes(INVISIBILITY_QUERY)) {
+                    offenders.push(`${identifier} for ${clientEntityPath(typeId)}`);
+                }
+            }
+        }
+
+        assert.deepEqual(
+            offenders,
+            [],
+            "a material chosen by the invisibility query hides the mob the swap just took a shadow from"
+        );
+    });
+
+    it("leaves the player huntable by every hostile mob that hunts", () => {
+        // Both ends of the aggro contract, because the swap's price is paid in targeting and neither
+        // half says anything in a content log: the player may not carry the invisibility that hides an
+        // entity from hostile mobs, and each hostile mob has to keep naming the player as a target.
+        const player = readJson(entityPath(PLAYER_TYPE))["minecraft:entity"].components;
+        assert.equal(
+            player["minecraft:is_hidden_when_invisible"],
+            undefined,
+            "the player may not hide from hostile mobs"
+        );
+        assert.equal(player["minecraft:spell_effects"], undefined, "and may not be permanently invisible");
+
+        for (const typeId of BETA_HOSTILE_TYPES) {
+            const definition = readJson(entityPath(typeId));
+            if (targetGoals(definition).length === 0) continue;
+            assert.ok(huntsThePlayer(definition), `${entityPath(typeId)} no longer names family "player"`);
+        }
+    });
 });
 
 describe("Entity shadows - how each client entity runs it", () => {
@@ -426,9 +436,11 @@ describe("Entity shadows - how each client entity runs it", () => {
             const definition = readJson(path);
             const description = definition["minecraft:client_entity"].description;
 
-            if (javaShadow(typeId) === undefined) {
-                // A ghast draws no decal in Beta, so its client entity binds no emitter -- and keeps
-                // the swap all the same, or Bedrock would draw one.
+            if (javaShadow(typeId) === undefined || KEEPS_ENGINE_SHADOW.has(typeId)) {
+                // A ghast draws no decal in Beta, and the player may not carry the swap, so neither
+                // binds an emitter -- and neither may bind the controller either, which would read a
+                // pair of numbers only a decal uses. The player's particle file stays in the pack as
+                // the decal a swap would bind again; nothing references it while this holds.
                 assert.equal(description.particle_effects?.[EFFECT_ALIAS], undefined, `${path}: no decal`);
                 assert.equal(
                     JSON.stringify(description).includes("controller.animation.betarock.entity_shadow"),
@@ -471,7 +483,6 @@ describe("Entity shadows - how each client entity runs it", () => {
         // "query.property: property does not exist, consider using query.has_property." instead.
         for (const typeId of betaRoster()) {
             const definition = readJson(clientEntityPath(typeId));
-            const description = definition["minecraft:client_entity"].description;
             const wired = wiredController(definition) !== undefined;
             if (!wired) continue;
 
@@ -660,7 +671,7 @@ describe("Entity shadows - one emitter, forever", () => {
         assert.deepEqual(Object.keys(all), [CONTROLLER], "one controller serves every entity");
 
         const controller = all[CONTROLLER];
-        assert.deepEqual(Object.keys(controller.states).sort(), ["idle", "shadow"]);
+        assert.deepEqual(Object.keys(controller.states).sort(compareText), ["idle", "shadow"]);
 
         // An emitter starts when a state is entered, so the decal lives in a state the controller
         // moves into -- a state's own particle_effects are not something to rely on firing.

@@ -7,6 +7,7 @@ import {
     staleContentLogs,
     totalBytes
 } from "../../scripts/lib/contentLogs.mjs";
+import { compareText } from "../support/text.js";
 
 const DIR = "/logs";
 const MINUTE = 60 * 1000;
@@ -45,7 +46,7 @@ describe("Which content logs a launch makes redundant", () => {
         const stale = staleContentLogs(entries, { now });
 
         assert.deepEqual(
-            stale.map((log) => log.name).sort(),
+            stale.map((log) => log.name).sort(compareText),
             ["ContentLog_session_1.txt", "ContentLog_session_2.txt"],
             "every session but the one running now"
         );

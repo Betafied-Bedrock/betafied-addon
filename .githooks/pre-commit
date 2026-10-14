@@ -2,7 +2,7 @@
 # Agent tooling and instruction files must never enter history, at any depth.
 set -eu
 
-deny='^(\.agents/|\.superpowers/|\.desloppify/|\.scratch/|\.freebuff/|docs/agents/|docs/superpowers/|CLAUDE\.md$)|(^|/)AGENTS\.md$|^packs/.*\.md$'
+deny='^(\.agents/|\.claude/|\.codex/|\.superpowers/|\.desloppify/|\.scratch/|\.freebuff/|docs/agents/|docs/superpowers/|CLAUDE\.md$)|(^|/)AGENTS\.md$|^packs/.*\.md$'
 
 blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E "$deny" || true)
 

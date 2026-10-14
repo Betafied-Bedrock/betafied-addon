@@ -3,7 +3,6 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:player",
-            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow_player" },
             "materials": {
                 "default": "entity_alphatest",
                 "cape": "entity_alphatest",
@@ -94,8 +93,7 @@
                     "};"
                 ],
                 "animate": [
-                    "root",
-                    "bh_entity_shadow"
+                    "root"
                 ],
                 "variables": {
                     "variable.fp_melee_spear_use_attachable_rotation_z": "public",
@@ -108,7 +106,6 @@
                 "should_update_effects_offscreen": "1.0"
             },
             "animations": {
-                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "root": "controller.animation.player.root",
                 "base_controller": "controller.animation.player.base",
                 "hudplayer": "controller.animation.player.hudplayer",
@@ -139,6 +136,8 @@
                 "attack.positions": "animation.player.attack.positions",
                 "attack.rotations": "animation.player.attack.rotations",
                 "place_swing": "animation.player.place_swing",
+                "death_flop": "animation.player.death_flop",
+                "death_flop_reset": "animation.player.death_flop_reset",
                 "sneaking": "animation.player.sneaking",
                 "bob": "animation.player.bob",
                 "damage_nearby_mobs": "animation.humanoid.damage_nearby_mobs",

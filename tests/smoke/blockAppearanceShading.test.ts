@@ -101,4 +101,67 @@ describe("Block Appearance & Shading Contract", () => {
             );
         }
     });
+
+    it("relights leaves toward Beta with a trimmed ambient occlusion exponent", () => {
+        const blocks = readJson("packs/RP/blocks.json");
+        const leafIds = [
+            "acacia_leaves", "birch_leaves", "dark_oak_leaves", "jungle_leaves",
+            "leaves", "leaves2", "mangrove_leaves", "oak_leaves", "spruce_leaves"
+        ];
+
+        for (const id of leafIds) {
+            const block = blocks[id];
+            assert.ok(block, `missing block definition for ${id}`);
+            assert.equal(
+                block.ambient_occlusion_exponent,
+                0.25,
+                `${id} must trim ambient occlusion toward Beta's flat leaf shading`
+            );
+            assert.equal(
+                block.brightness_gamma,
+                undefined,
+                `${id} must not carry legacy brightness_gamma`
+            );
+        }
+    });
+
+    it("bakes Beta directional face dimming onto the leaf faces", () => {
+        const blocks = readJson("packs/RP/blocks.json");
+        const terrain = readJson("packs/RP/textures/terrain_texture.json").texture_data;
+
+        // Oak and birch share Beta's base leaf texture (index 52); spruce uses its own (index 132).
+        const cases: [string, string][] = [
+            ["oak_leaves", "oak_leaves"],
+            ["birch_leaves", "oak_leaves"],
+            ["spruce_leaves", "spruce_leaves"]
+        ];
+
+        for (const [id, base] of cases) {
+            const block = blocks[id];
+            assert.ok(block, `missing block definition for ${id}`);
+            assert.equal(typeof block.textures, "object", `${id} must have per-face texture mapping`);
+            assert.equal(block.textures.up, base, `${id} up face must stay unmodified`);
+
+            // Directional multipliers calibrated with the glowstone face dimming: N/S 84.3% (#D7D7D7), E/W 66.7% (#AAAAAA), bottom 57.2% (#929292), top unmodified.
+            const faceGroups: [string, string, string][] = [
+                ["down", `${base}_bottom`, "#929292"],
+                ["north", `${base}_north_south`, "#D7D7D7"],
+                ["south", `${base}_north_south`, "#D7D7D7"],
+                ["east", `${base}_east_west`, "#AAAAAA"],
+                ["west", `${base}_east_west`, "#AAAAAA"]
+            ];
+
+            for (const [face, key, overlay] of faceGroups) {
+                assert.equal(block.textures[face], key, `${id}.${face} must map to ${key}`);
+                const def = terrain[key];
+                assert.ok(def, `terrain_texture.json missing key ${key} for ${id}.${face}`);
+                assert.equal(def.textures[0].tint_color, overlay, `${key} must carry tint ${overlay}`);
+                assert.equal(
+                    def.textures[0].overlay_color,
+                    undefined,
+                    `${key} must not use overlay_color, which discards the leaf alpha cutout`
+                );
+            }
+        }
+    });
 });

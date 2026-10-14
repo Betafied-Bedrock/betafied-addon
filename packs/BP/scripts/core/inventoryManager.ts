@@ -92,12 +92,12 @@ function sweepPlacers(accessor?: SlotAccessor): void {
     }
 }
 
-export function processExemptInventory(player: Player): void {
+export function sweepExemptInventory(player: Player): void {
     sweepPlacers(inventorySlots(player));
-    processExemptEquipment(player);
+    sweepExemptEquipment(player);
 }
 
-export function processExemptEquipment(player: Player): void {
+export function sweepExemptEquipment(player: Player): void {
     sweepPlacers(equipmentSlots(player));
 }
 
@@ -118,15 +118,15 @@ function sweepPlayer(player: Player, fullSweep: boolean, equipmentSweep: boolean
     const sweepAll = dirty || exemptionFlipped || fullSweep;
 
     if (isExempt) {
-        if (sweepAll) processExemptInventory(player);
-        else if (equipmentSweep) processExemptEquipment(player);
+        if (sweepAll) sweepExemptInventory(player);
+        else if (equipmentSweep) sweepExemptEquipment(player);
         return;
     }
 
     if (wasExempt) msgCooldowns.delete(player.id);
 
-    if (sweepAll) processInventory(player);
-    else if (equipmentSweep) processEquipment(player);
+    if (sweepAll) sweepInventory(player);
+    else if (equipmentSweep) sweepEquipment(player);
 }
 
 export function* inventorySweepJob(): Generator<void, void, unknown> {
@@ -145,7 +145,7 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
         } catch (e) {
             reportError({
                 system: "InventoryManager",
-                operation: "processInventory",
+                operation: "sweepInventory",
                 target: player.name
             }, e);
         }
@@ -157,10 +157,11 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
     }
 }
 
-export function processPlayers(): void {
+export function sweepPlayers(): void {
     const job = inventorySweepJob();
     while (!job.next().done) {
-        // Drain synchronously
+        // This wrapper exists for callers that need the whole sweep finished before they continue,
+        // unlike the time-sliced registration below.
     }
 }
 
@@ -182,39 +183,33 @@ function preserveDurability(sourceItem: ItemStack, targetItem: ItemStack): void 
     }
 }
 
-export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
-    const id = item.typeId;
+function stripEnchantments(item: ItemStack, id: string): ItemNormalizationAction | undefined {
+    const enchantable = item.getComponent(ItemComponentTypes.Enchantable);
+    if (!enchantable || enchantable.getEnchantments().length === 0) return undefined;
 
-    if (!isVanillaId(id) && !isModItem(id)) {
-        return { type: "keep" };
-    }
+    const cleanItem = new ItemStack(id, item.amount);
+    preserveDurability(item, cleanItem);
+    return { type: "strip_enchantments", item: cleanItem };
+}
 
+function evaluatePackItem(id: string, item: ItemStack): ItemNormalizationAction | undefined {
     if (BH_FOOD_IDS.has(id)) {
-        if (item.amount > maxBetaStackSize(id)) {
-            return { type: "unstack_food", convertedId: id, totalAmount: item.amount };
-        }
-        return { type: "keep" };
+        return item.amount > maxBetaStackSize(id)
+            ? { type: "unstack_food", convertedId: id, totalAmount: item.amount }
+            : { type: "keep" };
     }
 
     if (id === BH_BOW_ID) {
         if (item.amount > 1) {
             return { type: "unstack_utility", targetId: id, totalAmount: item.amount };
         }
-        const enchantable = item.getComponent(ItemComponentTypes.Enchantable);
-        if (enchantable && enchantable.getEnchantments().length > 0) {
-            const cleanItem = new ItemStack(id, item.amount);
-            preserveDurability(item, cleanItem);
-            return { type: "strip_enchantments", item: cleanItem };
-        }
-        return { type: "keep" };
+        return stripEnchantments(item, id) ?? { type: "keep" };
     }
 
-    if (!isVanillaId(id)) {
-        return { type: "keep" };
-    }
+    return undefined;
+}
 
-    // A bucket is the one capped item the pack does not own, so its stack is held here instead of in an
-    // item JSON: the engine's own bucket is what fills from a source block and pours it back.
+function evaluateVanillaOverride(id: string, item: ItemStack): ItemNormalizationAction | undefined {
     if (BETA_CAPPED_VANILLA_IDS.has(id)) {
         return item.amount > 1
             ? { type: "unstack_utility", targetId: id, totalAmount: item.amount }
@@ -227,14 +222,15 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         return { type: "replace", item: replacement };
     }
 
+    return undefined;
+}
+
+function evaluateRetargetedItem(id: string, item: ItemStack): ItemNormalizationAction | undefined {
     const placerTarget = resolvePlacerReplacement(id);
     if (placerTarget) {
-        // A door, a sign or a cake carries the era's limit of one in its own JSON, so a vanilla stack
-        // has to come apart as it retypes; every other placer target keeps its count.
-        if (item.amount > 1 && BETA_CAPPED_ITEM_IDS.has(placerTarget)) {
-            return { type: "unstack_utility", targetId: placerTarget, totalAmount: item.amount };
-        }
-        return { type: "replace", item: new ItemStack(placerTarget, item.amount) };
+        return item.amount > 1 && BETA_CAPPED_ITEM_IDS.has(placerTarget)
+            ? { type: "unstack_utility", targetId: placerTarget, totalAmount: item.amount }
+            : { type: "replace", item: new ItemStack(placerTarget, item.amount) };
     }
 
     const cappedItem = BETA_CAPPED_ITEM_OF[id];
@@ -248,6 +244,10 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         return { type: "unstack_food", convertedId: FOOD_CONVERSIONS[id], totalAmount: item.amount };
     }
 
+    return undefined;
+}
+
+function evaluateNormalizedItem(id: string, item: ItemStack): ItemNormalizationAction {
     const norm = normalizeItem(id);
     if (norm.action === "remove") {
         return { type: "delete", reason: "banned" };
@@ -259,18 +259,22 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         return { type: "replace", item: replacement };
     }
 
-    const enchantable = item.getComponent(ItemComponentTypes.Enchantable);
-    if (enchantable && enchantable.getEnchantments().length > 0) {
-        const cleanItem = new ItemStack(id, item.amount);
-        preserveDurability(item, cleanItem);
-        return { type: "strip_enchantments", item: cleanItem };
+    return stripEnchantments(item, id)
+        ?? (isBetaItem(id) ? { type: "keep" } : { type: "delete", reason: "unsupported" });
+}
+
+export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
+    const id = item.typeId;
+
+    if (!isVanillaId(id) && !isModItem(id)) {
+        return { type: "keep" };
     }
 
-    if (!isBetaItem(id)) {
-        return { type: "delete", reason: "unsupported" };
-    }
-
-    return { type: "keep" };
+    return evaluatePackItem(id, item)
+        ?? (isVanillaId(id) ? undefined : { type: "keep" })
+        ?? evaluateVanillaOverride(id, item)
+        ?? evaluateRetargetedItem(id, item)
+        ?? evaluateNormalizedItem(id, item);
 }
 
 function handleItemUnstacking(player: Player, inv: Container, slotIndex: number, targetId: string, amount: number): void {
@@ -343,12 +347,12 @@ function reportSweep(player: Player, { removed, stripped }: { removed: boolean; 
     if (stripped) notifyPlayer(player, CONFIG.ENCHANT_MSG);
 }
 
-export function processInventory(player: Player): void {
+export function sweepInventory(player: Player): void {
     reportSweep(player, sweepStrict(player, inventorySlots(player)));
-    processEquipment(player);
+    sweepEquipment(player);
 }
 
-export function processEquipment(player: Player): void {
+export function sweepEquipment(player: Player): void {
     reportSweep(player, sweepStrict(player, equipmentSlots(player)));
 }
 
@@ -373,7 +377,7 @@ eventBus.onPlayerGameModeChange((ev) => {
     if (!isInventoryExempt(ev.player)) {
         msgCooldowns.delete(ev.player.id);
         previousExemptionState.set(ev.player.id, false);
-        processInventory(ev.player);
+        sweepInventory(ev.player);
     }
 });
 

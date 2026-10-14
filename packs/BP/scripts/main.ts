@@ -20,6 +20,7 @@ import "./interactions/cropTrampling.js";
 import "./interactions/placement.js";
 import "./player/foodAndHealth.js";
 import "./player/playerState.js";
+import "./player/death.js";
 import "./world/chunkScrubber.js";
 import "./world/netherIce.js";
 import "./world/classicFog.js";

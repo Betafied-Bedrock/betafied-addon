@@ -11,11 +11,6 @@ export interface ScheduledTask {
     readonly task: TaskCallback;
 }
 
-/**
- * Master tick manager and staggered scheduler.
- * Consolidates fragmented interval loops across multiple subsystems into a single master
- * tick dispatcher, staggering workloads across ticks to eliminate watchdog spikes.
- */
 export class TickManager {
     private tasks = new Map<string, ScheduledTask>();
     private readonly jobRunner = new JobRunner();

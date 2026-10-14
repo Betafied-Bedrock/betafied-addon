@@ -1,18 +1,20 @@
-/**
- * Mock implementation of @minecraft/server for offline testing and integration verification.
- */
-
 export const registeredBeforeEvents = new Map<string, Function[]>();
 export const registeredAfterEvents = new Map<string, Function[]>();
 export const scheduledIntervals: { id: number; callback: Function; interval: number }[] = [];
 export const scheduledTimeouts: { id: number; callback: Function; timeout: number }[] = [];
 export const activeJobs: Generator<void, void, unknown>[] = [];
 export const activeJobEntries = new Map<number, Generator<void, void, unknown>>();
+export const commandFeedbackWrites: boolean[] = [];
+
 export const mockPlayers: any[] = [];
 export const mockEntities = new Map<string, any>();
 export const mockDynamicProperties = new Map<string, any>();
 
+export const mockSpawnedItems: MockItemEntity[] = [];
+
 export let nextRunId = 1;
+
+let mockSendCommandFeedback = true;
 
 export function resetMocks(): void {
     registeredBeforeEvents.clear();
@@ -21,9 +23,12 @@ export function resetMocks(): void {
     scheduledTimeouts.length = 0;
     activeJobs.length = 0;
     activeJobEntries.clear();
+    commandFeedbackWrites.length = 0;
+    mockSendCommandFeedback = true;
     mockPlayers.length = 0;
     mockEntities.clear();
     mockDynamicProperties.clear();
+    mockSpawnedItems.length = 0;
     for (const dim of dimensions.values()) {
         dim.blocks.clear();
         dim.particles.length = 0;
@@ -161,6 +166,7 @@ const FACE_OFFSETS: Readonly<Record<string, { x: number; y: number; z: number }>
 
 export class MockDimension {
     readonly id: string;
+    readonly heightRange = { min: -64, max: 319 };
     public blocks = new Map<string, any>();
 
     constructor(id: string) {
@@ -248,8 +254,12 @@ export class MockDimension {
         return entity;
     }
 
-    spawnItem(_itemStack: ItemStack, _location: { x: number; y: number; z: number }) {
-        return { id: "mock_item_entity", typeId: "minecraft:item" };
+    spawnItem(itemStack: ItemStack, location: { x: number; y: number; z: number }) {
+        const entity = new MockItemEntity(location);
+        entity.itemStack = itemStack;
+        entity.dimension = this;
+        mockSpawnedItems.push(entity);
+        return entity;
     }
 
     particles: { effectName: string; location: any; molang?: any }[] = [];
@@ -309,6 +319,29 @@ export const world = {
             mockDynamicProperties.set(identifier, value);
         }
     },
+    /**
+     * The engine's documented default: the Overworld spawn's Y stays unresolved at 32767 until something
+     * fixes it, which means "the height is determined by surrounding blocks" — a teleport to that value
+     * drops the player above the world. The mock answered a landed 64 for the whole 5.7 cycle, which is
+     * what let the respawn's void loop pass offline.
+     */
+    getDefaultSpawnLocation() {
+        return { x: 0, y: 32767, z: 0 };
+    },
+    /**
+     * The `sendcommandfeedback` gamerule, as a player-move helper sees it. Bedrock's own default is on and
+     * a world can arrive with it off, so the value is kept rather than assumed: what the helper must not
+     * do is write `true` over a world that never had it on.
+     */
+    gameRules: {
+        get sendCommandFeedback(): boolean {
+            return mockSendCommandFeedback;
+        },
+        set sendCommandFeedback(value: boolean) {
+            mockSendCommandFeedback = value;
+            commandFeedbackWrites.push(value);
+        }
+    },
     getDimension(dimensionId: string) {
         const dim = dimensions.get(dimensionId);
         if (!dim) {
@@ -324,6 +357,7 @@ export const world = {
         playerBreakBlock: createEventSignal(registeredBeforeEvents, "playerBreakBlock"),
         playerPlaceBlock: createEventSignal(registeredBeforeEvents, "playerPlaceBlock"),
         itemUse: createEventSignal(registeredBeforeEvents, "itemUse"),
+        entityHurt: createEventSignal(registeredBeforeEvents, "entityHurt"),
         chatSend: createEventSignal(registeredBeforeEvents, "chatSend")
     },
     afterEvents: {
@@ -466,6 +500,20 @@ export const GameMode = Object.freeze({
     Spectator: "spectator"
 });
 
+export const InputPermissionCategory = Object.freeze({
+    Camera: 1,
+    Movement: 2,
+    LateralMovement: 4,
+    Sneak: 5,
+    Jump: 6,
+    Mount: 7,
+    Dismount: 8,
+    MoveForward: 9,
+    MoveBackward: 10,
+    MoveLeft: 11,
+    MoveRight: 12
+});
+
 export const HudElement = Object.freeze({
     PaperDoll: 0,
     Armor: 1,
@@ -525,12 +573,6 @@ export const ItemComponentTypes = Object.freeze({
     Cooldown: "minecraft:cooldown"
 });
 
-/**
- * Property identifiers the pack's own entity definitions declare, with the default an unwritten
- * property reads back as. The engine throws on a write to an identifier the entity type does not
- * have and returns undefined for one it never declared, so the mock mirrors both: an undeclared
- * identifier is what tells a pass to leave an entity alone rather than post to it.
- */
 export const declaredEntityProperties: Map<string, number> = new Map([
     ["betarock:shadow_span", 1],
     ["betarock:shadow_alpha", 0.5]
@@ -545,11 +587,9 @@ export class Entity {
     protected components = new Map<string, any>();
     isRemoved: boolean = false;
     isOnGround: boolean = true;
-    /** Half-extents the engine would report for this entity; a pig's 0.9 hitbox is 0.45 here. */
     hitboxExtent: { x: number; y: number; z: number } = { x: 0.45, y: 0.45, z: 0.45 };
     private effects = new Map<string, { duration: number; options?: any }>();
     private propertyValues = new Map<string, boolean | number | string>();
-    /** Every property write, in order, because each one is a networked actor update. */
     propertyWrites: { identifier: string; value: boolean | number | string }[] = [];
 
     getProperty(identifier: string): boolean | number | string | undefined {
@@ -603,6 +643,25 @@ export class Entity {
         this.components.set(typeId, component);
     }
 
+    // Entity-scoped, unlike `world`'s. The engine keeps the two stores separate, and the death flag
+    // is per-player for exactly that reason.
+    private entityDynamicProperties = new Map<string, any>();
+
+    getDynamicProperty(identifier: string) {
+        return this.entityDynamicProperties.get(identifier);
+    }
+
+    setDynamicProperty(identifier: string, value?: any) {
+        if (value === undefined) this.entityDynamicProperties.delete(identifier);
+        else this.entityDynamicProperties.set(identifier, value);
+    }
+
+    impulse: { x: number; y: number; z: number } | undefined;
+
+    applyImpulse(vector: { x: number; y: number; z: number }): void {
+        this.impulse = { ...vector };
+    }
+
     remove(): void {
         this.isValid = false;
         this.isRemoved = true;
@@ -633,8 +692,13 @@ export class Entity {
         this.rotation = { ...rotation };
     }
 
-    teleport(location: { x: number; y: number; z: number }): void {
+    teleport(
+        location: { x: number; y: number; z: number },
+        options?: { rotation?: { x: number; y: number } }
+    ): void {
         this.location = { ...location };
+        // A teleport carries its rotation with the move, which is the pair the era set in one call.
+        if (options?.rotation) this.rotation = { ...options.rotation };
     }
 
     playAnimation(animationName: string): void {
@@ -663,11 +727,53 @@ export class Entity {
     }
 }
 
+export class MockItemEntity extends Entity {
+    itemStack: ItemStack | undefined;
+
+    constructor(location: { x: number; y: number; z: number }) {
+        super();
+        this.typeId = "minecraft:item";
+        this.location = { ...location };
+    }
+}
+
 export class Player extends Entity {
     name: string = "Steve";
     public gameMode: string = GameMode.Survival;
     public commandsRun: string[] = [];
     public messagesSent: string[] = [];
+
+    setGameMode(gameMode: string): void {
+        this.gameMode = gameMode;
+    }
+
+    public readonly inputPermissions = {
+        disabled: new Set<number>(),
+        setPermissionCategory(category: number, isEnabled: boolean): void {
+            if (isEnabled) this.disabled.delete(category);
+            else this.disabled.add(category);
+        },
+        isPermissionCategoryEnabled(category: number): boolean {
+            return !this.disabled.has(category);
+        }
+    };
+
+    public readonly camera = {
+        fovWrites: [] as number[],
+        clears: 0,
+        setFov(options?: { fov?: number }): void {
+            this.fovWrites.push(options?.fov ?? -1);
+        },
+        clear(): void {
+            this.clears += 1;
+        }
+    };
+
+    public spawnPoint: any = undefined;
+
+    getSpawnPoint(): any {
+        return this.spawnPoint;
+    }
 
     constructor(id: string = "mock_player", name: string = "Steve") {
         super();

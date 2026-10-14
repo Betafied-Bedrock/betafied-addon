@@ -1,5 +1,3 @@
-/** Canonical dimension identifiers and vertical bounds for Beta 1.7.3. */
-
 // Dimension.id uses prefixed identifiers; world.getDimension uses short keys.
 export const OVERWORLD_ID = "minecraft:overworld";
 export const NETHER_ID = "minecraft:nether";

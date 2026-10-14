@@ -112,7 +112,7 @@
         ]
       },
       "minecraft:movement": {
-        "value": 0.322
+        "value": 0.245
       },
       "minecraft:navigation.walk": {
         "is_amphibious": false,

@@ -10,6 +10,42 @@
                 "textures/blocks/leaves_oak_opaque"
             ]
         },
+        "oak_leaves_bottom": {
+            "textures": [
+                {
+                    "tint_color": "#929292",
+                    "path": "textures/blocks/leaves_oak"
+                },
+                {
+                    "tint_color": "#929292",
+                    "path": "textures/blocks/leaves_oak_opaque"
+                }
+            ]
+        },
+        "oak_leaves_north_south": {
+            "textures": [
+                {
+                    "tint_color": "#D7D7D7",
+                    "path": "textures/blocks/leaves_oak"
+                },
+                {
+                    "tint_color": "#D7D7D7",
+                    "path": "textures/blocks/leaves_oak_opaque"
+                }
+            ]
+        },
+        "oak_leaves_east_west": {
+            "textures": [
+                {
+                    "tint_color": "#AAAAAA",
+                    "path": "textures/blocks/leaves_oak"
+                },
+                {
+                    "tint_color": "#AAAAAA",
+                    "path": "textures/blocks/leaves_oak_opaque"
+                }
+            ]
+        },
         "oak_leaves_carried": {
             "textures": [
                 "textures/blocks/leaves_oak_carried",
@@ -32,6 +68,42 @@
             "textures": [
                 "textures/blocks/leaves_spruce",
                 "textures/blocks/leaves_spruce_opaque"
+            ]
+        },
+        "spruce_leaves_bottom": {
+            "textures": [
+                {
+                    "tint_color": "#929292",
+                    "path": "textures/blocks/leaves_spruce"
+                },
+                {
+                    "tint_color": "#929292",
+                    "path": "textures/blocks/leaves_spruce_opaque"
+                }
+            ]
+        },
+        "spruce_leaves_north_south": {
+            "textures": [
+                {
+                    "tint_color": "#D7D7D7",
+                    "path": "textures/blocks/leaves_spruce"
+                },
+                {
+                    "tint_color": "#D7D7D7",
+                    "path": "textures/blocks/leaves_spruce_opaque"
+                }
+            ]
+        },
+        "spruce_leaves_east_west": {
+            "textures": [
+                {
+                    "tint_color": "#AAAAAA",
+                    "path": "textures/blocks/leaves_spruce"
+                },
+                {
+                    "tint_color": "#AAAAAA",
+                    "path": "textures/blocks/leaves_spruce_opaque"
+                }
             ]
         },
         "spruce_leaves_carried": {

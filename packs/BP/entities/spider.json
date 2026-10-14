@@ -48,7 +48,7 @@
         "max": 16
       },
       "minecraft:movement": {
-        "value": 0.368
+        "value": 0.28
       },
       "minecraft:navigation.climb": {
         "can_path_over_water": true

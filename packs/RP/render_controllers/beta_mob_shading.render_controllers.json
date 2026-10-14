@@ -120,13 +120,8 @@
       "on_fire_color": { "r": "0.0", "g": "0.0", "b": "0.0", "a": "-1.0" }
     },
     "controller.render.spider": {
-      "arrays": {
-        "materials": {
-          "Array.materials": [ "Material.default", "Material.invisible" ]
-        }
-      },
       "geometry": "Geometry.default",
-      "materials": [ { "*": "Array.materials[query.is_invisible]" } ],
+      "materials": [ { "*": "Material.default" } ],
       "textures": [ "Texture.default" ],
       "light_color_multiplier": "0.8",
       "overlay_color": { "r": "0.0", "g": "0.0", "b": "0.0", "a": "-1.0" },

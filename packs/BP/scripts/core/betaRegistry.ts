@@ -1,14 +1,3 @@
-/**
- * Canonical Beta 1.7.3 Registry
- *
- * Defines the finite, authentic universe of Minecraft Beta 1.7.3 entities, items, and blocks.
- * Used by cleaners, spawn handlers, and inventory managers to invert filtering:
- * instead of fragile modern blacklists, everything not explicitly recognized here is normalized or removed.
- *
- * Inversion only ever applies to the vanilla namespace — see `isVanillaId`.
- */
-
-/** Addon replacement block and item IDs. */
 export const BH_FENCE_ID = "bh:fence";
 export const BH_CHEST_ID = "bh:chest";
 export const BH_BOW_ID = "bh:bow";
@@ -18,46 +7,21 @@ export const BH_IRON_DOOR_ID = "bh:iron_door";
 export const BH_SIGN_ID = "bh:oak_sign";
 export const BH_CAKE_ID = "bh:cake";
 
-/**
- * The pack's door items, and the vanilla block each one places. Beta 1.7.3's `ItemDoor` capped itself
- * at one, so the items carry `minecraft:max_stack_size` 1 and the engine enforces the era's limit in
- * every container instead of a script sweeping chests after the fact.
- */
 export const BETA_DOOR_BLOCK_OF: Readonly<Record<string, string>> = Object.freeze({
     [BH_WOODEN_DOOR_ID]: "minecraft:wooden_door",
     [BH_IRON_DOOR_ID]: "minecraft:iron_door"
 });
 
-/** Both door blocks, so a half standing in the world can be recognized from the block alone. */
 export const BETA_DOOR_BLOCK_IDS: ReadonlySet<string> = Object.freeze(
     new Set(Object.values(BETA_DOOR_BLOCK_OF))
 );
 
-/**
- * The blocks whose own use answered a click before the held item was ever asked. Beta 1.7.3's
- * `ItemInWorldManager.onItemUse` ran `Block.onBlockActivated` first and stopped there when it answered
- * true, which a door and a trapdoor always did — so a sign held against one was never placed, and the
- * sign editor never opened. The engine consumes that same click, so the pack's sign placement has to
- * stand down on these blocks instead of writing the sign the engine left unwritten.
- */
 export const BETA_USE_CONSUMING_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:wooden_door",
     "minecraft:iron_door",
     "minecraft:trapdoor"
 ]));
 
-/**
- * Vanilla ids the era capped at one that the pack has to own, because the engine keeps its own stack
- * size for an item it defines natively: the two doors (`ItemDoor`), the sign (`ItemSign`) and the cake
- * (`ItemReed`). Each maps onto the pack item that replaces it, so a chest, a drop and a hotbar all end
- * up holding the same capped id. The doors are in the table because their placeable block stays
- * vanilla: a `bh:` door is a `minecraft:block_placer` for the era's block, so breaking it hands back
- * the vanilla item, which only the retype turns into the pack's capped one.
- *
- * `ItemBucket` capped the same way and is the one the pack does not own: filling from a source block
- * and pouring it back is the engine's own bucket behaviour, which a pack item cannot be given, so that
- * item stays vanilla and its stack is the sweep's to hold — see `BETA_CAPPED_VANILLA_IDS`.
- */
 export const BETA_CAPPED_ITEM_OF: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:wooden_door": BH_WOODEN_DOOR_ID,
     "minecraft:iron_door": BH_IRON_DOOR_ID,
@@ -65,16 +29,10 @@ export const BETA_CAPPED_ITEM_OF: Readonly<Record<string, string>> = Object.free
     "minecraft:cake": BH_CAKE_ID
 });
 
-/**
- * Capped vanilla ids the engine already provides, so the pack leaves the item alone and only the sweep
- * holds its stack to one. A bucket is the one item whose use is a fluid — the engine's own bucket fills
- * from a water or lava source and pours it back — which is why the item cannot be the pack's.
- */
 export const BETA_CAPPED_VANILLA_IDS: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:bucket"
 ]));
 
-/** The pack items above; every one of them holds a single item per slot. */
 export const BETA_CAPPED_ITEM_IDS: ReadonlySet<string> = Object.freeze(
     new Set(Object.values(BETA_CAPPED_ITEM_OF))
 );
@@ -258,8 +216,6 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:oak_sapling", "minecraft:birch_sapling", "minecraft:spruce_sapling",
     "minecraft:oak_planks", "minecraft:birch_planks", "minecraft:spruce_planks",
     "minecraft:dandelion", "minecraft:poppy", "minecraft:brown_mushroom", "minecraft:red_mushroom",
-    // Bedrock never renamed sugar cane: the block and the item are both `minecraft:reeds`, while
-    // `minecraft:sugar_cane` is the id the normalizer converts back onto it.
     "minecraft:cactus", "minecraft:reeds", "minecraft:wheat", "minecraft:carved_pumpkin", "minecraft:pumpkin",
     "minecraft:lit_pumpkin", "minecraft:jack_o_lantern", "minecraft:short_grass", "minecraft:fern", "minecraft:dead_bush", "minecraft:cobweb",
     "minecraft:oak_stairs", "minecraft:cobblestone_stairs", "minecraft:stone_stairs",
@@ -277,10 +233,10 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:lever", "minecraft:stone_button", "minecraft:stone_pressure_plate", "minecraft:wooden_pressure_plate",
     "minecraft:redstone_torch", "minecraft:unlit_redstone_torch", "minecraft:redstone_wire", "minecraft:repeater",
     "minecraft:piston", "minecraft:sticky_piston", "minecraft:rail", "minecraft:golden_rail", "minecraft:detector_rail",
+    // Beta's piston extension (block 34) is its own block on this engine, so a base without its arm
+    // is a broken piston. Both heads belong to the era even though neither has an item form.
+    "minecraft:piston_arm_collision", "minecraft:sticky_piston_arm_collision",
     "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door",
-    // Bedrock keeps the oak sign's two blocks under their legacy ids; only the later species carry a
-    // wood prefix. Without them the scrubber reads a placed sign as modern terrain and rewrites it to
-    // the item id, which is not a block at all — and a wall sign is a second block, not a state.
     "minecraft:standing_sign", "minecraft:wall_sign"
 ]));
 

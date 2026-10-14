@@ -126,7 +126,7 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
     return Math.random() < CONFIG.WANDER_HOP_CHANCE;
 }
 
-export function doHop(entity: Entity): void {
+export function applyRandomHop(entity: Entity): void {
     const isChicken = entity.typeId === "minecraft:chicken";
     const hopCount = isChicken ? 1 : 1 + Math.floor(Math.random() * 2);
 
@@ -167,7 +167,7 @@ function tryAnimalHop(entity: Entity, dimension: Dimension, currentTick: number)
 
     if (!evaluateHopConditions(entity, dimension)) return;
 
-    doHop(entity);
+    applyRandomHop(entity);
 
     const cooldown = CONFIG.JUMP_COOLDOWN_MIN +
         Math.floor(Math.random() * (CONFIG.JUMP_COOLDOWN_MAX - CONFIG.JUMP_COOLDOWN_MIN));

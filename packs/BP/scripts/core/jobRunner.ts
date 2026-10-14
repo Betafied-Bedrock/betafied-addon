@@ -2,32 +2,16 @@ import { system } from "@minecraft/server";
 import { reportError, runCatching } from "./errorReporter.js";
 
 export interface JobOptions {
-    /** Subsystem identifier for error reporting (defaults to "jobRunner"). */
     system?: string;
-    /** Operation identifier for error reporting (defaults to "execute"). */
     operation?: string;
-    /** Invoked if an unhandled error occurs during generator stepping. */
     onError?: (error: unknown) => void;
-    /** Invoked when the generator completes naturally or halts due to an error. */
     onFinally?: () => void;
 }
 
 export interface BatchJobOptions extends JobOptions {
-    /** Number of items to process before yielding the tick. Defaults to 1. */
     batchSize?: number;
 }
 
-/**
- * Manages generator time-slicing via Bedrock's `system.runJob`.
- *
- * Bedrock scripts execute in single-threaded QuickJS on the server's main thread.
- * `system.runJob` provides cooperative multitasking across server ticks rather
- * than true multithreading: each job is stepped sequentially within Bedrock's
- * per-tick script time budget.
- *
- * Instances track job IDs to guarantee cleanup when systems stop, preventing
- * orphaned background loops from running across tick intervals.
- */
 export class JobRunner {
     private readonly activeJobs: Set<number>;
 
@@ -56,7 +40,7 @@ export class JobRunner {
             }
         );
 
-        if (typeof started !== "number" || started < 0) {
+        if (started < 0) {
             return -1;
         }
 
@@ -112,7 +96,7 @@ export class JobRunner {
                 return -1;
             }
         );
-        return typeof started === "number" ? started : -1;
+        return started;
     }
 
     public static forEach<T>(

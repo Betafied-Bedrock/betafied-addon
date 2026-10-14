@@ -1,3 +1,4 @@
+import commentBudget from "./comment-budget.mjs";
 import noBetaApi from "./no-beta-api.mjs";
 import noLiveReferenceCache from "./no-live-reference-cache.mjs";
 import requireJsExtension from "./require-js-extension.mjs";
@@ -9,6 +10,7 @@ import requireJsExtension from "./require-js-extension.mjs";
  */
 export default {
     rules: {
+        "comment-budget": commentBudget,
         "no-beta-api": noBetaApi,
         "no-live-reference-cache": noLiveReferenceCache,
         "require-js-extension": requireJsExtension

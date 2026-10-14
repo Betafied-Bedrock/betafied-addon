@@ -5,6 +5,7 @@ import {
     EntityComponentTypes,
     system
 } from "@minecraft/server";
+import type { Container } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { BH_BOW_ID } from "../core/betaRegistry.js";
 
@@ -16,6 +17,23 @@ const CONFIG = Object.freeze({
 const lastFireTime = new Map<string, number>();
 const holdIntervals = new Map<string, number>();
 
+function takeArrowFrom(inv: Container): boolean {
+    const size = inv.size;
+    for (let i = 0; i < size; i++) {
+        const slotItem = inv.getItem(i);
+        if (slotItem?.typeId !== "minecraft:arrow") continue;
+
+        if (slotItem.amount > 1) {
+            inv.setItem(i, new ItemStack("minecraft:arrow", slotItem.amount - 1));
+        } else {
+            inv.setItem(i, undefined);
+        }
+        return true;
+    }
+
+    return false;
+}
+
 function fireArrow(player: Player): boolean {
     const now = system.currentTick;
     const lastFire = lastFireTime.get(player.id) ?? 0;
@@ -23,31 +41,10 @@ function fireArrow(player: Player): boolean {
     if (now - lastFire < CONFIG.FIRE_COOLDOWN) return false;
     lastFireTime.set(player.id, now);
 
-    const isCreative = player.getGameMode() === GameMode.Creative;
-    const invComp = player.getComponent(EntityComponentTypes.Inventory);
-    const inv = invComp?.container;
+    const inv = player.getComponent(EntityComponentTypes.Inventory)?.container;
     if (!inv) return false;
 
-    if (!isCreative) {
-        let arrowSlot = -1;
-        const size = inv.size;
-        for (let i = 0; i < size; i++) {
-            const slotItem = inv.getItem(i);
-            if (slotItem?.typeId === "minecraft:arrow") {
-                arrowSlot = i;
-                break;
-            }
-        }
-
-        if (arrowSlot === -1) return false;
-
-        const arrowItem = inv.getItem(arrowSlot);
-        if (arrowItem && arrowItem.amount > 1) {
-            inv.setItem(arrowSlot, new ItemStack("minecraft:arrow", arrowItem.amount - 1));
-        } else {
-            inv.setItem(arrowSlot, undefined);
-        }
-    }
+    if (player.getGameMode() !== GameMode.Creative && !takeArrowFrom(inv)) return false;
 
     const dir = player.getViewDirection();
     const head = player.getHeadLocation();

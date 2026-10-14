@@ -2,26 +2,108 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
-## 5.6.1 — 2026-10-13
+## 5.8 — 2026-10-14
 
-A fix-up release for 5.6: sugar cane keeps its identity, signs stay out of the way of doors, the inventory grid regains the crafts that fit it, and mobs already in a world are no longer left invisible.
+5.8 fixes the death loop that sends players without a bed above the world, makes signs writable again, and keeps extended pistons intact.
 
-### Sugar cane
+### Respawn
 
-- Fixed harvested and broken sugar cane so it keeps its identity instead of being deleted, which had made cane vanish as players walked up to it.
+- Fixed players without a bed being stuck in a slowly voiding world with no possibility of return.
+- Added a world spawn recorded on the world's first join, where a player without a bed or respawn anchor now respawns.
+- Changed a join position the dimension cannot hold to never become that world spawn.
+- Changed a respawn with no bed and no recorded world spawn to leave the player where they died.
 
 ### Signs
 
-- Fixed signs placed against doors and trapdoors so the block's own use answers the click, as in Beta, instead of leaving a sign nobody can type on.
+- Fixed clicks on standing and wall signs being swallowed, which left signs nobody could write on.
+- Changed the top face to place the standing sign turned to the placing player's rotation, as Beta's `ItemSign` did.
+- Fixed a sign placed against a block being written twice, once by the pack and once by the item's own placer.
 
-### Crafting
+### Blocks
 
-- Fixed logs so they craft into planks in the player's 2x2 inventory grid again, which the first workbench depends on.
-- Restored the jack-o'-lantern, sandstone, and furnace minecart crafts to the player's 2x2 inventory grid, which 5.6 had moved onto the custom crafting table.
+- Fixed an extended piston losing its head when a chunk loaded, which left a broken piston behind.
+
+### Tooling
+
+- Fixed the test mock answering a resolved world spawn, which kept the death loop passing offline.
+
+## 5.7 — 2026-10-13
+
+5.7 adds Beta-style death behavior, adjusts mob movement, and fixes several rendering and item-drop issues.
+
+### Death
+
+- Added Beta's death screen with the original gradient and `Game over!` text.
+- Changed the death screen to keep the hotbar, hearts, and crosshair visible behind it.
+- Added Beta-style inventory and armor drops on death.
+- Changed death drops to use the era's throw behavior and spread around the player.
+- Added the player death flop.
+- Added the smoke effect after death.
+- Added the hurt sound played on a lethal hit.
+- Added Beta-style death camera behavior with the field of view narrowing from 70 degrees.
+- Changed dead players to spectator mode with movement locked until respawn.
+- Changed respawning to face south and restore the normal camera.
+- Changed scripted player teleports to suppress the engine's `You have been teleported to ...` message.
+- Removed the permanent player invisibility used by the shadow pack.
+- Restored hostile mob targeting of players.
+- Restored Bedrock's normal player shadow.
+- Fixed players already loaded into a world remaining invisible after updating.
 
 ### Mobs
 
-- Fixed existing mobs in a loaded world so they keep their normal appearance instead of turning fully invisible.
+- Reduced mob walking speeds to better match Beta's pacing.
+- Changed all mobs to use the same updated movement-speed baseline.
+- Fixed zombies not retaliating when attacked.
+- Fixed spiders rendering invisible because their controller could select the invisible material from the old shadow system.
+- Changed Herobrine encounters to have a minimum eight-hour delay between sightings.
+- Reduced Herobrine encounter frequency so sightings average closer to once per day.
+
+### Blocks
+
+- Changed leaves to use flatter Beta-style shading.
+- Reduced ambient occlusion on leaf blocks.
+- Added Beta-style face shading to the bottom, north/south, and east/west sides of leaves.
+- Changed wooden slabs to use stone-slab sounds.
+- Removed fire behavior from wooden slabs to match the slab block they were based on.
+
+### Drops
+
+- Fixed converted ground-item stacks losing all but the first item when processed by the background sweep.
+- Changed raw iron already on the ground to convert into a single iron ore.
+- Changed raw gold already on the ground to convert into a single gold ore.
+- Changed raw ore conversion to match the one-ore drop produced by a mined Beta ore block.
+
+### Tooling
+
+- Added a lint rule limiting inline comment blocks to twelve lines.
+- Removed script comments that only repeated what the code already made clear.
+
+## 5.6.1 — 2026-10-13
+
+5.6.1 is a small fix-up release for sugar cane, signs, crafting, and mob rendering.
+
+### Sugar cane
+
+- Fixed harvested and broken sugar cane being removed during item conversion.
+- Changed sugar cane drops to keep their proper item identity instead of disappearing when collected.
+
+### Signs
+
+- Fixed signs being placeable against doors and trapdoors in cases where the block itself should handle the interaction.
+- Changed door and trapdoor interactions to take priority so unusable signs are not left attached to them.
+
+### Crafting
+
+- Restored log-to-plank recipes to the player's 2x2 inventory crafting grid.
+- Restored jack-o'-lantern crafting to the 2x2 inventory grid.
+- Restored sandstone crafting to the 2x2 inventory grid.
+- Restored furnace minecart crafting to the 2x2 inventory grid.
+- Fixed recipes that were incorrectly moved to the custom crafting table in 5.6.
+
+### Mobs
+
+- Fixed mobs already present in loaded worlds becoming fully invisible.
+- Changed existing entities to keep their normal render state when the updated pack is applied.
 
 ### Tooling
 

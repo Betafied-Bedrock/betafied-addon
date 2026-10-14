@@ -1,13 +1,3 @@
-/**
- * Central EventBus Architecture for Betafied
- *
- * Provides a single entrance for all Bedrock world and system events:
- * - Subscribes to Bedrock engine events ONCE at the boundary.
- * - Dispatches to registered subsystem handlers in deterministic priority order.
- * - Supports short-circuiting on cancelled beforeEvents.
- * - Isolates handler errors so one subsystem failure never crashes another.
- */
-
 import { world } from "@minecraft/server";
 import type {
     BlockContainerClosedAfterEvent,
@@ -17,6 +7,7 @@ import type {
     EntityHitBlockAfterEvent,
     EntityHitEntityAfterEvent,
     EntityHurtAfterEvent,
+    EntityHurtBeforeEvent,
     EntityLoadAfterEvent,
     EntitySpawnAfterEvent,
     ItemReleaseUseAfterEvent,
@@ -53,7 +44,7 @@ class EventBus {
         const id = this.nextId++;
         const list = this.handlers.get(eventName) ?? [];
         list.push({ id, priority, callback: callback as (event: unknown) => void });
-        list.sort((a, b) => b.priority - a.priority);
+        list.sort((a, b) => b.priority - a.priority || a.id - b.id);
         this.handlers.set(eventName, list);
 
         return () => {
@@ -113,6 +104,10 @@ class EventBus {
         return this.subscribe("entityHurt", callback, priority);
     }
 
+    onEntityHurtBefore(callback: (event: EntityHurtBeforeEvent) => void, priority: number = 0): () => void {
+        return this.subscribe("entityHurtBefore", callback, priority);
+    }
+
     onEntityHitEntity(callback: (event: EntityHitEntityAfterEvent) => void, priority: number = 0): () => void {
         return this.subscribe("entityHitEntity", callback, priority);
     }
@@ -125,9 +120,6 @@ class EventBus {
         return this.subscribe("playerPlaceBlock", callback, priority);
     }
 
-    /**
-     * Fires before a block is placed, so a handler can veto the placement by setting `cancel`.
-     */
     onPlayerPlaceBlockBefore(callback: (event: PlayerPlaceBlockBeforeEvent) => void, priority: number = 0): () => void {
         return this.subscribe("playerPlaceBlockBefore", callback, priority);
     }
@@ -136,11 +128,6 @@ class EventBus {
         return this.subscribe("playerBreakBlock", callback, priority);
     }
 
-    /**
-     * Fires before a block breaks, so a handler can veto the break by setting
-     * `cancel`. Bedrock only exposes block *placement* as a beta beforeEvent; the
-     * break beforeEvent is stable and is the one handler we can rely on.
-     */
     onPlayerBreakBlockBefore(callback: (event: PlayerBreakBlockBeforeEvent) => void, priority: number = 0): () => void {
         return this.subscribe("playerBreakBlockBefore", callback, priority);
     }
@@ -189,9 +176,6 @@ class EventBus {
         return this.subscribe("chatSend", callback, priority);
     }
 
-    /**
-     * Initializes engine-level subscriptions. Idempotent.
-     */
     init(): void {
         if (this.initialized) return;
         this.initialized = true;
@@ -201,6 +185,7 @@ class EventBus {
         world.beforeEvents.itemUse.subscribe((e) => this.dispatch("itemUse", e));
         world.beforeEvents.playerBreakBlock.subscribe((e) => this.dispatch("playerBreakBlockBefore", e));
         world.beforeEvents.playerPlaceBlock.subscribe((e) => this.dispatch("playerPlaceBlockBefore", e));
+        world.beforeEvents.entityHurt.subscribe((e) => this.dispatch("entityHurtBefore", e));
 
         world.afterEvents.itemUse.subscribe((e) => this.dispatch("itemUseAfter", e));
         world.afterEvents.entitySpawn.subscribe((e) => this.dispatch("entitySpawn", e));

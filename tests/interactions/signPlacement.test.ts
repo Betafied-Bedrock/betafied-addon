@@ -15,15 +15,9 @@ import {
     ItemStack,
     Player,
     resetMocks,
-    scheduledTimeouts,
-    world
+    scheduledTimeouts
 } from "@minecraft/server";
-
-const OVERWORLD = "minecraft:overworld";
-
-function dimension() {
-    return world.getDimension(OVERWORLD);
-}
+import { dimension } from "../support/world.js";
 
 function signHolder(gameMode: string = GameMode.Survival): Player {
     const player = new Player("sign_placer", "SignPlacer");
@@ -111,7 +105,7 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
     });
 
     describe("placing the pack's sign", () => {
-        it("leaves the top face to the item's own placer, which is what raises the sign editor", () => {
+        it("puts the standing sign up itself, turned to the era's rotation", () => {
             const dim = dimension();
             const ground = dim.getBlock({ x: 2, y: 64, z: 2 });
             const above = dim.getBlock({ x: 2, y: 65, z: 2 });
@@ -126,11 +120,12 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
 
             assert.equal(
                 event.cancel,
-                false,
-                "cancelling the engine's placement would leave a sign nobody can type on"
+                true,
+                "the item's own placer writes its own cell, which is the sign placed twice"
             );
-            assert.equal(above.typeId, "minecraft:air", "the standing sign is the engine's to write");
-            assert.ok(heldItem(player), "the engine spends the item when it places the sign");
+            assert.equal(above.typeId, "minecraft:standing_sign");
+            assert.equal(above.permutation.getState("ground_sign_direction"), 12);
+            assert.equal(heldItem(player), undefined);
         });
 
         it("hangs a wall sign on the block that was clicked", () => {
@@ -144,14 +139,14 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             eventBus.dispatch("playerInteractWithBlock", event);
             settle();
 
-            assert.equal(event.cancel, false, "cancelling here would suppress the engine's placement");
+            assert.equal(event.cancel, true, "the engine has no wall sign to write, so it writes none");
             assert.equal(hanging.typeId, "minecraft:wall_sign");
             assert.equal(hanging.permutation.getState("facing_direction"), 2);
             assert.equal(heldItem(player), undefined);
             assert.ok(player.soundsPlayed.some(sound => sound.soundId === "use.wood"));
         });
 
-        it("rehangs the standing sign the engine put up under a wall click", () => {
+        it("cancels the click before the engine can answer it with a second sign", () => {
             const dim = dimension();
             const wall = dim.getBlock({ x: 14, y: 64, z: 14 });
             const hanging = dim.getBlock({ x: 14, y: 64, z: 13 });
@@ -161,38 +156,31 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             const event = clickEvent(wall, Direction.North, player);
             eventBus.dispatch("playerInteractWithBlock", event);
 
-            // The engine answers the click before the deferred pass does: it places the block the item
-            // names and spends the sign placing it.
-            hanging.setPermutation(BlockPermutation.resolve("minecraft:standing_sign", {
-                ground_sign_direction: 9
-            }));
-            player.getComponent(EntityComponentTypes.Equippable)
-                ?.setEquipment(EquipmentSlot.Mainhand, undefined);
+            // Nothing of the engine's lands in the cell: the click is cancelled in the before-event, so
+            // the placer never runs and the pack's sign is the only one a wall click leaves behind.
+            assert.equal(event.cancel, true);
             settle();
 
-            assert.equal(hanging.typeId, "minecraft:wall_sign", "the cell keeps the editor's sign, hung");
+            assert.equal(hanging.typeId, "minecraft:wall_sign");
             assert.equal(hanging.permutation.getState("facing_direction"), 2);
+            assert.equal(heldItem(player), undefined, "one click spends one sign");
         });
 
-        it("leaves a wall sign the engine hung by itself alone", () => {
+        it("leaves the click to the engine when the cell already holds a sign", () => {
             const dim = dimension();
             const wall = dim.getBlock({ x: 16, y: 64, z: 16 });
-            const hanging = dim.getBlock({ x: 16, y: 64, z: 15 });
-            hanging.setType("minecraft:air");
+            const taken = dim.getBlock({ x: 16, y: 64, z: 15 });
+            const standing = BlockPermutation.resolve("minecraft:standing_sign", { ground_sign_direction: 8 });
+            taken.setPermutation(standing);
 
             const player = signHolder();
             const event = clickEvent(wall, Direction.North, player);
             eventBus.dispatch("playerInteractWithBlock", event);
-
-            const hungByTheEngine = BlockPermutation.resolve("minecraft:wall_sign", { facing_direction: 2 });
-            hanging.setPermutation(hungByTheEngine);
             settle();
 
-            assert.equal(
-                hanging.permutation,
-                hungByTheEngine,
-                "a sign the engine already hung is not ours to rewrite"
-            );
+            assert.equal(event.cancel, false, "a cell the sign cannot take is not a placement to cancel");
+            assert.equal(taken.permutation, standing, "the pack writes only into the empty cell it planned for");
+            assert.ok(heldItem(player));
         });
 
         it("leaves a cell that holds a build alone", () => {
@@ -361,7 +349,7 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
         });
     });
 
-    describe("the era's missing sign editor", () => {
+    describe("the editor the engine opens, reached by clicking the sign", () => {
         const EDITHANDS = "editor_seeker";
 
         function standingSign(cell: { x: number; y: number; z: number }) {
@@ -376,24 +364,28 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             return new Player(EDITHANDS, "EditorSeeker");
         }
 
-        it("swallows a click on a standing sign, so nothing answers with the editor", () => {
+        it("leaves a click on a standing sign to the engine, which is what raises the editor", () => {
             const sign = standingSign({ x: 20, y: 64, z: 20 });
             const event = clickEvent(sign, Direction.North, barePlayer(), undefined);
 
             eventBus.dispatch("playerInteractWithBlock", event);
 
-            assert.equal(event.cancel, true, "an empty hand on a sign is the engine's editor");
+            assert.equal(
+                event.cancel,
+                false,
+                "cancelling here is the editor no script API can open in its place"
+            );
             assert.equal(sign.permutation.getState("ground_sign_direction"), 8);
         });
 
-        it("swallows a click on a wall sign the same way", () => {
+        it("leaves a click on a wall sign to it the same way", () => {
             const sign = dimension().getBlock({ x: 22, y: 64, z: 22 });
             sign.setPermutation(BlockPermutation.resolve("minecraft:wall_sign", { facing_direction: 2 }));
 
             const event = clickEvent(sign, Direction.North, barePlayer(), undefined);
             eventBus.dispatch("playerInteractWithBlock", event);
 
-            assert.equal(event.cancel, true);
+            assert.equal(event.cancel, false, "a wall sign carries text too");
         });
 
         it("keeps a block that goes up against the sign", () => {
@@ -407,7 +399,7 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             assert.equal(event.cancel, false, "the era put that block up, and the engine still can");
         });
 
-        it("swallows a block the engine cannot put on the sign", () => {
+        it("keeps the editor's click even where the held block cannot go up", () => {
             const dim = dimension();
             const sign = standingSign({ x: 26, y: 64, z: 26 });
             dim.getBlock({ x: 26, y: 64, z: 25 }).setPermutation(BlockPermutation.resolve("minecraft:stone"));
@@ -415,7 +407,7 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             const event = clickEvent(sign, Direction.North, barePlayer(), new ItemStack("minecraft:cobblestone", 1));
             eventBus.dispatch("playerInteractWithBlock", event);
 
-            assert.equal(event.cancel, true, "a placement that cannot happen is the editor's click");
+            assert.equal(event.cancel, false, "a placement that cannot happen is the editor's click");
         });
 
         it("still hangs the pack's sign from a sign it was clicked on", () => {
@@ -429,12 +421,12 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             eventBus.dispatch("playerInteractWithBlock", event);
             settle();
 
-            assert.equal(event.cancel, false, "the era placed a sign there, and the engine has to as well");
+            assert.equal(event.cancel, true, "the pack writes that sign itself, so the engine must not add one");
             assert.equal(hanging.typeId, "minecraft:wall_sign");
             assert.equal(hanging.permutation.getState("facing_direction"), 2);
         });
 
-        it("swallows the pack's own sign where the era placed nothing", () => {
+        it("leaves the pack's own sign with no room above it to the engine", () => {
             const dim = dimension();
             const sign = standingSign({ x: 30, y: 64, z: 30 });
             dim.getBlock({ x: 30, y: 65, z: 30 }).setPermutation(BlockPermutation.resolve("minecraft:stone"));
@@ -444,7 +436,7 @@ describe("Sign Placement - Beta 1.7.3 two sign blocks", () => {
             eventBus.dispatch("playerInteractWithBlock", event);
             settle();
 
-            assert.equal(event.cancel, true, "a sign with no room above it is no sign, and no editor");
+            assert.equal(event.cancel, false, "the sign that cannot take another is still the editor's click");
             assert.ok(heldItem(player));
         });
     });

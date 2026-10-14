@@ -6,6 +6,10 @@ export async function resolve(specifier, context, nextResolve) {
     return nextResolve(new URL('./minecraftServer.ts', import.meta.url).href, context);
   }
 
+  if (specifier === '@minecraft/server-ui') {
+    return nextResolve(new URL('./minecraftServerUi.ts', import.meta.url).href, context);
+  }
+
   if (specifier.endsWith('.js') && context.parentURL) {
     try {
       const resolved = new URL(specifier, context.parentURL);

@@ -15,11 +15,6 @@ const ORE_DROP_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:raw_gold": "minecraft:gold_ore"
 });
 
-/**
- * Exact ids Bedrock exposes under a second name for one item the era knew by one. Sugar cane is the
- * case that bit: the world still holds `minecraft:reeds`, but a drop carries `minecraft:sugar_cane`,
- * so an id the pack never registered reads as post-Beta and the drop is deleted at load.
- */
 const ITEM_ID_ALIASES: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:sugar_cane": "minecraft:reeds"
 });
@@ -98,7 +93,6 @@ const SIMPLE_WOOD_ITEMS: Readonly<Record<string, string>> = Object.freeze({
     _sapling: "minecraft:oak_sapling"
 });
 
-// Hoisted entries to avoid per-slot allocation in inventory sweep.
 const SIMPLE_WOOD_ENTRIES: readonly (readonly [string, string])[] = Object.freeze(
     Object.entries(SIMPLE_WOOD_ITEMS)
 );
@@ -143,7 +137,6 @@ export function normalizeBlock(blockId: string): NormalizationResult {
     return normalizeItem(blockId);
 }
 
-/** Maps vanilla placer item to custom bh: replacement block. */
 export function resolvePlacerReplacement(id: string): string | undefined {
     if (!id.startsWith("minecraft:")) {
         return undefined;
@@ -164,13 +157,10 @@ export function resolvePlacerReplacement(id: string): string | undefined {
         return BH_CHEST_ID;
     }
 
-    // Every post-Beta species collapses onto the era's oak door; the iron door only ever answered to
-    // its own id, so the table decides between the two and the suffix catches the rest.
     if (bareId.endsWith("_door")) {
         return BETA_CAPPED_ITEM_OF[id] ?? BH_WOODEN_DOOR_ID;
     }
 
-    // Beta had one sign, cut from any of its three woods, and one cake.
     if (bareId.endsWith("_sign")) {
         return BH_SIGN_ID;
     }
@@ -197,7 +187,6 @@ export function resolvePlacerReplacement(id: string): string | undefined {
     return undefined;
 }
 
-/** Vanilla foods retyped into instant-consumption bh: items. */
 export const FOOD_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:apple": "bh:apple",
     "minecraft:bread": "bh:bread",
@@ -213,7 +202,6 @@ export const FOOD_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze(
     "minecraft:cooked_fish": "bh:cooked_cod"
 });
 
-/** Returns replacement ID for held or picked-up items, or undefined if untouched. */
 export function resolveHeldItemReplacement(id: string): string | undefined {
     if (id === "minecraft:bow") {
         return BH_BOW_ID;
@@ -221,19 +209,10 @@ export function resolveHeldItemReplacement(id: string): string | undefined {
     return resolvePlacerReplacement(id) ?? FOOD_CONVERSIONS[id] ?? BETA_CAPPED_ITEM_OF[id];
 }
 
-/** Resolves normalized drop ID, or null if removed. */
-export function resolveDropId(itemId: string): string | null {
+export function planDropResolution(itemId: string): NormalizationResult {
     const retyped = resolveHeldItemReplacement(itemId);
     if (retyped !== undefined) {
-        return retyped;
+        return retyped === itemId ? { action: "keep" } : { action: "convert", targetId: retyped };
     }
-
-    const drop = normalizeEntityDrop(itemId);
-    if (drop.action === "remove") {
-        return null;
-    }
-    if (drop.action === "convert" && drop.targetId) {
-        return drop.targetId;
-    }
-    return itemId;
+    return normalizeEntityDrop(itemId);
 }

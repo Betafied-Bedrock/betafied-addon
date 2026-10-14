@@ -260,10 +260,10 @@ function printNextSteps(tag) {
 Next steps:
   1. Draft the '## ${tag}' section and get it approved by the maintainer before writing or
      committing anything. The approval covers the rest of these steps, so it is asked for once.
-  2. Write the approved '## ${tag}' section in CHANGELOG.md, replacing ${RELEASE_NOTES_PLACEHOLDER}.
-     Match the published GitHub style: a one-line summary, then '### Section' headings of
-     '- Added/Changed/Fixed/Removed' bullets. Each bullet must be a single, concise sentence
-     describing the feature for players (strictly user-facing, no file paths or developer details).
+  2. Write the approved '## ${tag}' section in CHANGELOG.md, replacing ${RELEASE_NOTES_PLACEHOLDER},
+     in the changelog style (docs/agents/workflow.md): a short intro, then '### Section' headings of
+     one-sentence Added/Changed/Fixed/Removed bullets. Run the avoid-ai-writing pass over the draft,
+     and again over the finished section.
   3. npm run check                       # write the notes first; the suite requires the section
   4. git add -A && git commit            # 'Betafied ${tag}: <summary>', as the authenticated GitHub user, no agent trailer
   5. git tag -a ${tag} -m "Betafied ${tag}: <summary>"

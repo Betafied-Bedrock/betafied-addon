@@ -1,15 +1,13 @@
 import {
     BlockPermutation,
     Direction,
-    EntityComponentTypes,
-    EquipmentSlot,
-    GameMode,
     Player,
     system,
     world
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
+import { consumeHeldItem } from "../core/heldItem.js";
 
 interface Cell {
     readonly x: number;
@@ -25,7 +23,7 @@ export const DOUBLE_SLAB_OF: Readonly<Record<string, string>> = Object.freeze({
 });
 
 export const SLAB_SOUND_OF: Readonly<Record<string, string>> = Object.freeze({
-    "bh:wooden_slab": "use.wood",
+    "bh:wooden_slab": "use.stone",
     "bh:cobblestone_slab": "use.stone",
     "bh:sandstone_slab": "use.stone",
     "bh:stone_slab": "use.stone"
@@ -37,21 +35,6 @@ export function canStackSlab(blockTypeId: string, face: Direction, heldItemId: s
 
 export function canMergePlacedSlab(permutationToPlaceId: string, belowBlockTypeId: string | undefined): boolean {
     return DOUBLE_SLAB_OF[permutationToPlaceId] !== undefined && belowBlockTypeId === permutationToPlaceId;
-}
-
-function consumeHeldSlab(player: Player): void {
-    if (player.getGameMode() === GameMode.Creative) return;
-
-    const equippable = player.getComponent(EntityComponentTypes.Equippable);
-    const held = equippable?.getEquipment(EquipmentSlot.Mainhand);
-    if (!equippable || !held) return;
-
-    if (held.amount > 1) {
-        held.amount -= 1;
-        equippable.setEquipment(EquipmentSlot.Mainhand, held);
-    } else {
-        equippable.setEquipment(EquipmentSlot.Mainhand, undefined);
-    }
 }
 
 function scheduleSlabDoubling(
@@ -75,7 +58,7 @@ function scheduleSlabDoubling(
             }
 
             if (player.isValid) {
-                consumeHeldSlab(player);
+                consumeHeldItem(player, (typeId) => typeId === slabId);
             }
         } catch (e) {
             reportError({

@@ -82,7 +82,9 @@ describe("Slab Stacking - Beta 1.7.3 Pre-Placement Stacking", () => {
         });
 
         it("defines placement sounds for each slab type", () => {
-            assert.equal(SLAB_SOUND_OF["bh:wooden_slab"], "use.wood");
+            // Beta's wooden slab was the stone slab wearing a plank texture, so it placed
+            // with the stone sound too.
+            assert.equal(SLAB_SOUND_OF["bh:wooden_slab"], "use.stone");
             assert.equal(SLAB_SOUND_OF["bh:stone_slab"], "use.stone");
             assert.equal(SLAB_SOUND_OF["bh:cobblestone_slab"], "use.stone");
             assert.equal(SLAB_SOUND_OF["bh:sandstone_slab"], "use.stone");
@@ -196,6 +198,44 @@ describe("Slab Stacking - Beta 1.7.3 Pre-Placement Stacking", () => {
             assert.equal(upperBlock.typeId, "minecraft:air", "Upper cell must remain air");
             const held = equip.getEquipment(EquipmentSlot.Mainhand);
             assert.equal(held, undefined, "Last item in stack should be removed when consumed");
+        });
+
+        it("spends the slab the click was made with, not a stack drawn in the tick since", () => {
+            const dim = world.getDimension("overworld");
+            const loc = { x: 14, y: 64, z: 14 };
+            const block = dim.getBlock(loc);
+            block.setType("bh:wooden_slab");
+
+            const player = new Player("p4", "Swapper");
+            player.gameMode = GameMode.Survival;
+            const equip = new EntityEquippableComponent();
+            player.setComponent(EntityComponentTypes.Equippable, equip);
+            equip.setEquipment(EquipmentSlot.Mainhand, new ItemStack("bh:wooden_slab", 2));
+
+            const event: any = {
+                block,
+                blockFace: Direction.Up,
+                faceLocation: { x: 0.5, y: 1.0, z: 0.5 },
+                isFirstEvent: true,
+                itemStack: new ItemStack("bh:wooden_slab", 2),
+                player,
+                cancel: false
+            };
+
+            eventBus.dispatch("playerInteractWithBlock", event);
+            assert.equal(event.cancel, true);
+
+            // The doubling lands a tick later, so the mainhand stack is read again then.
+            equip.setEquipment(EquipmentSlot.Mainhand, new ItemStack("minecraft:iron_sword", 1));
+
+            while (scheduledTimeouts.length > 0) {
+                scheduledTimeouts.shift()!.callback();
+            }
+
+            assert.equal(block.typeId, "bh:double_wooden_slab", "the doubling still lands");
+            const held = equip.getEquipment(EquipmentSlot.Mainhand);
+            assert.equal(held?.typeId, "minecraft:iron_sword", "a stack the click never named is left alone");
+            assert.equal(held?.amount, 1);
         });
     });
 });
