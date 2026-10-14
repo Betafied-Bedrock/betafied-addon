@@ -29,13 +29,9 @@
                 "explosion_resistance": 3
             },
             "minecraft:loot": "loot_tables/blocks/double_wooden_slab.json",
-            "minecraft:flammable": {
-                "catch_chance_modifier": 5,
-                "destroy_chance_modifier": 20
-            },
             "minecraft:map_color": "#B8945F",
             "minecraft:sound": {
-                "sound": "wood"
+                "sound": "stone"
             },
             "minecraft:display_name": "Wooden Slab",
             "minecraft:tags": ["stone", "minecraft:is_pickaxe_item_destructible"]

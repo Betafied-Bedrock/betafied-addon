@@ -49,6 +49,19 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
         assert.equal(cow.getProperty("betarock:shadow_span"), 1, "the properties are still migrated");
     });
 
+    it("takes the pack's own invisibility back off an entity that no longer hides", () => {
+        const player = new Entity();
+        player.typeId = "minecraft:player";
+        player.addEffect("invisibility", 20000000, { showParticles: false });
+
+        // The player's definition stopped hiding from hostile mobs, and the world cannot wait the
+        // effect out: twenty million ticks outlive it, so a player would stay untargetable for the
+        // rest of the save. The component's absence is what marks it as this pack's leftover.
+        migrateEntity(player);
+
+        assert.equal(player.getEffect("invisibility"), undefined, "the leftover invisibility is removed");
+    });
+
     it("is idempotent and leaves already-migrated entities untouched", () => {
         const cow = new Entity();
         cow.typeId = "minecraft:cow";

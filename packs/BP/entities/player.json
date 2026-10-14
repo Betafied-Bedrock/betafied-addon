@@ -21,22 +21,11 @@
             }
         },
         "components": {
-            "minecraft:renders_when_invisible": {},
-            "minecraft:spell_effects": {
-                "add_effects": [
-                    {
-                        "effect": "invisibility",
-                        "duration": "infinite",
-                        "visible": false
-                    }
-                ]
-            },
             "minecraft:type_family": {
                 "family": [
                     "player"
                 ]
             },
-            "minecraft:is_hidden_when_invisible": {},
             "minecraft:loot": {
                 "table": "loot_tables/empty.json"
             },

@@ -92,12 +92,12 @@ function sweepPlacers(accessor?: SlotAccessor): void {
     }
 }
 
-export function processExemptInventory(player: Player): void {
+export function sweepExemptInventory(player: Player): void {
     sweepPlacers(inventorySlots(player));
-    processExemptEquipment(player);
+    sweepExemptEquipment(player);
 }
 
-export function processExemptEquipment(player: Player): void {
+export function sweepExemptEquipment(player: Player): void {
     sweepPlacers(equipmentSlots(player));
 }
 
@@ -118,15 +118,15 @@ function sweepPlayer(player: Player, fullSweep: boolean, equipmentSweep: boolean
     const sweepAll = dirty || exemptionFlipped || fullSweep;
 
     if (isExempt) {
-        if (sweepAll) processExemptInventory(player);
-        else if (equipmentSweep) processExemptEquipment(player);
+        if (sweepAll) sweepExemptInventory(player);
+        else if (equipmentSweep) sweepExemptEquipment(player);
         return;
     }
 
     if (wasExempt) msgCooldowns.delete(player.id);
 
-    if (sweepAll) processInventory(player);
-    else if (equipmentSweep) processEquipment(player);
+    if (sweepAll) sweepInventory(player);
+    else if (equipmentSweep) sweepEquipment(player);
 }
 
 export function* inventorySweepJob(): Generator<void, void, unknown> {
@@ -145,7 +145,7 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
         } catch (e) {
             reportError({
                 system: "InventoryManager",
-                operation: "processInventory",
+                operation: "sweepInventory",
                 target: player.name
             }, e);
         }
@@ -157,10 +157,11 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
     }
 }
 
-export function processPlayers(): void {
+export function sweepPlayers(): void {
     const job = inventorySweepJob();
     while (!job.next().done) {
-        // Drain synchronously
+        // This wrapper exists for callers that need the whole sweep finished before they continue,
+        // unlike the time-sliced registration below.
     }
 }
 
@@ -208,8 +209,6 @@ function evaluatePackItem(id: string, item: ItemStack): ItemNormalizationAction 
     return undefined;
 }
 
-// A bucket is the one capped item the pack does not own, so its stack is held here instead of in an
-// item JSON: the engine's own bucket is what fills from a source block and pours it back.
 function evaluateVanillaOverride(id: string, item: ItemStack): ItemNormalizationAction | undefined {
     if (BETA_CAPPED_VANILLA_IDS.has(id)) {
         return item.amount > 1
@@ -226,8 +225,6 @@ function evaluateVanillaOverride(id: string, item: ItemStack): ItemNormalization
     return undefined;
 }
 
-// A door, a sign or a cake carries the era's limit of one in its own JSON, so a vanilla stack has to
-// come apart as it retypes; every other placer target keeps its count.
 function evaluateRetargetedItem(id: string, item: ItemStack): ItemNormalizationAction | undefined {
     const placerTarget = resolvePlacerReplacement(id);
     if (placerTarget) {
@@ -273,7 +270,6 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         return { type: "keep" };
     }
 
-    // The order is the policy: each classifier owns one class of id, and the first answer wins.
     return evaluatePackItem(id, item)
         ?? (isVanillaId(id) ? undefined : { type: "keep" })
         ?? evaluateVanillaOverride(id, item)
@@ -351,12 +347,12 @@ function reportSweep(player: Player, { removed, stripped }: { removed: boolean; 
     if (stripped) notifyPlayer(player, CONFIG.ENCHANT_MSG);
 }
 
-export function processInventory(player: Player): void {
+export function sweepInventory(player: Player): void {
     reportSweep(player, sweepStrict(player, inventorySlots(player)));
-    processEquipment(player);
+    sweepEquipment(player);
 }
 
-export function processEquipment(player: Player): void {
+export function sweepEquipment(player: Player): void {
     reportSweep(player, sweepStrict(player, equipmentSlots(player)));
 }
 
@@ -381,7 +377,7 @@ eventBus.onPlayerGameModeChange((ev) => {
     if (!isInventoryExempt(ev.player)) {
         msgCooldowns.delete(ev.player.id);
         previousExemptionState.set(ev.player.id, false);
-        processInventory(ev.player);
+        sweepInventory(ev.player);
     }
 });
 

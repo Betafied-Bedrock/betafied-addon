@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { system } from "@minecraft/server";
-import { evaluateHopConditions, doHop } from "../../packs/BP/scripts/mobs/betaAnimalAI.js";
+import { evaluateHopConditions, applyRandomHop } from "../../packs/BP/scripts/mobs/betaAnimalAI.js";
 
 describe("Beta Animal AI - Authentic Beta Mobs", () => {
     it("detects obstacle ahead and triggers hop condition", () => {
@@ -107,7 +107,7 @@ describe("Beta Animal AI - Authentic Beta Mobs", () => {
         assert.equal(triggered, true, "Crowded pen with other passive mobs should trigger hop condition");
     });
 
-    it("applies upward and forward impulse when doHop is executed", () => {
+    it("applies upward and forward impulse when applyRandomHop is executed", () => {
         let appliedImpulse: { x: number; y: number; z: number } | null = null;
 
         const fakeMob = {
@@ -125,9 +125,9 @@ describe("Beta Animal AI - Authentic Beta Mobs", () => {
             }
         };
 
-        doHop(fakeMob as any);
+        applyRandomHop(fakeMob as any);
 
-        // doHop runs first hop immediately or via runTimeout
+        // applyRandomHop runs first hop immediately or via runTimeout
         // Execute scheduled timeouts
         const timeouts = (system as any).scheduledTimeouts;
         if (timeouts && timeouts.length > 0) {
@@ -161,7 +161,7 @@ describe("Beta Animal AI - Authentic Beta Mobs", () => {
             }
         };
 
-        doHop(fallingMob as any);
+        applyRandomHop(fallingMob as any);
 
         const timeouts = (system as any).scheduledTimeouts;
         if (timeouts && timeouts.length > 0) {

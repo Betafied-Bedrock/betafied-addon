@@ -1,10 +1,8 @@
-import { world, ItemStack, EntityComponentTypes } from "@minecraft/server";
+import { world } from "@minecraft/server";
 import { reportError } from "../core/errorReporter.js";
-import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
-import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
-import { resolveDropId } from "../core/normalizer.js";
 import { tickManager } from "../core/tickManager.js";
 import { migrateEntity } from "./entityMigration.js";
+import { SWEEP_SANITIZATION, sanitizeWorldEntity } from "./entitySpawnHandler.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 100,
@@ -28,28 +26,10 @@ export function* cleanerJob(): Generator<void, void, unknown> {
             for (const ent of entities) {
                 if (!ent.isValid) continue;
 
-                if (isForeignOwnedEntity(ent)) continue;
-
-                if (isVanillaId(ent.typeId) && !isBetaEntity(ent.typeId)) {
-                    ent.remove();
-                } else if (ent.typeId === "minecraft:item") {
-                    const itemComp = ent.getComponent(EntityComponentTypes.Item);
-                    const itemStack = itemComp?.itemStack;
-                    if (itemStack) {
-                        const finalId = resolveDropId(itemStack.typeId);
-                        if (finalId === null) {
-                            ent.remove();
-                        } else if (finalId !== itemStack.typeId) {
-                            const loc = ent.location;
-                            const dim = ent.dimension;
-                            const amount = itemStack.amount;
-                            ent.remove();
-                            dim.spawnItem(new ItemStack(finalId, amount), loc);
-                        }
-                    }
-                } else {
-                    migrateEntity(ent);
-                }
+                // The sweep is the backstop for entities that were already resident before this pass
+                // could see them spawn, so it runs the same policy rather than a second copy of it.
+                sanitizeWorldEntity(ent, SWEEP_SANITIZATION);
+                migrateEntity(ent);
 
                 processed++;
                 if (processed % CONFIG.ENTITIES_PER_TICK === 0) {

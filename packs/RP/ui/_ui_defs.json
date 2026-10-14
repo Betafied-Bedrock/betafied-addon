@@ -3,6 +3,7 @@
         "ui/debug_screen.json",
         "ui/.bfui/common.json",
         "ui/.bfui/chat_screen.json",
-        "ui/.bfui/pause_screen.json"
+        "ui/.bfui/pause_screen.json",
+        "ui/.bfui/death_screen.json"
     ]
 }

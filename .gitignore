@@ -19,6 +19,8 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 .agents/
+.claude/
+.codex/
 .desloppify/
 .freebuff/
 .superpowers/

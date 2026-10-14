@@ -23,7 +23,7 @@ export const DOUBLE_SLAB_OF: Readonly<Record<string, string>> = Object.freeze({
 });
 
 export const SLAB_SOUND_OF: Readonly<Record<string, string>> = Object.freeze({
-    "bh:wooden_slab": "use.wood",
+    "bh:wooden_slab": "use.stone",
     "bh:cobblestone_slab": "use.stone",
     "bh:sandstone_slab": "use.stone",
     "bh:stone_slab": "use.stone"

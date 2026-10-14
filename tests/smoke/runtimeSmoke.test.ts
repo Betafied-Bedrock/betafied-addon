@@ -27,6 +27,30 @@ describe("Bedrock Runtime Smoke Suite - Manifest & Entrypoint Integrity", () => 
         assert.ok(serverDep.version, "@minecraft/server dependency must have a version");
     });
 
+    it("pins @minecraft/server-ui to the engine line @minecraft/server is pinned to", () => {
+        const manifest = JSON.parse(readFileSync(bpManifestPath, "utf-8"));
+        const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf-8"));
+        // Both pins read `<module version>.<engine build>` and it is the engine suffix that has to
+        // agree — the module versions are unrelated numbers, so the comparison drops them rather
+        // than assuming the two ever line up. A caret would break the module-version check below.
+        const engine = (v: string) => v.split(".").slice(-3).join(".");
+
+        const uiDep = manifest.dependencies.find((d: any) => d.module_name === "@minecraft/server-ui");
+        assert.ok(uiDep, "BP manifest must declare @minecraft/server-ui: the death screen is a form");
+
+        const uiPin = pkg.devDependencies["@minecraft/server-ui"];
+        assert.ok(uiPin, "package.json must pin @minecraft/server-ui: its types are what tsc reads");
+        assert.equal(
+            engine(uiPin),
+            engine(pkg.devDependencies["@minecraft/server"]),
+            "form types must come from the same engine build as the server types"
+        );
+        assert.ok(
+            uiPin.startsWith(`${uiDep.version}.`),
+            `manifest ${uiDep.version} and devDependency ${uiPin} must name the same module version`
+        );
+    });
+
     it("verifies resource pack manifest structure", () => {
         assert.ok(existsSync(rpManifestPath), "RP manifest must exist");
         const raw = readFileSync(rpManifestPath, "utf-8");
@@ -58,6 +82,25 @@ describe("Bedrock Runtime Smoke Suite - Manifest & Entrypoint Integrity", () => 
         }
 
         assert.deepEqual(offenders, [], `world.getDimension must take a short key, not a Dimension.id: ${offenders.join(", ")}`);
+    });
+
+    it("moves players with methods, never with a teleport command", () => {
+        // `/tp` and `/teleport` report success and then move the player relative to a context the
+        // script cannot see, and on a client or Realm the command may not even be permitted. Both
+        // `Player.teleport` and `Entity.teleport` take a location and an optional dimension, which is
+        // what every call site in this pack uses. This is the same shape as the dimension-key scan
+        // above: a rule the code has to keep, asserted against the sources rather than trusted.
+        const scriptsDir = resolve(root, "packs/BP/scripts");
+        const offenders: string[] = [];
+
+        for (const file of readdirSync(scriptsDir, { recursive: true }).map(String).filter(f => f.endsWith(".ts"))) {
+            const source = readFileSync(resolve(scriptsDir, file), "utf-8");
+            for (const match of source.matchAll(/runCommand\(\s*[`"']\/?(?:tp|teleport)\b/gi)) {
+                offenders.push(`${file} -> ${match[0]}`);
+            }
+        }
+
+        assert.deepEqual(offenders, [], `use Player.teleport with a location, not a command: ${offenders.join(", ")}`);
     });
 
     it("reaches every script module from main.ts so the transpiler emits it", () => {

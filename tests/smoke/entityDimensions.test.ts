@@ -8,80 +8,7 @@ import {
 } from "../../packs/BP/scripts/core/betaRegistry.js";
 import { compareText } from "../support/text.js";
 
-/**
- * Beta 1.7.3's entity sizes and ground speeds, against the files that declare them.
- *
- * The era's numbers come from the recovered client at `reference-docs/beta-1.7.3` (gitignored, like
- * the rest of `reference-docs/`), and every entry below cites the line it was read from. Before that
- * clone existed these files carried vanilla Bedrock's dimensions and vanilla Bedrock's speeds, which
- * is what a player notices first: a Beta zombie's box is 1.8 tall where Bedrock's is 1.9, a Beta
- * chicken is 0.3 x 0.4 where the pack had 0.6 x 0.8, and a Beta pig walks at 70% of the player's
- * walking speed where the pack had it at half of vanilla's *own* pig.
- *
- * ## Sizes
- *
- * An entity's box is set in its constructor. `Entity` declares 0.6 x 1.8 (Entity.java:86-87) and
- * `setSize` overwrites it (Entity.java:153), so a mob that never calls `setSize` is a 0.6 x 1.8
- * humanoid -- which is why the zombie, skeleton, creeper and pigman are pinned at 1.8 rather than at
- * Bedrock's 1.9. The mobs that do call it: pig 0.9 x 0.9 (EntityPig.java:7), cow and sheep
- * 0.9 x 1.3 (EntityCow.java:7, EntitySheep.java:11), chicken 0.3 x 0.4 (EntityChicken.java:15), wolf
- * 0.8 x 0.8 (EntityWolf.java:18), squid 0.95 x 0.95 (EntitySquid.java:22), spider 1.4 x 0.9
- * (EntitySpider.java:7), ghast 4.0 x 4.0 (EntityGhast.java:16), slime `0.6 * size`
- * (EntitySlime.java:24, sizes 1/2/4) and the player 0.6 x 1.8 (EntityPlayer.java:152).
- *
- * ## Speed
- *
- * Beta has exactly one ground-movement factor for every living entity:
- * `EntityLiving.moveEntityWithHeading` passes `0.1F * var9` -- 0.1 on a normal block, because
- * `var9 = 0.16277136 / 0.546^3` is 1.0 -- into `Entity.moveFlying` (Entity.java:611), which scales
- * the input by `factor / max(magnitude, 1)`. The motion a mob gains per tick is therefore
- * `min(magnitude, 1) * 0.1`, and since `EntityCreature.updatePlayerActionState` sets
- * `moveForward = moveSpeed` (EntityCreature.java:69), a mob's speed is its `moveSpeed` as a fraction
- * of the walking player's, with anything above 1 clamped to a full stride. The values: 0.7 is
- * `EntityLiving.moveSpeed`'s default (EntityLiving.java:56), the zombie and the pigman lower it to
- * 0.5 (EntityZombie.java:7, EntityPigZombie.java:13), the spider raises it to 0.8
- * (EntitySpider.java:8) and the wolf to 1.1 (EntityWolf.java:19), which Beta clamps back to the
- * player's own speed.
- *
- * Bedrock's `minecraft:movement` value is documented only as "base movement speed", so the unit is
- * calibrated where the two editions provably agree: Bedrock's own zombie is 0.23, and the zombie is
- * the one mob both eras define as *half the walking player's* speed. That makes one Beta unit 0.46
- * Bedrock units -- `0.23 / 0.5` -- and every derived value below is `0.46 * moveSpeed`, rounded to
- * three decimals. The same constant falls out of Java's AI movement term independently
- * (`0.1 / 0.216`), which is why it is the number to change if one in-game measurement says the mobs
- * are now too fast or too slow.
- *
- * Because Beta has a single ground speed, `movement * speed_multiplier` is what the engine walks,
- * and a behavior multiplier other than 1 is a claim that Beta had a *second* speed. Every one of
- * those claims was removed, except the two states Beta really did distinguish:
- *
- *  - `zombie_pigman`'s `melee_attack` keeps 1.9, which is `EntityPigZombie.java:19`: `moveSpeed`
- *    becomes 0.95 while the pigman has a target, against its own 0.5.
- *  - `mount_pathing` is left exactly as it was. A ridden mob does not use its own `moveSpeed` at all
- *    -- `EntityLiving` copies the rider's input, so a saddled pig moves at its *rider's* walking
- *    speed (0.46 here, not its own 0.322) -- and how Bedrock's mount component splits rider input
- *    from mob speed is not something this pack can check offline.
- *
- * ## What cannot be declared
- *
- * A mob's eye height is `height * 0.85` (EntityLiving.java:89), `height * 0.8` for the wolf
- * (EntityWolf.java:221), and 1.62 for the player -- the camera rides `yOffset` (EntityPlayer.java:44,
- * 152), while the player's own `getEyeHeight` answers 0.12F, which is not a camera height.
- * Bedrock exposes no component for a mob's eye height -- the entity component list has none, and the
- * head location a script can read is documented only as "the head component", with how it is
- * computed left unsaid -- so these are recorded here instead of declared. The size table above is
- * all a client can carry.
- *
- * Three mobs cannot be translated from `moveSpeed`, and keep vanilla's value:
- *
- *  - the squid drives its own drift (`EntitySquid.moveEntityWithHeading`), it does not walk;
- *  - the ghast steers toward a waypoint with `motion += direction * 0.1` every 2-6 ticks
- *    (EntityGhast.java:31-60), so no scalar `moveSpeed` describes it;
- *  - the player is client-driven, and Bedrock's file value of 0.1 is vanilla's own -- the same 0.1
- *    that Beta's shared factor happens to be, which is a coincidence, not a translation.
- */
 const LEGACY_ROSTER_IDS: Readonly<Record<string, string>> = Object.freeze({
-    // Bedrock renamed the pigman and kept the old id working; the pack ships the old definition.
     "minecraft:zombified_piglin": "minecraft:zombie_pigman"
 });
 
@@ -129,10 +56,29 @@ const BETA_MOVE_SPEED: Readonly<Record<string, number | undefined>> = Object.fre
 });
 
 /**
- * Bedrock units per Beta unit: the walking player is 1.0 in Beta and 0.46 here, calibrated on the
- * zombie -- Beta's 0.5 against Bedrock's own 0.23 -- and reproduced by Java's `0.1 / 0.216`.
+ * Bedrock units per Beta unit: one `moveSpeed` unit is one share of the walking player's speed.
+ *
+ * It read 0.46, from taking Bedrock's own zombie (0.23) as Beta's half-speed zombie. That extrapolated
+ * past what the engine does -- the 5.6 playtest had a creeper at 0.322 outrunning a walking player -- so
+ * the unit is anchored on what the roster has to pace like instead: the 0.7-share mobs land on 0.245,
+ * next to the 0.25 the vanilla animals walk at. Still the one number to move if the era's shares need
+ * re-pacing, and every declared speed is read off it -- apart from the shares at a full stride, which
+ * `ENGINE_PACE_CORRECTION` below carries off it because the engine overshoots them.
  */
-const WALKING_PLAYER_UNITS = 0.46;
+const WALKING_PLAYER_UNITS = 0.35;
+
+/**
+ * The declared value for a share the anchor cannot pin, because the engine's response is not
+ * proportional across the range: the 5.6 creeper at 0.322 paced a *sprinting* player where Beta's 0.7
+ * share is 3.0 blocks a second against a walk of 4.317. That leaves the shares furthest above the
+ * zombie as the ones the anchor overshoots, and Beta's wolf is the worst of them
+ * (`EntityWolf.java:19` is 1.1, the roster's highest, clamped to a full walking stride).
+ *
+ * Both readings of that one datapoint, with the 0.7 shares on the era's 3.0 blocks a second: 0.326 if
+ * the creeper's own 1.25 attack multiplier was in play, 0.287 if it was not. 0.3 is Bedrock's own wolf
+ * and sits inside both. See BETA_POLICY_GAPS.md §11.
+ */
+const ENGINE_PACE_CORRECTION: Readonly<Record<string, number>> = Object.freeze({ wolf: 0.3 });
 
 /** Beta's eye height per definition file, as the rule each one follows. */
 const BETA_EYE_HEIGHT: Readonly<Record<string, number>> = Object.freeze({
@@ -172,9 +118,14 @@ const MULTIPLIER_EXCEPTIONS: Readonly<Record<string, number>> = Object.freeze({
     "cow.mount_pathing": 1.5,
     "sheep.mount_pathing": 1.5,
     "chicken.mount_pathing": 1.5,
-    "wolf.mount_pathing": 1.25,
     "zombie_pigman.mount_pathing": 1.25
 });
+
+/**
+ * The wolf's own `mount_pathing` multiplier is deliberately absent above: Beta's wolf has one speed,
+ * a clamped full stride, so the goal that drives its pursuit may not run it above the walking
+ * player's pace. Its `random_stroll`, `melee_attack` and `follow_owner` goals are all 1.0 already.
+ */
 
 /** The multiplier a ridden mob's own speed is wrong for, so only its presence is pinned. */
 const MOUNT_PATHING = "minecraft:behavior.mount_pathing";
@@ -201,7 +152,7 @@ function roster(): string[] {
     return ["minecraft:player", ...BETA_PASSIVE_TYPES, ...BETA_HOSTILE_TYPES];
 }
 
-/** Three decimals, so `0.46 * 0.7` compares equal to the 0.322 the file declares. */
+/** Three decimals, so `0.35 * 0.7` compares equal to the 0.245 the file declares. */
 function round(value: number): number {
     return Math.round(value * 1000) / 1000;
 }
@@ -273,9 +224,31 @@ describe("entity dimensions and speed", () => {
             const { value } = entityOf(typeId).components["minecraft:movement"];
             assert.equal(
                 round(value),
-                round(WALKING_PLAYER_UNITS * speed),
+                ENGINE_PACE_CORRECTION[file] ?? round(WALKING_PLAYER_UNITS * speed),
                 `${file}: movement`
             );
+        }
+    });
+
+    it("carries a corrected share down without reordering the roster", () => {
+        for (const [file, corrected] of Object.entries(ENGINE_PACE_CORRECTION)) {
+            const share = BETA_MOVE_SPEED[file];
+            assert.ok(share !== undefined, `${file}: a correction needs a Beta share to be read off`);
+            assert.ok(
+                corrected < WALKING_PLAYER_UNITS,
+                `${file}: a correction sits below the walk it is corrected from`
+            );
+
+            for (const [other, otherShare] of Object.entries(BETA_MOVE_SPEED)) {
+                // A slime's value lives in its per-size groups, and no share outranks a full stride.
+                if (otherShare === undefined || otherShare >= share! || other === "slime") continue;
+
+                const value = entityOf(`minecraft:${other}`).components["minecraft:movement"].value;
+                assert.ok(
+                    corrected > value,
+                    `${file}: Beta's ordering keeps it faster than the ${other} share`
+                );
+            }
         }
     });
 

@@ -2,26 +2,69 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
-## 5.6.1 — 2026-10-13
+## 5.7 — 2026-10-13
 
-A fix-up release for 5.6: sugar cane keeps its identity, signs stay out of the way of doors, the inventory grid regains the crafts that fit it, and mobs already in a world are no longer left invisible.
+5.7 adds Beta's death sequence, re-paces the mobs to the era's walk, and relights the leaves.
 
-### Sugar cane
+### Death
 
-- Fixed harvested and broken sugar cane so it keeps its identity instead of being deleted, which had made cane vanish as players walked up to it.
-
-### Signs
-
-- Fixed signs placed against doors and trapdoors so the block's own use answers the click, as in Beta, instead of leaving a sign nobody can type on.
-
-### Crafting
-
-- Fixed logs so they craft into planks in the player's 2x2 inventory grid again, which the first workbench depends on.
-- Restored the jack-o'-lantern, sandstone, and furnace minecart crafts to the player's 2x2 inventory grid, which 5.6 had moved onto the custom crafting table.
+- Added Beta's death screen: the era's gradient and "Game over!" headline, with the hotbar, hearts and crosshair drawn behind them.
+- Added the death drop: the inventory and worn armour are thrown out with the era's throw, spread over the two blocks around the player.
+- Added the death flop, the smoke puff after it, and the hurt sound the era played on a lethal hit.
+- Added the era's death camera, narrowing from 70 degrees while the screen stays up.
+- Changed a dead player to spectator with movement locked, so a death cannot be walked out of.
+- Changed the respawn to face south and hand the camera back.
+- Changed the pack's scripted player moves to mute the engine's teleport announcement, removing the "You have been teleported to ..." line.
+- Removed the permanent invisibility the shadow pack had put on players: hostile mobs target players again, and Bedrock draws its own shadow under them.
+- Fixed players already in a loaded world keeping the invisibility after the update.
 
 ### Mobs
 
-- Fixed existing mobs in a loaded world so they keep their normal appearance instead of turning fully invisible.
+- Changed the walking speed of every mob to the pack's new anchor, after 5.6's roster read as too fast.
+- Fixed zombies not fighting back, which they lost in the 4.0 rewrite.
+- Fixed spiders drawing invisible, because their render controller chose the invisible material whenever the shadow pack had them hidden.
+- Changed Herobrine to a rare event: at least eight hours between sightings, and the better part of a day on average.
+
+### Blocks
+
+- Changed leaves to Beta's flat shading, trimming ambient occlusion and baking the era's face dimming into the bottom, north/south and east/west sides.
+- Changed wooden slabs to sound like the stone slab they were cloned from and to stop catching fire.
+
+### Drops
+
+- Fixed converted ground stacks losing everything past the first item when the background sweep retyped them.
+- Changed raw iron and raw gold already on the ground to collapse to one ore, the amount one mined block drops.
+
+### Tooling
+
+- Added a lint rule capping an inline comment block at twelve lines, and swept the scripts of comments that restated the code.
+
+## 5.6.1 — 2026-10-13
+
+5.6.1 is a small fix-up release for sugar cane, signs, crafting, and mob rendering.
+
+### Sugar cane
+
+- Fixed harvested and broken sugar cane being removed during item conversion.
+- Changed sugar cane drops to keep their proper item identity instead of disappearing when collected.
+
+### Signs
+
+- Fixed signs being placeable against doors and trapdoors in cases where the block itself should handle the interaction.
+- Changed door and trapdoor interactions to take priority so unusable signs are not left attached to them.
+
+### Crafting
+
+- Restored log-to-plank recipes to the player's 2x2 inventory crafting grid.
+- Restored jack-o'-lantern crafting to the 2x2 inventory grid.
+- Restored sandstone crafting to the 2x2 inventory grid.
+- Restored furnace minecart crafting to the 2x2 inventory grid.
+- Fixed recipes that were incorrectly moved to the custom crafting table in 5.6.
+
+### Mobs
+
+- Fixed mobs already present in loaded worlds becoming fully invisible.
+- Changed existing entities to keep their normal render state when the updated pack is applied.
 
 ### Tooling
 

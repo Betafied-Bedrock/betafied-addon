@@ -1,0 +1,387 @@
+{
+  // Beta 1.7.3's death screen (GuiGameOver.drawScreen), rebuilt on the form the script layer already
+  // owns. Everything below is derived from the era's own source: the gradient rectangle, the two text
+  // rows at their scale and baseline, GuiButton's 200x20 metrics, and the HUD the era left visible
+  // behind the screen. Values and their source lines are pinned by tests/smoke/deathScreenUi.test.ts so
+  // a later edit has to change the test too.
+  "namespace": "bfui-death_screen",
+
+  // The screen's own content: the two text rows and the buttons. Everything the era drew *under* them -
+  // the HUD and the wash - is mounted in `screen_underlay`, because that slot is the one rect in this
+  // screen the engine resolves outside the content's safezone inset.
+  "root_panel": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      { "title@bfui-death_screen.title": {} },
+      { "score@bfui-death_screen.score": {} },
+      { "button_layout@bfui-death_screen.button_layout": {} }
+    ]
+  },
+
+  // The era's paint order is the world, then the HUD (GuiIngame.renderGameOverlay), then the screen's
+  // gradient over it, then the screen's own text and buttons. Everything below the text is mounted here,
+  // in the engine's background slot, for two reasons: base_screen mounts that slot as
+  // `bg_no_safezone_screen_panel@$screen_bg_content` *outside* the safezone stack, so it is the one rect
+  // this screen resolves without the content's inset; and the wash can only cover the HUD if the two are
+  // drawn in one panel with the wash second. The era's HUD is redrawn at all because the dead player is
+  // parked in GameMode.Spectator, and spectator is what hides Bedrock's HUD.
+  "screen_underlay": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      { "hud@bfui-death_screen.hud": {} },
+      { "wash@bfui-death_screen.wash": {} }
+    ]
+  },
+
+  // drawGradientRect(0, 0, width, height, 1615855616, -1602211792): 0x60500000 at the top vertices and
+  // 0xA0803030 at the bottom ones (Gui.drawGradientRect, where the first colour takes var2). Alpha stops
+  // short of opaque on purpose - the era never hid the world behind the screen.
+  //
+  // Baked into a texture rather than left to `gradient_renderer`, because that renderer draws through the
+  // engine's `ui_fill_gradient` material and this pack re-blends that material to Java's crosshair
+  // function (GuiIngame's glBlendFunc(775, 769), the difference blend the crosshair needs). A gradient
+  // drawn there comes out as a filter over the world instead of a translucent wash. An image takes the
+  // ordinary alpha path. The two colours and the interpolation between them are pinned by
+  // tests/smoke/deathScreenUi.test.ts.
+  //
+  // An image does not fill the control it is given: the engine's `keep_ratio` is on by default and *fits*
+  // the sprite inside its rect, centred. Measured off a screenshot of the running pack, this one drew
+  // 16:512 fitted to the screen height - 49 device px wide by the full height, at the same 5x UI scale
+  // that puts the era's 200x20 buttons at ~1000x100 device px - a band down the middle of the screen. The
+  // stretch is therefore declared and not inherited; `fill` and `keep_ratio: false` are the pair the
+  // engine itself stretches a sprite with.
+  "wash": {
+    "type": "image",
+    "texture": "textures/ui/death_gradient",
+    "size": [ "100%", "100%" ],
+    "keep_ratio": false,
+    "fill": true
+  },
+
+  // renderGameOverlay's own order: the hotbar bar, its selection frame, the ten hearts, then the
+  // crosshair. The wash above is drawn after all of it, which is what tints the HUD the way the era does.
+  "hud": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "controls": [
+      { "hotbar@bfui-death_screen.hotbar": {} },
+      { "hotbar_selector@bfui-death_screen.hotbar_selector": {} },
+      {
+        "heart_0@bfui-death_screen.heart": {
+          "offset": [ -86.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_a" ] } } ]
+        }
+      },
+      {
+        "heart_1@bfui-death_screen.heart": {
+          "offset": [ -78.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_b" ] } } ]
+        }
+      },
+      {
+        "heart_2@bfui-death_screen.heart": {
+          "offset": [ -70.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_c" ] } } ]
+        }
+      },
+      {
+        "heart_3@bfui-death_screen.heart": {
+          "offset": [ -62.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_a" ] } } ]
+        }
+      },
+      {
+        "heart_4@bfui-death_screen.heart": {
+          "offset": [ -54.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_b" ] } } ]
+        }
+      },
+      {
+        "heart_5@bfui-death_screen.heart": {
+          "offset": [ -46.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_c" ] } } ]
+        }
+      },
+      {
+        "heart_6@bfui-death_screen.heart": {
+          "offset": [ -38.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_a" ] } } ]
+        }
+      },
+      {
+        "heart_7@bfui-death_screen.heart": {
+          "offset": [ -30.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_b" ] } } ]
+        }
+      },
+      {
+        "heart_8@bfui-death_screen.heart": {
+          "offset": [ -22.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_c" ] } } ]
+        }
+      },
+      {
+        "heart_9@bfui-death_screen.heart": {
+          "offset": [ -14.5, -23 ],
+          "controls": [ { "heart_sprite@bfui-death_screen.heart_sprite": { "anims": [ "@bfui-death_screen.heart_jitter_a" ] } } ]
+        }
+      },
+      { "crosshair_arm_horizontal@bfui-death_screen.crosshair_pixel": { "size": [ 9, 1 ] } },
+      { "crosshair_arm_vertical@bfui-death_screen.crosshair_pixel": { "size": [ 1, 9 ] } },
+      { "crosshair_centre@bfui-death_screen.crosshair_pixel": { "size": [ 1, 1 ] } }
+    ]
+  },
+
+  // drawTexturedModalRect(width / 2 - 91, height - 22, 0, 0, 182, 22), and the 24x22 selection frame at
+  // width / 2 - 92 + currentItem * 20, height - 23. Both anchor to the bottom edge, so the era's own
+  // heights are the offsets.
+  //
+  // `uv_size` is the crop and has no default: with only a `uv` start, the engine maps the *whole* sheet
+  // into the control, which is what put all of gui.png and icons.png on screen at once - the HUD came out
+  // as a mash of every sprite in the two atlases, each squeezed into the era's own 182x22 and 9x9 boxes.
+  // Every `uv` in the engine's own UI carries its `uv_size` for this reason.
+  //
+  // The frame is drawn on slot 0: the era read currentItem from the player and nothing in a form screen
+  // binds it, which is the one value of the era's HUD this skin cannot follow.
+  "hotbar": {
+    "type": "image",
+    "texture": "textures/gui/gui",
+    "uv": [ 0, 0 ],
+    "uv_size": [ 182, 22 ],
+    "size": [ 182, 22 ],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle"
+  },
+
+  "hotbar_selector": {
+    "type": "image",
+    "texture": "textures/gui/gui",
+    "uv": [ 0, 22 ],
+    "uv_size": [ 24, 22 ],
+    "size": [ 24, 22 ],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle",
+    "offset": [ -80, -1 ]
+  },
+
+  // Ten empty containers at width / 2 - 91 + i * 8, height - 32, uv (16, 0) of icons.png - the container
+  // the era draws and leaves empty, because the health it just rolled back is not the zero the screen
+  // renders. The sprites are 9px wide on the era's 8px pitch, which is the pixel they overlap by, and
+  // their bottom edge is the era's height - 23.
+  //
+  // The x offsets are therefore half pixels (the row's centre is width / 2 - 50.5 and a `bottom_middle`
+  // anchor places the sprite's own centre).
+  //
+  // The slot is a panel carrying the era's x, with the container sprite inside it carrying the jitter:
+  // an `offset` animation writes the whole offset, so animating the slot itself would move it off its own
+  // column.
+  "heart": {
+    "type": "panel",
+    "size": [ 9, 9 ],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle",
+    "controls": [
+      { "heart_sprite@bfui-death_screen.heart_sprite": {} }
+    ]
+  },
+
+  "heart_sprite": {
+    "type": "image",
+    "texture": "textures/gui/icons",
+    "uv": [ 16, 0 ],
+    "uv_size": [ 9, 9 ],
+    "size": [ 9, 9 ],
+    "anims": [ "@bfui-death_screen.heart_jitter_a" ]
+  },
+
+  // renderGameOverlay: `if (var13 <= 4) { var17 += this.rand.nextInt(2); }` - with health at 0 the era
+  // drops each slot by 0 or 1px, per slot, every tick, from an RNG it reseeds off the tick counter, so no
+  // UI animation can replay the pattern. These loop a 1px drop on three staggered periods instead, which
+  // reads as the same buzz; the ten hearts are dealt one of the three by index, so they drift in and out
+  // of step rather than bouncing as a row. A self-referencing `next` is how the engine's own
+  // `anim_scrollbar_box_fadeout` loops.
+  "heart_jitter_a": {
+    "anim_type": "offset",
+    "easing": "linear",
+    "duration": 0.05,
+    "from": [ 0, 0 ],
+    "to": [ 0, 1 ],
+    "next": "@bfui-death_screen.heart_jitter_a"
+  },
+
+  // Spelled out rather than inherited from `heart_jitter_a`, because `next` inherits too: a copy would
+  // chain into `a` and stop being a loop of its own.
+  "heart_jitter_b": {
+    "anim_type": "offset",
+    "easing": "linear",
+    "duration": 0.065,
+    "from": [ 0, 0 ],
+    "to": [ 0, 1 ],
+    "next": "@bfui-death_screen.heart_jitter_b"
+  },
+
+  "heart_jitter_c": {
+    "anim_type": "offset",
+    "easing": "linear",
+    "duration": 0.08,
+    "from": [ 0, 0 ],
+    "to": [ 0, 1 ],
+    "next": "@bfui-death_screen.heart_jitter_c"
+  },
+
+  // drawTexturedModalRect(width / 2 - 7, height / 2 - 7, 0, 0, 16, 16) under glBlendFunc(775, 769): the
+  // 9x1 and 1x9 arms of icons.png's crosshair, centred. The difference blend is why the era's crosshair
+  // inverts the world rather than painting white over it, and a `gradient_renderer` fill is the only
+  // control this engine draws through the material the pack re-blends to that function
+  // (materials/ui.material). The centre pixel is covered twice by the two arms, and Java's blend cancels
+  // there, so the 1x1 centre is what puts it back - the pack's own HUD crosshair composes the same three
+  // fills for the same reason.
+  "crosshair_pixel": {
+    "type": "custom",
+    "renderer": "gradient_renderer",
+    "color1": [ 1, 1, 1, 1 ],
+    "color2": [ 1, 1, 1, 1 ],
+    "size": [ 1, 1 ],
+    "anchor_from": "center",
+    "anchor_to": "center"
+  },
+
+  // "Game over!" under glScalef(2, 2, 2) at y=30. The scale doubles the 8px font, so the baseline sits
+  // at 60 and the glyph box starts at 44 - the offset here is the box, not the baseline.
+  "title": {
+    "type": "label",
+    "size": [ "100%", "default" ],
+    "text": "#title_text",
+    "color": [ 1, 1, 1, 1 ],
+    "font_type": "default",
+    "font_scale_factor": 2.0,
+    "shadow": true,
+    "localize": false,
+    "text_alignment": "center",
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "offset": [ 0, 44 ],
+    "bindings": [
+      { "binding_name": "#title_text" }
+    ]
+  },
+
+  // "Score: &e" + score, unscaled, baseline y=100 - box top 92. The ampersand is the era's own bug: its
+  // renderer only translated the section sign, so the escape printed literally.
+  //
+  // The body arrives on `#form_text`, and the property bag carries the same string as its declared
+  // default. A label draws the property bag's value when the binding that would fill it has not run,
+  // so a form body the engine does not push to a replaced `long_form` still prints the era's line
+  // rather than nothing. The two copies are pinned together by tests/smoke/deathScreenUi.test.ts.
+  "score": {
+    "type": "label",
+    "size": [ "100%", "default" ],
+    "property_bag": {
+      "#form_text": "Score: &e0"
+    },
+    "text": "#form_text",
+    "color": [ 1, 1, 1, 1 ],
+    "font_type": "default",
+    "shadow": true,
+    "localize": false,
+    "text_alignment": "center",
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "offset": [ 0, 92 ],
+    "bindings": [
+      { "binding_name": "#form_text" }
+    ]
+  },
+
+  // initGui places the buttons at height / 4 + 72 and height / 4 + 96, so they ride a quarter of the
+  // screen rather than its centre, 72 below that line. That is the quarter as a percentage offset - a
+  // percentage resolves against the parent's height there, which is how the Java-styled packs slide a
+  // window in - and then the era's own 72 as a fixed spacer, the way vanilla spaces a stack. An
+  // asymmetric anchor pair cannot say it: this engine resolves anchor_from against the parent and
+  // anchor_to against the child, the opposite of the JSON UI reference table, so the +72 was measured
+  // from the top of the screen and the buttons landed on the header.
+  "button_layout": {
+    "type": "stack_panel",
+    "orientation": "vertical",
+    "size": [ "100%", "100%c" ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "offset": [ 0, "25%" ],
+    "controls": [
+      { "era_offset": { "type": "panel", "size": [ "0px", "72px" ] } },
+      { "buttons@bfui-death_screen.form_buttons": {} }
+    ]
+  },
+
+  // One item per form button, drawn from the engine's own form_buttons collection so a click still
+  // arrives as a form response - the whole reason this is a screen rather than a HUD overlay.
+  "form_buttons": {
+    "type": "stack_panel",
+    "orientation": "vertical",
+    "size": [ "100%", "100%c" ],
+    "factory": {
+      "name": "buttons",
+      "control_ids": {
+        "button": "bfui-death_screen.button_item"
+      }
+    },
+    "collection_name": "form_buttons",
+    "bindings": [
+      {
+        "binding_name": "#form_button_contents",
+        "binding_name_override": "#collection_length"
+      }
+    ]
+  },
+
+  // 24px pitch around a 20px button: initGui places them at height / 4 + 72 and + 96.
+  "button_item": {
+    "type": "panel",
+    "size": [ "100%", 24 ],
+    "controls": [
+      { "button@bfui-death_screen.button": {} }
+    ]
+  },
+
+  // GuiButton at width 200, height 20. textures/ui/vanilla_default, _pressed and _locked are this
+  // pack's crops of the era's gui.png widget rows - normal, hover and disabled - so the skin reuses
+  // them rather than restating the art.
+  "button@common_buttons.light_text_button": {
+    "$button_type_panel": "bfui-death_screen.button_label",
+    "$pressed_button_name": "button.form_button_click",
+    "$button_text": "#form_button_text",
+    "$button_text_binding_type": "collection",
+    "$button_text_grid_collection_name": "form_buttons",
+    "$default_button_texture": "textures/ui/vanilla_default",
+    "$hover_button_texture": "textures/ui/vanilla_pressed",
+    "$pressed_button_texture": "textures/ui/vanilla_pressed",
+    "$locked_button_texture": "textures/ui/vanilla_locked",
+    // GuiButton.drawButton: 14737632 enabled, 16777120 hovered, -6250336 disabled.
+    "$default_text_color": [ 0.87843137, 0.87843137, 0.87843137, 1 ],
+    "$hover_text_color": [ 1, 1, 0.62745098, 1 ],
+    "$pressed_text_color": [ 1, 1, 0.62745098, 1 ],
+    "$locked_text_color": [ 0.62745098, 0.62745098, 0.62745098, 1 ],
+    "$font_type": "default",
+    "$button_image_size": [ "100%", "100%" ],
+    "$border_visible": false,
+    "$border_alpha": 0,
+    "$button_pressed_offset": [ 0, 0 ],
+    "size": [ 200, 20 ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    // Binds this item to its own row of the collection, which is what makes #form_button_text above
+    // resolve per button rather than once for the whole list.
+    "bindings": [
+      {
+        "binding_type": "collection_details",
+        "binding_collection_name": "form_buttons"
+      }
+    ]
+  },
+
+  "button_label@common_buttons.new_ui_binding_button_label": {
+    "shadow": true
+  }
+}

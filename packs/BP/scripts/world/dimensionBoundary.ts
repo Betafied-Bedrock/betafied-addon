@@ -1,5 +1,6 @@
 import { world } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
+import { teleportQuietly } from "../core/quietTeleport.js";
 import { END_ID, OVERWORLD_ID, OVERWORLD_KEY } from "../core/betaConstants.js";
 
 eventBus.onPlayerDimensionChange((event) => {
@@ -11,7 +12,7 @@ eventBus.onPlayerDimensionChange((event) => {
             const targetLoc = spawn && spawn.dimension.id === OVERWORLD_ID
                 ? { x: spawn.x, y: spawn.y, z: spawn.z }
                 : { x: 0, y: 70, z: 0 };
-            player.teleport(targetLoc, { dimension: overworld });
+            teleportQuietly(player, targetLoc, { dimension: overworld });
             player.sendMessage("§cThe End does not exist in Beta 1.7.3.");
         }
     }

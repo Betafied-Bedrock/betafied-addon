@@ -1,10 +1,3 @@
-/**
- * Beta 1.7.3 allowed wooden doors to be toggled by attacking/punching (left-click) as well
- * as interacting (right-click), whereas iron doors remained strictly redstone-operated.
- * Modern Bedrock does not toggle doors on attack, so this module restores that punch-to-toggle
- * behavior for authentic wooden doors.
- */
-
 import { Block, system } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
@@ -37,10 +30,6 @@ function findStateKey(
     return Object.keys(states).find(name => name.endsWith(`:${suffix}`));
 }
 
-/**
- * Calculates door halves and inverted open state from the attacked block.
- * Returns undefined for non-wooden doors or invalid door state configurations.
- */
 export function planDoorToggle(
     blockTypeId: string,
     states: Readonly<Record<string, boolean | number | string>>,
@@ -79,7 +68,6 @@ function isDebounced(key: string, currentTick: number): boolean {
     }
     lastToggledTicks.set(key, currentTick);
 
-    // Prune stale entries when cache grows to avoid retention over long sessions
     if (lastToggledTicks.size > 100) {
         for (const [k, tick] of lastToggledTicks) {
             if (currentTick - tick > 100) {

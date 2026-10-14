@@ -2,7 +2,7 @@ import { world, system, ItemStack, Dimension, Entity, EntityComponentTypes, Vect
 import { reportError } from "../core/errorReporter.js";
 import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
-import { resolveDropId } from "../core/normalizer.js";
+import { planDropResolution } from "../core/normalizer.js";
 import { eventBus } from "../core/eventBus.js";
 import { migrateEntity } from "./entityMigration.js";
 
@@ -98,28 +98,40 @@ const UNAUTHENTIC_TREE_DROPS = new Set([
     "minecraft:stick"
 ]);
 
-function handleItemDrop(entity: Entity): void {
+export interface SanitizationOptions {
+    readonly attributeLeafOrigin: boolean;
+}
+
+export const SPAWN_TIME_SANITIZATION: SanitizationOptions = Object.freeze({ attributeLeafOrigin: true });
+
+export const SWEEP_SANITIZATION: SanitizationOptions = Object.freeze({ attributeLeafOrigin: false });
+
+const ORE_DROP_AMOUNT: Readonly<Record<string, number>> = Object.freeze({
+    "minecraft:raw_iron": 1,
+    "minecraft:raw_gold": 1
+});
+
+function handleItemDrop(entity: Entity, options: SanitizationOptions): void {
     const itemComp = entity.getComponent(EntityComponentTypes.Item);
     if (!itemComp?.itemStack) return;
 
     const itemId = itemComp.itemStack.typeId;
     const amount = itemComp.itemStack.amount;
 
-    if (UNAUTHENTIC_TREE_DROPS.has(itemId) && isTreeAppleDrop(entity)) {
+    if (options.attributeLeafOrigin && UNAUTHENTIC_TREE_DROPS.has(itemId) && isTreeAppleDrop(entity)) {
         entity.remove();
         return;
     }
 
     // Convert to bh: identifier so drops merge into existing converted inventory stacks.
-    const finalId = resolveDropId(itemId);
-    if (finalId === null) {
+    const resolution = planDropResolution(itemId);
+    if (resolution.action === "remove") {
         entity.remove();
-    } else if (finalId !== itemId) {
+    } else if (resolution.action === "convert" && resolution.targetId !== undefined) {
         const loc = entity.location;
         const dim = entity.dimension;
         entity.remove();
-        const dropAmount = (itemId === "minecraft:raw_iron" || itemId === "minecraft:raw_gold") ? 1 : amount;
-        spawnStackedDrop(dim, loc, finalId, dropAmount);
+        spawnStackedDrop(dim, loc, resolution.targetId, ORE_DROP_AMOUNT[itemId] ?? amount);
     }
 }
 
@@ -135,13 +147,16 @@ function spawnStackedDrop(dim: Dimension, loc: Vector3, itemId: string, amount: 
     }
 }
 
-export function sanitizeWorldEntity(entity: Entity | undefined): void {
+export function sanitizeWorldEntity(
+    entity: Entity | undefined,
+    options: SanitizationOptions = SPAWN_TIME_SANITIZATION
+): void {
     if (!entity || !entity.isValid) return;
 
     if (isForeignOwnedEntity(entity)) return;
 
     if (entity.typeId === "minecraft:item") {
-        handleItemDrop(entity);
+        handleItemDrop(entity, options);
         return;
     }
 

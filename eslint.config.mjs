@@ -26,6 +26,10 @@ export default tseslint.config(
     rules: {
       "minecraft-linting/avoid-unnecessary-command": "error",
       "betafied/require-js-extension": "error",
+      // The "why" only, and never the "what", sets no ceiling by itself, so a long block of "why"
+      // passes review and buries the function it explains. Twelve lines is already generous; past it
+      // the prose is in the reader's way on every visit to the file.
+      "betafied/comment-budget": ["error", { max: 12 }],
       // Pre-release surface is allowed here, but only knowingly: the rule keeps it from arriving
       // unannounced, because a @beta member looks like any other and disappears with the module id.
       "betafied/no-beta-api": "warn",

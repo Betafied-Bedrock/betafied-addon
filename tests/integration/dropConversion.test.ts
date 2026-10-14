@@ -2,9 +2,10 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { ItemStack, EntityComponentTypes } from "@minecraft/server";
 import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
-import { resetMocks } from "../mocks/minecraftServer.js";
+import { mockPlayers, resetMocks, world, Player } from "../mocks/minecraftServer.js";
 // Importing the module registers its entitySpawn handler on the bus.
 import "../../packs/BP/scripts/mobs/entitySpawnHandler.js";
+import { cleanerJob } from "../../packs/BP/scripts/mobs/entityCleaner.js";
 
 interface Spawned {
     typeId: string;
@@ -38,6 +39,32 @@ function brokenDrop(typeId: string, amount = 1): { entity: any; spawned: Spawned
     };
 
     return { entity, spawned, removed: () => removed };
+}
+
+/**
+ * The same drop, but placed in the world before the script could see it spawn and then swept up by
+ * `entityCleaner`. The mock does not run the spawn handler on `spawnEntity` unless `eventBus.init()`
+ * was called, so this reaches the sweep alone.
+ */
+function sweptDrop(typeId: string, amount = 1): { spawned: Spawned[]; removed: () => boolean } {
+    const overworld = world.getDimension("minecraft:overworld") as any;
+    const spawned: Spawned[] = [];
+
+    overworld.spawnItem = (item: ItemStack) => {
+        spawned.push({ typeId: item.typeId, amount: item.amount });
+        return { id: "mock_item_entity", typeId: "minecraft:item" };
+    };
+
+    const player = new Player("parity_player");
+    player.dimension = overworld;
+    mockPlayers.push(player);
+
+    const entity = overworld.spawnEntity("minecraft:item", { x: 0, y: 64, z: 0 });
+    entity.setComponent(EntityComponentTypes.Item, { itemStack: new ItemStack(typeId, amount) });
+
+    Array.from(cleanerJob());
+
+    return { spawned, removed: () => entity.isRemoved === true };
 }
 
 describe("Drop conversion - picked-up items match their stack", () => {
@@ -122,6 +149,39 @@ describe("Drop conversion - picked-up items match their stack", () => {
 
         assert.equal(removed(), true, "the vanilla salmon entity is replaced, not kept");
         assert.equal(spawned[0]?.typeId, "bh:cod", "salmon collapses to the Beta cod item");
+    });
+
+    it("answers a drop the same way whether it is seen at spawn or swept up later", () => {
+        const cases: readonly [string, number][] = [
+            ["minecraft:oak_log", 3],
+            ["minecraft:birch_log", 2],
+            ["minecraft:raw_iron", 3],
+            ["minecraft:raw_gold", 2],
+            ["minecraft:porkchop", 4],
+            ["minecraft:sugar_cane", 2],
+            ["minecraft:reeds", 3],
+            ["minecraft:rotten_flesh", 1],
+            ["minecraft:smooth_stone", 1],
+            ["bh:oak_log", 2]
+        ];
+
+        for (const [id, amount] of cases) {
+            const atSpawn = brokenDrop(id, amount);
+            eventBus.dispatch("entitySpawn", { entity: atSpawn.entity });
+
+            const atSweep = sweptDrop(id, amount);
+
+            assert.deepEqual(
+                atSweep.spawned,
+                atSpawn.spawned,
+                `${id} x${amount} must land the same way in the sweep as at spawn`
+            );
+            assert.equal(
+                atSweep.removed(),
+                atSpawn.removed(),
+                `${id} x${amount} must be replaced or kept by both passes`
+            );
+        }
     });
 
     it("leaves an already-final bh food untouched", () => {

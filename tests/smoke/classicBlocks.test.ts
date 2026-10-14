@@ -238,6 +238,31 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
             false,
             "wooden_slab must not be chopped with an axe"
         );
+
+        // The clone went as far as the sound and the break time, which is why a wooden
+        // half heard and timed like the stone one it was copied from.
+        const stoneMining = blockOf("stone_slab").components["minecraft:destructible_by_mining"];
+        for (const name of ["wooden_slab", "double_wooden_slab"]) {
+            const components = blockOf(name).components;
+
+            assert.equal(
+                components["minecraft:sound"].sound,
+                "stone",
+                `${name} must sound like the stone slab it is a clone of`
+            );
+            assert.deepEqual(
+                components["minecraft:destructible_by_mining"],
+                stoneMining,
+                `${name} must break at the stone slab's speed`
+            );
+            // Declaring flammability is what would let the plank texture catch; Beta's slab
+            // block was the stone one, so the wooden half was the era's fireproof timber.
+            assert.equal(
+                components["minecraft:flammable"],
+                undefined,
+                `${name} must not burn like the planks it is textured from`
+            );
+        }
     });
 
     it("gives the sword haste only to the wood-class blocks", () => {

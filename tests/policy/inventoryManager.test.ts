@@ -12,8 +12,8 @@ import {
 } from "@minecraft/server";
 import {
     evaluateItemAction,
-    processInventory,
-    processPlayers,
+    sweepInventory,
+    sweepPlayers,
     inventorySweepJob
 } from "../../packs/BP/scripts/core/inventoryManager.js";
 import { PRIVILEGED_TAGS } from "../../packs/BP/scripts/core/permissions.js";
@@ -99,7 +99,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             mockPlayers.length = 0;
             mockPlayers.push(player);
 
-            processPlayers();
+            sweepPlayers();
 
             assert.equal(inv.getItem(0)?.typeId, "bh:oak_log");
             assert.equal(inv.getItem(0)?.amount, 64);
@@ -132,7 +132,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             mockPlayers.length = 0;
             mockPlayers.push(player);
 
-            processPlayers();
+            sweepPlayers();
 
             assert.equal(inv.getItem(0)?.typeId, "bh:spruce_log");
             assert.equal(inv.getItem(0)?.amount, 32);
@@ -182,7 +182,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             inv.setItem(0, new ItemStack("minecraft:wooden_door", 3));
             player.setComponent(EntityComponentTypes.Inventory, { container: inv });
 
-            processInventory(player);
+            sweepInventory(player);
 
             for (const slot of [0, 1, 2]) {
                 assert.equal(inv.getItem(slot)?.typeId, "bh:wooden_door");
@@ -248,7 +248,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             inv.setItem(0, new ItemStack("minecraft:bucket", 3));
             player.setComponent(EntityComponentTypes.Inventory, { container: inv });
 
-            processInventory(player);
+            sweepInventory(player);
 
             for (const slot of [0, 1, 2]) {
                 assert.equal(inv.getItem(slot)?.typeId, "minecraft:bucket");
@@ -267,7 +267,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             inv.setItem(0, new ItemStack("minecraft:oak_sign", 3));
             player.setComponent(EntityComponentTypes.Inventory, { container: inv });
 
-            processInventory(player);
+            sweepInventory(player);
 
             for (const slot of [0, 1, 2]) {
                 assert.equal(inv.getItem(slot)?.typeId, "bh:oak_sign");
@@ -347,7 +347,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             inv.setItem(0, new ItemStack("bh:porkchop", 4));
             player.setComponent(EntityComponentTypes.Inventory, { container: inv });
 
-            processInventory(player);
+            sweepInventory(player);
 
             assert.equal(inv.getItem(0)?.typeId, "bh:porkchop");
             assert.equal(inv.getItem(0)?.amount, 1);
@@ -377,7 +377,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             equippable.setEquipment(EquipmentSlot.Feet, new ItemStack("minecraft:netherite_boots", 1));
             equippable.setEquipment(EquipmentSlot.Offhand, new ItemStack("minecraft:shield", 1));
 
-            processInventory(player);
+            sweepInventory(player);
 
             // Modern armor/offhand should be wiped
             assert.equal(equippable.getEquipment(EquipmentSlot.Head), undefined);
@@ -404,7 +404,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             });
             equippable.setEquipment(EquipmentSlot.Chest, enchantedChest);
 
-            processInventory(player);
+            sweepInventory(player);
 
             const cleaned = equippable.getEquipment(EquipmentSlot.Chest);
             assert.ok(cleaned);
@@ -437,7 +437,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             player.setComponent(EntityComponentTypes.Equippable, equippable);
 
             mockPlayers.push(player);
-            processPlayers();
+            sweepPlayers();
 
             assert.equal(inv.getItem(0)?.typeId, "gun:1911");
             assert.equal(inv.getItem(0)?.amount, 1);
@@ -471,7 +471,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             mockPlayers.push(player);
 
             // 1. Tick with builder_exempt active: items must NOT be removed
-            processPlayers();
+            sweepPlayers();
             assert.ok(inv.getItem(0), "Elytra should be preserved while exempt");
             assert.ok(inv.getItem(1), "Totem should be preserved while exempt");
             assert.ok(equippable.getEquipment(EquipmentSlot.Chest), "Netherite chestplate preserved while exempt");
@@ -481,7 +481,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             player.removeTag(PRIVILEGED_TAGS.BUILDER_EXEMPT);
 
             // 3. Next tick sweep: must immediately wipe inventory & equipment without delay
-            processPlayers();
+            sweepPlayers();
             assert.equal(inv.getItem(0), undefined, "Elytra must be cleared immediately after tag removal");
             assert.equal(inv.getItem(1), undefined, "Totem must be cleared immediately after tag removal");
             assert.equal(equippable.getEquipment(EquipmentSlot.Chest), undefined, "Netherite chestplate must be cleared immediately after tag removal");
@@ -548,7 +548,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             const { inv } = playerHolding("idle_builder", "minecraft:netherite_sword");
 
             atTick(3, () => {
-                processPlayers();
+                sweepPlayers();
                 assert.ok(inv.getItem(0), "a player who touched nothing must not have 36 slots re-read");
             });
         });
@@ -558,7 +558,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
 
             atTick(3, () => {
                 eventBus.dispatch("playerInventoryItemChange", { player, slot: 0, itemStack: inv.getItem(0) });
-                processPlayers();
+                sweepPlayers();
                 assert.equal(inv.getItem(0), undefined, "a reported change must be normalized on the next sweep");
             });
         });
@@ -567,7 +567,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             const { inv } = playerHolding("safety_net", "minecraft:netherite_sword");
 
             atTick(20, () => {
-                processPlayers();
+                sweepPlayers();
                 assert.equal(inv.getItem(0), undefined, "the safety sweep must catch what the event missed");
             });
         });
@@ -677,7 +677,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             mockPlayers.length = 0;
         });
 
-        it("synchronous processPlayers() processes all players in one call", () => {
+        it("synchronous sweepPlayers() processes all players in one call", () => {
             mockPlayers.length = 0;
             const p1 = new Player("p1");
             const p2 = new Player("p2");
@@ -687,7 +687,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             (system as any).currentTick = 0;
 
             assert.doesNotThrow(() => {
-                processPlayers();
+                sweepPlayers();
             });
 
             mockPlayers.length = 0;

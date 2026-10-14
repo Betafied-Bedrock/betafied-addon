@@ -5,7 +5,7 @@ import {
     sweepPairs,
     sessions,
     CHEST_PAIRS_PER_TICK
-} from "../../packs/BP/scripts/interactions/doubleChest.js";
+} from "../../packs/BP/scripts/interactions/chestMirror.js";
 import { resetMocks } from "../mocks/minecraftServer.js";
 
 describe("Double Chest Session Sweep Generator & Batching", () => {

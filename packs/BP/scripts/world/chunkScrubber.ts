@@ -64,8 +64,6 @@ function buildUntouchedFilter(): BlockFilter {
     const candidates = new Set<string>([
         "minecraft:air",
         ...BETA_BLOCK_IDS,
-        // Bedrock's legacy spellings for era blocks the registry names the Java way: the fine pass
-        // would otherwise read a cobweb or a dead bush as modern terrain and erase it.
         "minecraft:deadbush",
         "minecraft:web",
         "minecraft:mob_spawner",
@@ -213,11 +211,6 @@ export function solidifyBetaFloor(dim: Dimension, cx: number, cz: number): void 
     const originX = cx * CHUNK_SIZE;
     const originZ = cz * CHUNK_SIZE;
 
-    // The floor is deterministic per chunk and its base layer is always a full bedrock slab, so
-    // "Y=0 holds nothing but bedrock" answers "was this chunk sealed already" for 256 blocks. The
-    // cap above the base is ~120 separate fills - the single largest native cost the scrubber had -
-    // and without this gate every re-verify of an already-sealed chunk paid for all of them again.
-    // A failed fill leaves the slab unsealed, so the probe stays true and the seal is retried.
     if (
         !containsBlocksIn(
             dim,
@@ -231,8 +224,6 @@ export function solidifyBetaFloor(dim: Dimension, cx: number, cz: number): void 
         return;
     }
 
-    // A solid base first: with the sub-zero column no longer ballasted, a gap here would drop the
-    // player onto native deepslate or, in a flat world, into the void.
     fill(dim, originX, BETA_FLOOR_Y, originZ, originX + CHUNK_SIZE - 1, BETA_FLOOR_Y, originZ + CHUNK_SIZE - 1, "minecraft:bedrock");
 
     for (let z = 0; z < CHUNK_SIZE; z++) {

@@ -333,10 +333,10 @@ entity: `EntityLiving.moveEntityWithHeading` passes `0.1F * var9` (1.0 on a norm
 `EntityCreature.updatePlayerActionState` sets `moveForward = moveSpeed` (`EntityCreature.java:69`). A
 mob's speed is therefore its `moveSpeed` as a share of the walking player's -- 0.5 for the zombie and
 pigman, 0.7 by default, 0.8 for the spider, 1.1 for the wolf, which Beta clamps back to a full stride.
-Bedrock documents `minecraft:movement` only as "base movement speed", so the unit is calibrated on the
-mob both editions define as *half the walking player*: Bedrock's own zombie is 0.23, making one Beta
-unit 0.46 (`0.23 / 0.5`) -- the same figure Java's AI movement term (`0.1 / 0.216`) produces -- and
-every other value is `0.46 x moveSpeed`.
+Bedrock documents `minecraft:movement` only as "base movement speed", so the unit is an anchor that
+only the game can settle: `WALKING_PLAYER_UNITS` in `tests/smoke/entityDimensions.test.ts` is that
+number, it is 0.35, and every declared speed is `0.35 x moveSpeed`, apart from the wolf, which the
+response overshoots (below).
 
 A mob's engine speed is `movement x speed_multiplier` (Microsoft's intended reading; the interaction
 itself is undocumented), so the multipliers that were discounting a stroll -- 0.8 on the pig, cow,
@@ -344,13 +344,40 @@ sheep, zombie, creeper and spider, and 1.25 on the creeper's and the skeleton's 
 flattened to 1, because Beta had a single speed for wandering and chasing alike. Two states keep a
 multiplier because Beta genuinely had a second speed: `zombie_pigman.melee_attack` is 1.9
 (`EntityPigZombie.java:19` raises `moveSpeed` to 0.95 while it has a target, against its own 0.5), and
-the five `mount_pathing` multipliers were left exactly as they were.
+the five `mount_pathing` multipliers were left exactly as they were -- the wolf's has since been
+flattened for the reason below.
 
-**Needs an in-game look, and it is one number.** The 0.46 anchor cannot be confirmed offline: nothing
-in the documentation says what Bedrock's movement value means physically, and the two derivations above
-agree only because both editions share the zombie's number. Walking a pig beside a walking player
-settles it. If the mobs now read as too fast or too slow, `WALKING_PLAYER_UNITS` in the test is the one
-place to change, since every declared speed is derived from it.
+**The in-game look came back, and it moved the anchor.** 5.6 shipped 0.46, read off Bedrock's own
+zombie (0.23) as the era's half-speed zombie, and the playtest read the roster as far too fast: a
+creeper at 0.322 outran a walking player, and the only two mobs that felt right were the ones left on
+vanilla's value. That assumption is the one part of this section the sources cannot check -- Beta's
+`moveSpeed` shares are read straight out of the recovered client, but nothing documents what Bedrock's
+value means physically -- so the unit is anchored on the pace the roster has to have instead: 0.35,
+which puts the six 0.7-share mobs (pig, cow, sheep, chicken, skeleton, creeper) on 0.245, next to the
+0.25 the vanilla animals walk at, keeps the era's ordering, and leaves the zombie and pigman at 0.175,
+the spider at 0.28 and the wolf and slime at 0.35, the wolf since moved off it (below). Re-pacing is
+that one constant plus the files it generates.
+
+**The creeper is the datapoint to steer by, and it says the response is not proportional.** At 0.322 a
+chasing creeper paced a *sprinting* player, where the era's 0.7 share is 3.0 blocks a second against a
+walk of 4.317 -- so the engine reads that value as more than 0.7 of a walk, and more than proportional
+to the zombie both anchors were read off. That curve is what no offline source measures, so 0.35 is an
+anchoring guess and the shares furthest above the zombie -- spider 0.28, wolf and slime 0.35 -- are the
+ones a second correction would have to move by more than the unit alone.
+
+**The wolf's second correction landed on the wolf, not the unit.** Its `moveSpeed` is 1.1, the share
+furthest above the zombie, and the playtest that moved the anchor still read it as too fast. Two things
+were stacking under it. `mount_pathing` -- priority 1 with `track_target: true`, which is the goal that
+drives a wolf's pursuit -- carried vanilla's 1.25
+(`VanillaBehaviorPack/entities/wolf.json`), so the mob already at the top of the curve was the one mob
+whose value a multiplier ran above itself; that is 1.0 now, which leaves the wolf the single pace the
+era gave it, since its `random_stroll`, `melee_attack` and `follow_owner` goals were all 1.0 already.
+The declared value then moved off the anchor as well, because a value above the 0.7-share tier is what
+the response overshoots: reading the creeper datapoint against the 0.7 shares' 3.0 blocks a second puts
+the walking stride at 0.326 with that creeper's own 1.25 attack multiplier in play and 0.287 without
+it. The wolf is 0.3 -- inside both readings, Bedrock's own value for the mob, still the roster's top
+and still above the spider's 0.8 share. The slime's 1.0 share is in the same tier and is untouched; if
+it reads fast too, it takes the same treatment.
 
 Still open:
 
@@ -364,9 +391,9 @@ Still open:
   (`EntityGhast.java:37-46`), so no scalar describes either. The ghast's *box* is Beta's now; its motion
   is not.
 - **A ridden mob's speed is not translated.** Beta copies the rider's own input into the mount, so a
-  saddled pig travels at its *rider's* walking speed (0.46 here) rather than at its own 0.322. The
-  `mount_pathing` multipliers keep vanilla's values, and how Bedrock splits rider input from mob speed
-  is not checkable offline.
+  saddled pig travels at its *rider's* walking speed (0.35 here) rather than at its own 0.245. The four
+  remaining `mount_pathing` multipliers keep vanilla's values (the wolf's is 1.0), and how Bedrock
+  splits rider input from mob speed is not checkable offline.
 - **Health was left alone, deliberately.** Three values disagree with the era's: this pack's sheep is 8
   where `EntityLiving`'s default of 10 stood, its spider 16 and its zombie 22 where `EntityMob` sets 20.
   Boxes and speeds were the scope here; a health table is a separate gameplay decision.
@@ -467,6 +494,454 @@ spellings for blocks the registry names the Java way — `deadbush`, `web`, `mob
 covered by it; the item side of those ids (a picked-up cobweb, say) falls through `normalizeItem` to
 *remove*. Deciding this means either registering the Bedrock spellings beside the Java ones, or
 accepting the deletions and deleting the scrubber's list with them.
+
+## 14. Resolved: both ground passes run one policy
+
+`entitySpawnHandler.sanitizeWorldEntity` is now the only implementation of "what does this ground
+entity become". `entityCleaner` calls it instead of resolving the same ids a second way, which is the
+rule `docs/agents/subsystems/mobs.md` already stated — the sweep had drifted from it in two places,
+both visible only by driving one id through both passes:
+
+- The sweep respawned a retyped stack whole, so a `minecraft:porkchop` stack of four became one
+  `bh:porkchop` entity holding four. The engine clamps a stack to the item's `maxStackSize` as it is
+  built, and the sweep removes the old entity before the new one exists, so three porkchops were
+destroyed. It now splits through the same `spawnStackedDrop` the spawn pass uses.
+- The sweep kept a raw ore stack's size where the spawn pass collapsed it to the era's one ore per
+drop. `ORE_DROP_AMOUNT` names that rule in the one module, so both passes read it.
+
+The leaf-origin rule is deliberately **not** shared. `SWEEP_SANITIZATION` runs the policy without the
+apple-and-stick attribution, because that question belongs to the pass that saw the break: answering
+it in the sweep would attribute a drop to a break up to five seconds old and pay a 5x5x5 block scan
+per candidate in a pass that already runs every hundred ticks.
+
+Still open, and cheap to change but not free: an already-final ground stack that exceeds the era's cap
+(a `bh:porkchop` entity holding two) is left alone by both passes, while the inventory sweep splits
+it. Reaching those means reading `maxAmount` for every item entity in the sweep, which is an
+`ItemStack` allocation per entity per pass; the case can only reach the ground from a legacy save,
+since the sweep splits before it drops anything.
+
+Also still open: the raw-ore clamp discards the surplus of a stack that arrived from a chest or an old
+save, since it reads a raw ore drop as one mined block. If the era's one-ore-per-block reading is
+ever dropped, delete `ORE_DROP_AMOUNT` so the amount rides across — do not change one caller.
+
+## 15. The shadow swap cannot be had without aggro invisibility, so the player keeps Bedrock's own
+
+The 5.6 blob shadows take the wiki's only reliable route to a shadowless entity: a permanent
+invisibility effect, which is what stops the engine drawing its own decal, plus
+`minecraft:renders_when_invisible`. The pack added a third component to every mob,
+`minecraft:is_hidden_when_invisible`, and that is the one with a price. Mojang documents it as "The
+entity can hide from hostile mobs while invisible" -- the pair vanilla's wandering trader drinks at
+night -- and `nearest_attackable_target` carries a `target_invisible_multiplier` (0.7, multiplied by
+the target's armor coverage), so the effect alone already costs an invisible target most of a mob's
+range.
+
+On the player that meant hostile mobs never acquired the target they exist for: `zombie`, `skeleton`,
+`creeper`, `spider`, `slime` and `ghast` all name family `player` in a `nearest_attackable_target`, and
+an always-invisible player answered that filter with "no" for as long as the player lived. It read as a
+targeting bug rather than a rendering one because retaliation is a sight-free path: hitting a mob still
+worked, and so did standing close enough to be hit by its swing.
+
+**Decided:** the player carries none of the three components and binds no decal, so Bedrock draws its
+own shadow under players again. A world that already ran 5.6.1 has the effect applied to its players,
+and it does not lapse: the migration wrote twenty million ticks, so `entityMigration` now strips the
+invisibility back off any Beta mob whose definition no longer declares the component it was installed
+under. Nothing else in the era grants invisibility, so the absence of that component is an exact
+marker for the pack's own leftover. The swap, the decal binding and the gate that hid the local player's own
+decal are gone; `entity_shadow_player.json` stays in the pack, unreferenced, as the decal a safe swap
+would bind again. The two `betarock:shadow_*` properties stay declared on the player, because the
+migration repairs a missing property by writing it and an entity whose definition does not declare one
+leaves `resetProperty` throwing on every pass that sees it -- a declarative roster for the property
+rules is the better fix if anyone wants the pair gone.
+
+**Still open, and now load-bearing for the rest of the roster:**
+
+- Every other Beta mob keeps the swap, so an invisible mob is equally invisible to hostile mob AI.
+  `wolf.json` hunts `is_family sheep` and `is_family skeleton` with `must_see` true, which means wolves
+  cannot hunt sheep or fight skeletons today: the same bug the player just had, one mob removed.
+- There is no per-entity shadow control to put in the swap's place. The wiki's other routes are a tiny
+  `minecraft:collision_box` (which `entityDimensions.test.ts` pins at the era's sizes), a
+  `shadow_overlay` material the same page marks dead after RenderDragon, and a `banner_pole` model that
+  no source anywhere documents beyond the one sentence naming it.
+- `minecraft:behavior.hurt_by_target` is back on the zombie, which had lost it in the 4.0 rewrite while
+  every other hostile kept it. Without it a zombie could only ever attack on sight, so the retaliation
+  the era's mobs do have was missing from the one mob a player meets first.
+
+## 16. A dead player is locked in place, not merely parked in spectator
+
+The death design's §3.3 asserts the dead state on a slow pass, and the set it lists includes locking the
+input categories (`Movement`, `LateralMovement`, `Jump`, `Sneak` and the four directions) so a
+`/gamemode` command, a respawn path or another addon cannot leave a dead player walking around an empty
+corpse. The first cut asserted the game mode and nothing else: on Bedrock a spectator already flies,
+cannot be attacked and cannot use a block, so the lock waited on evidence that a dead player could still
+act — a throwaway probe's spectate phase, and both the probe and its `!test` entry point have since
+been removed.
+
+The maintainer directed the lock back in before that measurement was read, so the code now asserts both
+halves and `SPECTATE_VELOCITY … movingWhileSpectator=` is no longer gating anything.
+
+Both halves are re-asserted together every two ticks, and each write is skipped when the player is
+already in the wanted state — the pass runs for the whole length of a death, so a blind write would be
+eight networked permission updates per dead player per pass. `Camera`, `Mount` and `Dismount` stay
+enabled. `Camera` is deliberate: the era's death screen still let the player look around, and taking the
+camera away reads as a hung game rather than a death. `deathSystem.test.ts` pins the camera rather than
+leaving it as an omission someone can tighten by accident.
+
+`respawnPlayer` is the only place the lock is released, and it releases before it restores the game mode:
+an alive player left frozen is the one outcome worse than a dead one that could still walk.
+
+The pass is also the screen's retry window: the death itself shows the form, and a dismissed or relogged
+one comes back inside two ticks, so Escape does not read as an escape from a death.
+
+Still open: whether the lock survives the spectator transition the way `setGameMode` does, and whether a
+player who relogs mid-death is locked again before they can move. The pass re-asserts every two ticks,
+which is what makes a refusal survivable rather than fatal.
+
+## 17. The death drop scatters, where the era piled every stack on the corpse
+
+Beta 1.7.3 spawned each dropped stack at the player's own position with a random throw of up to 0.5
+blocks/tick, so a full inventory landed in a lump half a block across with the later stacks buried under
+the first. `player/death.ts` keeps the era's throw unchanged — the 0.5 max horizontal speed and the
+fixed +0.2 upward kick from the chest-height spawn point — and scatters the *spawn point* over the two
+blocks around the player instead. The radius is drawn as `sqrt(random) * 2`, because a uniformly drawn
+radius would oversample the inner rings and put most of the inventory back in the middle.
+
+The spawn height is the era's own `posY - 0.3 + getEyeHeight()` (`EntityPlayer.java:257`), and not the
+1.32 the design's §2.2 annotation reads it as. For a player `posY` is the eye (`yOffset` 1.62,
+`EntityPlayer.java:44`) and `getEyeHeight()` answers 0.12F, so the spawn sits 0.18 below the eye — 1.44
+above the feet Bedrock measures a player from. §11 already records that 0.12 answer; the design's
+"eye height 1.62 → posY + 1.32" line converted `posY` as though it were the feet. `player/death.ts`
+names the number `DROP_SPAWN_HEIGHT`, and `deathSystem.test.ts` pins it.
+
+Decided by the maintainer, not derived from the recovered client: nothing in the era scatters this way.
+The divergence is the spawn offset alone, which is why it is one named constant
+(`DROP_SCATTER_RADIUS`) rather than a change to the throw math. `deathSystem.test.ts` asserts both
+halves of that: every stack lands inside the radius, and the stacks do not share a single point.
+
+## 18. The death screen is a rebuild of the era's screen, with three values the engine decides
+
+The death design's §2.1 pinned the recovered client's copy verbatim — `Game over!` over `Score: &e0`,
+and explicitly **not** `You Died!`, which is the modern Java wording. A first pass had replaced it with
+the maintainer's own copy (a placeholder title over a `You Died` line), and this item recorded that
+divergence. The JSON UI redesign below put the era's copy back, so `player/deathScreen.ts` and the
+design table agree again and the divergence is closed.
+
+The design had also declared the screen's *presentation* out of scope — §299 read "No JSON-UI or form
+styling". That is no longer true. `ui/server_form.json` repoints the engine's form screen at
+`ui/.bfui/death_screen.json`, which reproduces `GuiGameOver.drawScreen`: the era's gradient rectangle,
+the header at its doubled scale, the unscaled score row, and `GuiButton`'s 200x20 metrics including
+1.7.3's blue hover state.
+
+`tests/smoke/deathScreenUi.test.ts` pins those numbers against the recovered client rather than against
+the UI file, so a drift from the era has to change a literal in the test as well. The same test pins
+that the era's quarter-height offset is a percentage offset plus a fixed spacer, and that no asymmetric
+anchor pair survives anywhere in the tree.
+
+The UI ground truth is on this machine after all. `game-versions/<version>/assets/assets/resource_packs/
+vanilla/__brarchive/ui.brarchive` is a `__brarchive` container, but it is *searchable*: plaintext JSON with
+a binary prologue, so `grep -a` and a byte-offset read recover any control verbatim. That is where every
+engine fact in this section was confirmed - `common.base_screen`, `common.screen_panel`,
+`common.screen_background`, `server_form.*` and the `$screen_*` variables. `Mojang/bedrock-samples` on
+GitHub is the fallback when the installed version predates an installed pack.
+
+What the archive settles about this screen:
+
+- `common.base_screen` declares `$screen_content`, `$additional_screen_content`, `$screen_bg_content`,
+  `$screen_animations` (eight entrance/exit push/pop and fade animations), `$background_animations`
+  (four alpha fades) and `$use_loading_bars`, and its children mount the background as
+  `bg_no_safezone_screen_panel@$screen_bg_content` (layer 2), the content inside the safezone stack
+  matrices as `root_screen_panel@$screen_content` within `common.screen_panel` (`["100%", "fill"]`),
+  and `common_dialogs.full_screen_background` at layer -1 - which draws nothing unless
+  `$is_full_screen_layout`, so no engine dim sits under this form's wash.
+- Vanilla's `third_party_server_screen` sets the content, Esc (`button.menu_cancel` ->
+  `button.menu_exit`) and the animation lists. Redefining a screen *replaces* vanilla's copy rather than
+  merging with it, so all four are restated in the pack's copy.
+- `common.screen_background` - the dim every vanilla screen uses - is an image with **no size**, and the
+  background slot is where it is mounted. The slot's control is the screen's rect (it is mounted outside
+  the safezone stack), and that is why the death wash is served from there too.
+- The rect is not the whole story: **an image does not fill the control it is given**. The engine's
+  `keep_ratio` is on by default and *fits* the sprite inside its rect, centred, so a 16x512 wash draws as
+  a 16-px-wide band down the middle of the screen. That was read back off a screenshot of the running
+  pack rather than off the JSON: the band measures 49 device px wide by the full 1542 of height, which is
+  exactly 16:512 fitted to the screen height, and the era's 200x20 buttons measure ~1000x100 device px in
+  the same shot, fixing the UI scale at 5. The wash therefore declares its stretch - a full-screen size
+  with `keep_ratio: false` and `fill: true`, the pair the engine's own UI uses wherever it stretches a
+  sprite. An earlier revision of this item blamed the size on percentages resolving against a parent that
+  never resolved; the band's aspect is what disproves that, and the fix is in `ui/.bfui/death_screen.json`.
+  Unverified in game after the change, since the reading above is of the broken state.
+- An `ActionFormData` body reaches a *replaced* `long_form` unreliably. The engine's own body label binds
+  `#form_text`, but a label draws the value its `property_bag` declares when the binding that would fill
+  it never runs, so the score row carries the era's line as that declared default and the test pins it to
+  `DEATH_SCREEN_COPY.body`. The two are one string, so the row prints the era's copy either way.
+
+### The JSON UI anchor pair runs the other way round
+
+`.agents/mcbe-json-ui`'s property table documents `anchor_from` as the anchor on the *child* and
+`anchor_to` as the anchor on the *parent*. In this engine build they resolve the opposite way:
+`anchor_to` names the point on the child and `anchor_from` the point on the parent. Two in-game looks
+pinned it. `[0, 72]` under a matching `top_middle` pair lands the control's top 72px below the screen
+top, which either reading predicts; the same offset with `anchor_to: bottom_middle` lands the stack's
+*bottom* 72px below the top, which only the reversed reading predicts — the documented one would put it
+at `height / 4 + 72`, three times further down the screen. The death screen was written on the
+documented reading and the buttons landed on the header. It now uses no asymmetric pair at all, and
+`deathScreenUi.test.ts` rejects one anywhere in the tree.
+
+The gradient's orientation used to rest on reading the in-game wash, but that reading was taken through
+the difference blend below, so it was not evidence of anything. It is settled by construction now: the
+texture's first row is the darker `0x60500000`, which is the top of the screen, as
+`Gui.drawGradientRect` reads it.
+
+### The pack's crosshair owns the engine's gradient-fill material
+
+`materials/ui.material` redefines the engine's own `ui_fill_gradient:ui_base` with Java's crosshair blend
+(`blendSrc: OneMinusDestColor`, `blendDst: OneMinusSrcColor`) — `GuiIngame`'s `glBlendFunc(775, 769)`.
+The pack draws its crosshair through `gradient_renderer`, and that is the only flat-colour fill JSON UI
+offers, so the material had to become a difference blend to keep the crosshair era-correct. Vanilla's
+own `ui_fill_gradient` sets no blend at all, so this is the pack's deviation rather than the engine's
+default.
+
+The consequence is that `gradient_renderer` cannot draw a translucent wash: a red gradient drawn there
+came out as a filter over the world, brighter than the era's overlay. The death screen's gradient is
+therefore baked into `textures/ui/death_gradient.png` — the era's two ARGB literals interpolated down the
+image, which `deathScreenUi.test.ts` decodes and checks row by row — and drawn as an `image`, which takes
+the ordinary alpha path.
+
+### The era's HUD is redrawn on the death screen, under the wash
+
+`GuiGameOver` overrides `doesGuiPauseGame()` to false, so the world keeps rendering behind it, and
+`EntityRenderer` goes on calling `renderGameOverlay`. That method draws the hotbar and its selection
+frame and the crosshair *unconditionally*, and the hearts under `playerController.shouldDrawHUD()` - so
+Beta's death screen has the era's HUD behind it: empty slots (the inventory has just been dropped), ten
+empty heart containers (health is 0), the selection frame at the current slot, and the crosshair over a
+live world.
+
+This pack shows none of that. The dead state parks the player in `GameMode.Spectator`, and spectator is
+what hides Bedrock's HUD - the park that makes a corpse unable to walk also erases the HUD the era left
+visible. The screen therefore redraws the era's HUD itself, from `textures/gui/gui.png` and
+`textures/gui/icons.png`, which the pack already carries and which are faithful conversions of the
+recovered client's own sheets (crop for crop, pixel for pixel - `deathScreenUi.test.ts` reads them back
+against it): the hotbar bar, the 24x22 selection frame, ten empty containers and the three fills that
+make up the crosshair, on the era's own coordinates. Nothing in it is bound to the world, which the era's
+own state allows: the inventory has just been dropped and the health is rolled back.
+
+Both sheets are drawn as `uv`/`uv_size` crops, and `uv_size` has no default: a control that sets only a
+`uv` start draws its *whole* texture into its box. The first in-game pass came back with both atlases on
+screen at once - every sprite in `gui.png` and `icons.png` squeezed into the era's own 182x22 and 9x9
+rects. `deathScreenUi.test.ts` now pins each drawn crop to the crop it verifies against the era's sheet,
+so the two cannot drift apart.
+
+The era's paint order is world, HUD, gradient, then text - the wash goes *over* the HUD and tints it -
+which is why the HUD and the wash are mounted together in the background slot with the wash second, and
+the two text rows and the buttons stay in the content above them. That slot is also the one rect this
+screen resolves outside the content's safezone inset (`bg_no_safezone_screen_panel@$screen_bg_content`).
+An earlier revision mounted the HUD in the content and the wash in the slot, which left the HUD under the
+wash's own layer and crisp rather than tinted - visible in game as a red band crossing a clean hotbar.
+
+The hearts shake. `renderGameOverlay` adds `this.rand.nextInt(2)` to each slot's y while health is at or
+below 4 - a 1px drop, per slot, every tick, out of an RNG it reseeds from the tick counter - and the dead
+player's health is 0, so that condition holds for as long as the screen is up. The pattern itself is not
+something a UI animation can replay, so the skin reproduces its shape instead: three self-looping
+`offset` animations that drop 1px on staggered periods (0.05, 0.065 and 0.08s, against the era's one roll
+per 0.05s tick), with the ten slots dealt one of the three by index so they drift rather than bounce as a
+row. Each slot is a panel carrying the era's x, with the container sprite inside it carrying the jitter,
+because an `offset` animation writes the whole offset. `deathScreenUi.test.ts` pins the direction (the
+era only ever adds to y), the loop and the stagger.
+
+One thing in it is deliberately not the era's:
+
+- The selection frame sits on slot 0. `renderGameOverlay` read `currentItem` from the player, and nothing
+  in a form screen binds it.
+
+One reading about the live HUD, unverified in game and outside this screen: `hud_screen.json`'s
+`crosshair_pixel` template is `ignored: true` and the three fills that instance it do not un-ignore it, so
+the crosshair a player sees may be the engine's rather than the pack's. That is the same shape of gap as
+the rest of this file - behaviour living in one file, the claim in another.
+
+Still open, and engine-dependent rather than decidable from the source:
+
+- The pack's pause background is the same shape the wash was: an unsized image
+  (`textures/ui/Black`, a 2x2 texture) served from `$screen_bg_content`. If `keep_ratio` fits that one too
+  it is a centred square rather than a full-screen dim, but nothing to hand settles it - the screenshots
+  on this machine are all of the death screen - so it needs one look at the pause menu. The fix, if it is
+  one, is the three properties the wash now carries.
+
+- Whether a bound `#form_text` honours a `\n`. The redesign retired the question: the screen's two rows
+  are separate controls, and the era's body carries no newline.
+- Beta's `initGui` disables the second button when `mc.session == null`. The skin ships the era's
+  disabled texture and colour but can never reach that state, because a Bedrock form has no session to
+  read.
+- The window a player is on decides how the era's fixed offsets read: Beta places the two text rows at
+  fixed y (60 and 100) while the buttons scale with the height, so a small window pushes the text
+  proportionally further down. The skin uses the era's numbers as written, which is Beta on a large
+  window.
+
+## 19. The vetoed lethal hit takes the era's death feedback with it
+
+`EntityLiving.attackEntityFrom` plays `getHurtSound()` on a survivable hit and `getDeathSound()` when the
+hit kills, and the player inherits `random.hurt` for both
+(`reference-docs/beta-1.7.3/1.7.3-LTS/src/minecraft/net/minecraft/src/EntityLiving.java:354-359`,
+`getDeathSound` at `:388`). Cancelling the lethal hit in the before-event therefore suppresses the sound
+the player would have heard at the moment of death: the death never happens, so neither branch runs, and
+with it goes the hurt flash and the death's own feedback.
+
+`player/death.ts` plays it by hand instead — `random.hurt`, the volume 1 the era used, and the era's own
+`(rand - rand) * 0.2 + 1` pitch jitter — through `Dimension.playSound`, which is the era's
+`playSoundAtEntity`: the sound is broadcast at the corpse rather than played privately, so witnesses hear
+the death too. It is called from the deferred call the veto schedules, not from the veto itself, because
+`playSound` is restricted-execution like the rest of the park; the engine runs that call at the end of
+the same tick, so the sound is not late by an audible amount. That delay is the one thing here the era
+did not have, and it is unavoidable: nothing that produces a sound, a mode change or an item spawn can
+be called from inside the before-event.
+
+### The era's death camera is two effects, and only the zoom is reproducible
+
+Both live in `EntityRenderer`, both keyed on `renderViewEntity.health <= 0`, both driven by `deathTime` in
+ticks:
+
+- a Z-roll of the whole view, `glRotatef(40 - 8000 / (t + 200), 0, 0, 1)` (`:152-158`) — 3.6° after one
+  second, 20° after ten, easing towards 40°;
+- a field of view that narrows, `70 / ((1 - 500 / (t + 500)) * 2 + 1)` (`:137-150`) — 65° after one
+  second, 44.5° after ten, easing towards 70/3 ≈ 23.3°.
+
+`GuiGameOver.doesGuiPauseGame()` is false, so the tick loop never stops and both easings keep running for
+as long as the screen is up: the effect is a slow roll and zoom, not a snap at the moment of death.
+`preparePlayerToSpawn` resets `deathTime` (`EntityPlayer.java:155`), so a respawn clears both.
+
+`assertDeathFov` reproduces the second one on the `deathState` pass from the era's own formula, with `t`
+the ticks since the death began and a half-degree deadband so the curve steps rather than streaming a
+camera update every pass. It is closed out by `camera.clear()` on respawn, which is also where a relog
+starts the curve over instead of resuming it.
+
+Still open:
+
+- **The roll cannot be reproduced.** No Bedrock API takes a camera roll: `CameraSetRotOptions.rotation` is
+  a `Vector2` of pitch and yaw, no camera preset carries a roll field, and `addShake` with
+  `CameraShakeType.Rotational` oscillates rather than holding a tilt. The half of the effect a player
+  actually notices is therefore still missing, which makes the zoom on its own a calmer version of it.
+- **The base is imposed, not scaled.** `Camera.setFov` takes an absolute FOV and the module exposes no
+  getter, so the death puts the era's 70° on the view whatever the player has set for themselves. Beta had
+  no FOV setting, so 70 is the era's own number rather than an override of one — but a Bedrock player who
+  moved theirs will see it move, and whether `clear()` gives theirs back is an in-game question.
+- **The era's underwater base is not reproduced.** It is 60° inside water material, not 70
+  (`EntityRenderer.java:141-143`). `isInWater` is not `isInsideOfMaterial(Material.water)` and where it
+  triggers is unverified, so a drowning death narrows from 70 rather than 60.
+- **Whether the zoom is visible behind the screen at all** is unverified. The death screen is a server form
+  drawn over the world, and no offline test can say whether an FOV set while one is open is honoured.
+
+### A respawn hands the view back forward, the way the era built the player
+
+The era does not carry a corpse's camera over a respawn: `EntityPlayer`'s constructor places every player
+at the spawn through `setLocationAndAngles(x + 0.5, y + 1, z + 0.5, 0.0F, 0.0F)`
+(`EntityPlayer.java:45-46`), and `Minecraft.respawn` builds a *fresh* player on every respawn
+(`Minecraft.java:1456`), so the bed branch overwrites the same pair with the same zeros (`:1465`) and the
+world-spawn branch simply keeps them. A respawned player therefore faces yaw 0 — south — with a level
+view, and `preparePlayerToSpawn` zeroes motion and pitch on the way (`Entity.java:143-145`).
+
+`respawnPlayer` sets that pair twice, deliberately: once as the `rotation` of the teleport, so the facing
+moves with the position as it did in the era's single call, and once through `setRotation`, because a
+player's camera is the client's and which of the two it follows is unverified. Without either, a respawned
+player keeps whatever the death camera left them looking at, which reads as a corpse's view.
+
+Still open: which of the two levers actually turns a player's view, and whether `getSpawnPoint()` already
+carries the era's `+0.5 / +1 / +0.5` block offset or wants it added — the teleport uses its coordinates as
+given.
+
+## 20. Every player move is announced by the engine, and one helper mutes it
+
+Bedrock tells the player it just moved. The string is command feedback — `commands.tp.successVictim`,
+"You have been teleported to %1$s" (`resource_packs/vanilla/texts/en_US.lang` in the installed client) — and
+the script API inherits the announcement: `TeleportOptions` carries no flag for it, and `tryTeleport` is not
+a silent variant either. The pack's three move sites are the death respawn, the End boundary bounce and the
+voided-player confine, and all three went through `player.teleport()` with the message still arriving.
+
+**Settled in game:** with `sendcommandfeedback` set to `false` by hand, the report stops. The gamerule is
+the lever, and the engine does route its own teleport announcement through the command-feedback check.
+
+`core/quietTeleport.ts` is the one place that answers it, so the message cannot return at a single call
+site: it mutes `world.gameRules.sendCommandFeedback` across the move, restoring only what it turned off. The
+deadline is extended rather than replaced when a second move lands inside the window — the last move out
+puts feedback back — and a world that arrives with `sendcommandfeedback` already `false` is left alone:
+writing `true` over it would be a worse trade than the message, since every command in the world would start
+reporting again.
+
+**The window is not the variable, and the 200-tick one is not the answer.** A first version held the mute two
+ticks and the message still arrived, which the note here read as "too short": it was widened to 20 ticks,
+and the message arrives under that window too, on the respawn, in game. A full second of mute across the move
+therefore silences nothing, so "too short" was wrong twice over — the other half of that reading, "the mute
+itself confirmed applied", rested on the content log carrying no `[Scripting][warning]` from
+`quietTeleport`, which shows the setter did not throw and says nothing about the engine's rule.
+
+**Read in game at a ten-second window, the mute was on and the announcement came anyway.** The probes
+bracket the write, the call and the restore, and they report the API's own view on each line: `mute on`
+`rule=false` — the value the setter left behind, read back in the same call — `called` `rule=false`, and
+`mute off` `rule=false` two hundred ticks later, so the mute held for the window's whole length. Inside it
+the engine sent both halves of the announcement, `commands.tp.successVictim` ("You have been teleported to
+3.02, 100.00, 499.71") and `commands.tp.success` ("Teleported cen0b to …"), the pair a player who runs `/tp`
+on themselves sees. So the script's rule reads off across the move and the move is announced regardless,
+which leaves the write's reach and the write's timing, and they want different fixes:
+
+- **The write lands after the tick that makes it.** Then every version so far has missed by one tick — 2, 20
+  and 200 ticks all write the rule and issue the move in the same tick, which is the one tick the write
+  cannot cover, and lengthening a window that opens too late changes nothing. The fix is a mute that leads
+  the move: rule off, move on the next tick.
+- **The write never reaches the engine's rule.** Then the mute is a no-op in every window. The only setting
+  path confirmed in game is the command — `/gamerule sendcommandfeedback false` typed by hand — which both
+  sets the rule and broadcasts it to clients, where the script setter only writes the API's own value. A
+  script-driven `runCommand` of that same gamerule is the next lever if leading the move does not silence it.
+
+Command feedback is the lever either way: with the rule off by hand the report stops, so the engine does
+route its own teleport line through the check once the check is genuinely off. What is unverified is whether
+the script's write makes it off anywhere the announcement is decided.
+
+Also worth knowing before reading the move sites: the confine path is unreachable today — `island.ts` acts
+only on players tagged `voided`, and nothing in the pack sets that tag — so in practice the report can only
+come from the respawn and the End bounce.
+
+What is still open:
+
+- **Which of the two survives.** The build in the tree now mutes and then issues the move on the next tick,
+  leaving the window at 20 ticks and keeping the probes, so one respawn separates them: silent means the
+  write was a tick late and the helper keeps the leading mute; announced again means the write does not
+  reach the announcement's check at all, and the mute has to go through the command path. Nothing in the
+  pack should be changed on a guess here: the window has already been tuned once against a reading that did
+  not hold.
+- **The mute is world-wide for its window.** Another player running a command inside those 20 ticks gets no
+  feedback for it. `sendCommandFeedback` has no per-player form, and the window is a compromise between
+  covering the placement and holding the rule off for as little time as possible.
+
+## 21. The corpse flops, puffs, and then does not leave
+
+Beta's death has three parts and only two of them can be copied. `RenderLiving.rotateCorpse` turns a dead
+entity up to `getDeathMaxRotation` degrees about Z on a `sqrt(((deathTime + partialTicks - 1) / 20) * 1.6)`
+curve - 90 for a player, which `RenderPlayer` does not override for a dead one
+(`RenderLiving.java:120-132`) - so the body falls onto its side over about 0.7s. On the tick `deathTime`
+passes 20 the entity is deleted and twenty `explode` particles are scattered through its box
+(`EntityLiving.java:152-167`).
+
+Bedrock ships no player death animation at all, so the curve is authored into the pack:
+`animation.player.death_flop` in `packs/RP/animations/`, a frame per tick on the entity's `root` bone - the
+one bone whose pivot is `[0, 0, 0]`, the origin the era's `glRotatef` turned the corpse about - played from
+`enterDeathState` through `Entity.playAnimation`, with the aliases `player.entity.json` declares the way its
+own `place_swing` is declared. The puff is the same twenty particles at `deathTime` 21: `minecraft:explode`
+is not a spawnable Bedrock identifier, so `minecraft:basic_smoke_particle` stands in for Java's particle.
+
+Two divergences, both forced by a player being a live entity rather than a deleted one:
+
+- **The body stays.** The era deletes the corpse as it puffs, so there is nothing left lying there. A player
+  cannot be removed and respawned, so the flop holds its last frame and `respawnPlayer` plays
+  `animation.player.death_flop_reset` to stand the body back up.
+- **The puff fills the standing box.** The era reads the entity's box at the puff, and its client player has
+  already shrunk to 0.2 by then (`EntityPlayer.onDeath`). That is smaller than the corpse the puff is
+  marking, so this scatters through the era's standing 0.6 x 1.8 player box instead.
+
+What is still open:
+
+- **Whether a script can animate a player at all in practice.** `playAnimation` is documented on `Entity`,
+  inherited by `Player`, and processed client-side, so a call that returns proves nothing by itself; one
+  in-game death decides it.
+- **Whether that flop is visible.** The death state holds the player in Spectator on purpose, which hides
+  Bedrock's HUD, and vanilla's spectator render controller draws only a translucent head - so the body the
+  animation turns is not the body on screen. Leaving the death state alone was the explicit choice here;
+  making the corpse visible is a separate change.
 
 ## Why this file exists
 

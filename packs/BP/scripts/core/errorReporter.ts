@@ -1,7 +1,3 @@
-/**
- * Standardized error reporter and error boundary helper for Betafied scripts.
- */
-
 export interface ErrorContext {
     system: string;
     operation: string;
@@ -18,14 +14,13 @@ export function reportError(context: ErrorContext, error: unknown): void {
     console.warn(`${context.system}: Error during ${context.operation}${targetInfo}${detailEntries}: ${errorMsg}`);
 }
 
+export function runCatching<T>(context: ErrorContext, fn: () => T): T | undefined;
+export function runCatching<T>(context: ErrorContext, fn: () => T, fallback: (err: unknown) => T): T;
 export function runCatching<T>(context: ErrorContext, fn: () => T, fallback?: (err: unknown) => T): T | undefined {
     try {
         return fn();
     } catch (err) {
         reportError(context, err);
-        if (fallback) {
-            return fallback(err);
-        }
-        return undefined;
+        return fallback ? fallback(err) : undefined;
     }
 }

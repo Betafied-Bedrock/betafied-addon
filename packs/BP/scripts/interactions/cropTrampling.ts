@@ -5,11 +5,6 @@ import { eventBus } from "../core/eventBus.js";
 import { runCatching, reportError } from "../core/errorReporter.js";
 import { BH_FENCE_ID } from "../core/betaRegistry.js";
 
-/**
- * Beta 1.7.3 farmland trampling.
- * Recreates walking-based trampling and restores crops trampled by modern Bedrock engine landing checks.
- */
-
 function walkRuleApplies(mode: GameMode | undefined): boolean {
     return mode !== GameMode.Creative && mode !== GameMode.Spectator;
 }

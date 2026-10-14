@@ -82,7 +82,9 @@ describe("Slab Stacking - Beta 1.7.3 Pre-Placement Stacking", () => {
         });
 
         it("defines placement sounds for each slab type", () => {
-            assert.equal(SLAB_SOUND_OF["bh:wooden_slab"], "use.wood");
+            // Beta's wooden slab was the stone slab wearing a plank texture, so it placed
+            // with the stone sound too.
+            assert.equal(SLAB_SOUND_OF["bh:wooden_slab"], "use.stone");
             assert.equal(SLAB_SOUND_OF["bh:stone_slab"], "use.stone");
             assert.equal(SLAB_SOUND_OF["bh:cobblestone_slab"], "use.stone");
             assert.equal(SLAB_SOUND_OF["bh:sandstone_slab"], "use.stone");

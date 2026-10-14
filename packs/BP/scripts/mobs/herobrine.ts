@@ -15,11 +15,12 @@ const ENTITY_ID = "bh:herobrine";
 
 const CONFIG = Object.freeze({
     SWEEP_INTERVAL_TICKS: 20,
-    INITIAL_GAP_MIN_TICKS: 6000,
-    INITIAL_GAP_MAX_TICKS: 18000,
-    GAP_MIN_TICKS: 1200,
-    GAP_MAX_TICKS: 7200,
-    SIGHTING_CHANCE: 0.12,
+    MIN_REST_TICKS: 576000,
+    INITIAL_GAP_MIN_TICKS: 24000,
+    INITIAL_GAP_MAX_TICKS: 72000,
+    GAP_MIN_TICKS: 12000,
+    GAP_MAX_TICKS: 36000,
+    SIGHTING_CHANCE: 0.03,
     MIN_DISTANCE: 12,
     MAX_DISTANCE: 40,
     MIN_SPREAD_RADIANS: 0.26,
@@ -36,6 +37,9 @@ const CONFIG = Object.freeze({
     CAVE_PITCH_MAX: 1.0,
     SPAWN_ATTEMPTS: 12
 });
+
+export const SIGHTING_CHANCE = CONFIG.SIGHTING_CHANCE;
+export const MIN_REST_TICKS = CONFIG.MIN_REST_TICKS;
 
 const CAVE_SOUND = "ambient.cave";
 
@@ -228,11 +232,14 @@ export function forceAppearance(preferred?: Player): boolean {
     return attemptAppearance(target);
 }
 
-function clearSighting(): void {
-    sighting = null;
-}
-
 let nextRollTick = -1;
+
+function endSighting(entity?: Entity): void {
+    if (entity) dismiss(entity);
+    else sighting = null;
+
+    nextRollTick = system.currentTick + CONFIG.MIN_REST_TICKS;
+}
 
 function rollSweep(): void {
     const now = system.currentTick;
@@ -250,7 +257,7 @@ function rollSweep(): void {
 
     const players = world.getAllPlayers().filter((player) => player.isValid);
     if (players.length === 0) return;
-    if (Math.random() >= CONFIG.SIGHTING_CHANCE) return;
+    if (Math.random() >= SIGHTING_CHANCE) return;
 
     attemptAppearance(players[Math.floor(Math.random() * players.length)]);
 }
@@ -261,12 +268,12 @@ function maintainSighting(): void {
 
     const entity = world.getEntity(record.entityId);
     if (!entity?.isValid || entity.dimension.id !== record.dimensionId) {
-        clearSighting();
+        endSighting();
         return;
     }
 
     if (system.currentTick >= record.expiresAtTick) {
-        dismiss(entity);
+        endSighting(entity);
         return;
     }
 
@@ -279,18 +286,18 @@ function maintainSighting(): void {
         if (distance < nearest) nearest = distance;
 
         if (distance <= CONFIG.VANISH_RADIUS) {
-            dismiss(entity);
+            endSighting(entity);
             return;
         }
 
         if (distance <= CONFIG.LOOK_RADIUS && isLookingAt(player, entity)) {
-            dismiss(entity);
+            endSighting(entity);
             return;
         }
     }
 
     if (nearest > CONFIG.FORGET_RADIUS) {
-        dismiss(entity);
+        endSighting(entity);
     }
 }
 
