@@ -4,40 +4,54 @@ Notable changes in each Betafied release. Version numbers match the behavior and
 
 ## 5.7 — 2026-10-13
 
-5.7 adds Beta's death sequence, re-paces the mobs to the era's walk, and relights the leaves.
+5.7 adds Beta-style death behavior, adjusts mob movement, and fixes several rendering and item-drop issues.
 
 ### Death
 
-- Added Beta's death screen: the era's gradient and "Game over!" headline, with the hotbar, hearts and crosshair drawn behind them.
-- Added the death drop: the inventory and worn armour are thrown out with the era's throw, spread over the two blocks around the player.
-- Added the death flop, the smoke puff after it, and the hurt sound the era played on a lethal hit.
-- Added the era's death camera, narrowing from 70 degrees while the screen stays up.
-- Changed a dead player to spectator with movement locked, so a death cannot be walked out of.
-- Changed the respawn to face south and hand the camera back.
-- Changed the pack's scripted player moves to mute the engine's teleport announcement, removing the "You have been teleported to ..." line.
-- Removed the permanent invisibility the shadow pack had put on players: hostile mobs target players again, and Bedrock draws its own shadow under them.
-- Fixed players already in a loaded world keeping the invisibility after the update.
+- Added Beta's death screen with the original gradient and `Game over!` text.
+- Changed the death screen to keep the hotbar, hearts, and crosshair visible behind it.
+- Added Beta-style inventory and armor drops on death.
+- Changed death drops to use the era's throw behavior and spread around the player.
+- Added the player death flop.
+- Added the smoke effect after death.
+- Added the hurt sound played on a lethal hit.
+- Added Beta-style death camera behavior with the field of view narrowing from 70 degrees.
+- Changed dead players to spectator mode with movement locked until respawn.
+- Changed respawning to face south and restore the normal camera.
+- Changed scripted player teleports to suppress the engine's `You have been teleported to ...` message.
+- Removed the permanent player invisibility used by the shadow pack.
+- Restored hostile mob targeting of players.
+- Restored Bedrock's normal player shadow.
+- Fixed players already loaded into a world remaining invisible after updating.
 
 ### Mobs
 
-- Changed the walking speed of every mob to the pack's new anchor, after 5.6's roster read as too fast.
-- Fixed zombies not fighting back, which they lost in the 4.0 rewrite.
-- Fixed spiders drawing invisible, because their render controller chose the invisible material whenever the shadow pack had them hidden.
-- Changed Herobrine to a rare event: at least eight hours between sightings, and the better part of a day on average.
+- Reduced mob walking speeds to better match Beta's pacing.
+- Changed all mobs to use the same updated movement-speed baseline.
+- Fixed zombies not retaliating when attacked.
+- Fixed spiders rendering invisible because their controller could select the invisible material from the old shadow system.
+- Changed Herobrine encounters to have a minimum eight-hour delay between sightings.
+- Reduced Herobrine encounter frequency so sightings average closer to once per day.
 
 ### Blocks
 
-- Changed leaves to Beta's flat shading, trimming ambient occlusion and baking the era's face dimming into the bottom, north/south and east/west sides.
-- Changed wooden slabs to sound like the stone slab they were cloned from and to stop catching fire.
+- Changed leaves to use flatter Beta-style shading.
+- Reduced ambient occlusion on leaf blocks.
+- Added Beta-style face shading to the bottom, north/south, and east/west sides of leaves.
+- Changed wooden slabs to use stone-slab sounds.
+- Removed fire behavior from wooden slabs to match the slab block they were based on.
 
 ### Drops
 
-- Fixed converted ground stacks losing everything past the first item when the background sweep retyped them.
-- Changed raw iron and raw gold already on the ground to collapse to one ore, the amount one mined block drops.
+- Fixed converted ground-item stacks losing all but the first item when processed by the background sweep.
+- Changed raw iron already on the ground to convert into a single iron ore.
+- Changed raw gold already on the ground to convert into a single gold ore.
+- Changed raw ore conversion to match the one-ore drop produced by a mined Beta ore block.
 
 ### Tooling
 
-- Added a lint rule capping an inline comment block at twelve lines, and swept the scripts of comments that restated the code.
+- Added a lint rule limiting inline comment blocks to twelve lines.
+- Removed script comments that only repeated what the code already made clear.
 
 ## 5.6.1 — 2026-10-13
 
