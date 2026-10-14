@@ -8,6 +8,8 @@ import {
     system,
     world
 } from "@minecraft/server";
+import type { DimensionLocation, Vector3 } from "@minecraft/server";
+import { OVERWORLD_KEY } from "../core/betaConstants.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
 import { damageArmor } from "../combat/armor.js";
 import { eventBus } from "../core/eventBus.js";
@@ -23,6 +25,14 @@ import type { DeathScreenHandlers } from "./deathScreen.js";
 
 export const DEAD_PROPERTY = "bh:dead";
 export const PRE_DEATH_GAMEMODE_PROPERTY = "bh:pre_death_gamemode";
+
+/**
+ * The respawn's destination for a player without a bed, recorded once per world. Bedrock reports the
+ * world spawn's height as the unresolved 32767 sentinel — "the height is determined by surrounding
+ * blocks" — and only its own spawn pass resolves it, so a teleport to that value drops the player above
+ * the world. The first join stores where the engine actually put the player instead.
+ */
+const WORLD_SPAWN_PROPERTY = "betafied:world_spawn";
 
 export const LOCKED_INPUT_CATEGORIES: readonly InputPermissionCategory[] = Object.freeze([
     InputPermissionCategory.Movement,
@@ -177,6 +187,29 @@ export function enterDeathState(player: Player): void {
     }
 }
 
+function recordWorldSpawn(player: Player): void {
+    if (world.getDynamicProperty(WORLD_SPAWN_PROPERTY) !== undefined) return;
+
+    const { x, y, z } = player.location;
+    const { min, max } = player.dimension.heightRange;
+
+    // A save the void bug parked outside the dimension must not become everybody's spawn.
+    if (y < min || y > max) return;
+
+    world.setDynamicProperty(WORLD_SPAWN_PROPERTY, { x, y, z });
+}
+
+/** A bed or anchor outranks the world spawn, as it did in the era. */
+function respawnTarget(player: Player): DimensionLocation | undefined {
+    const spawnPoint = player.getSpawnPoint();
+    if (spawnPoint) return spawnPoint;
+
+    const worldSpawn = world.getDynamicProperty(WORLD_SPAWN_PROPERTY) as Vector3 | undefined;
+    if (!worldSpawn) return undefined;
+
+    return { dimension: world.getDimension(OVERWORLD_KEY), ...worldSpawn };
+}
+
 export function respawnPlayer(player: Player): void {
     if (!player.isValid) return;
 
@@ -188,14 +221,14 @@ export function respawnPlayer(player: Player): void {
 
         dismissDeathScreen(player);
 
-        const spawnPoint = player.getSpawnPoint();
-        const location = spawnPoint ?? world.getDefaultSpawnLocation();
-        const dimension = spawnPoint?.dimension ?? world.getDimension("overworld");
+        const target = respawnTarget(player);
 
-        teleportQuietly(player, { x: location.x, y: location.y, z: location.z }, {
-            dimension,
-            rotation: RESPAWN_ROTATION
-        });
+        if (target) {
+            teleportQuietly(player, { x: target.x, y: target.y, z: target.z }, {
+                dimension: target.dimension,
+                rotation: RESPAWN_ROTATION
+            });
+        }
 
         player.setRotation(RESPAWN_ROTATION);
         standCorpseBackUp(player);
@@ -279,7 +312,12 @@ eventBus.onPlayerSpawn((ev) => {
     if (!ev.initialSpawn) return;
     if (!ev.player) return;
 
-    system.run(() => assertDeathState(ev.player));
+    const player = ev.player;
+    system.run(() => {
+        if (!player.isValid) return;
+        recordWorldSpawn(player);
+        assertDeathState(player);
+    });
 });
 
 eventBus.onPlayerLeave((ev) => {

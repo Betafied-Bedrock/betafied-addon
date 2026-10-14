@@ -270,7 +270,9 @@ Both were the reason the item existed, so the removal is the trade, not an overs
 
 The placement rules the era applied are still enforced for the sign, which the engine cannot place for
 the pack: a custom item's `minecraft:block_placer` writes one block, never a wall sign, so
-`interactions/signPlacement.ts` writes the standing or the wall sign the way `ItemSign` did.
+`interactions/signPlacement.ts` writes the standing or the wall sign the way `ItemSign` did. It
+cancels the click to do it, because the placer reads that click for a cell of its own: leaving both
+runners on one click is the sign placed twice, and only the pack's half carries the era's rotation.
 
 Still open, all of it engine-dependent and needing an in-game look:
 
@@ -288,11 +290,13 @@ Still open, all of it engine-dependent and needing an in-game look:
   workbench answered the click before `ItemSign` was reached, and no sign went down against any of
   them. `BETA_USE_CONSUMING_BLOCK_IDS` holds the doors and the trapdoor, where the engine is known to
   consume the click; the others join it once the same consumption is seen in game.
-- **Does a script-placed sign open the editor for the player who placed it?** Beta's `ItemSign` called
-  `EntityPlayer.func_4048_a(sign)` on the newly written tile entity, so the editor opened with the
-  placement. No script API opens it, so the pack's sign cannot reproduce that half; the editor is
-  reached by clicking the sign afterwards instead. If the engine ever opens the editor for a
-  script-written sign, the double-open that would cause needs checking.
+- **The sign editor rides the player's own click on the sign, and the pack no longer swallows it.**
+  Beta's `ItemSign` called `EntityPlayer.func_4048_a(sign)` on the newly written tile entity, so the
+  editor opened with the placement. The engine does not raise it for the pack's placement — neither a
+  script-written sign nor one its own `minecraft:block_placer` writes — and no script API opens one,
+  so the click a player makes on a standing or wall sign is the only way to reach the editor and
+  `interactions/signPlacement.ts` leaves it to the engine. Cancelling that click, as the module did
+  while it read the editor as an era divergence, leaves a sign nobody can write on.
 - **Does the cake's `minecraft:block_placer` place on the faces `ItemReed` allowed?** Beta's cake went
   down on any face of a block, which is what the component has to reproduce; it is the one capped item
   whose placement is left entirely to the engine.
@@ -942,6 +946,46 @@ What is still open:
   Bedrock's HUD, and vanilla's spectator render controller draws only a translucent head - so the body the
   animation turns is not the body on screen. Leaving the death state alone was the explicit choice here;
   making the corpse visible is a separate change.
+
+## 22. The respawn destination is one recorded world spawn, never the engine's sentinel
+
+`World.getDefaultSpawnLocation()` reaches scripts with its Y unresolved: the documentation says the Y is
+32767 by default, "indicating a player's spawn height is not fixed and will be determined by surrounding
+blocks". Only the engine's own spawn pass resolves that, and its teleport path does not - MCPE-157125 is
+the same failure for entities moved to the Overworld spawn, which arrive at Y=32767 and fall into the void.
+`respawnPlayer` used the value verbatim as its bed-less destination, so a player without a spawn point was
+sent above the world, died to the fall, and got the screen again: the death loop the report describes,
+escapable only by rejoining, and re-entered on the next death.
+
+The fix records the resolution instead of reading it. The first join stores the player's position in the
+world property `betafied:world_spawn` (`recordWorldSpawn`, written once - later joins leave it alone), and a
+player without a bed respawns there, paired with `OVERWORLD_KEY` because the property is an Overworld
+`Vector3` and carries no dimension of its own. A bed or respawn anchor still wins, as it did in the era.
+
+Two behaviours that are deliberate:
+
+- **A position the dimension cannot hold is never recorded.** `recordWorldSpawn` checks the dimension's
+  `heightRange`, so a save the void bug left above the world cannot become the spawn everyone else gets.
+- **With no record and no bed, the respawn does not move the player.** `world.getDefaultSpawnLocation()` is
+  no longer a teleport destination anywhere in the pack, which is what makes the loop impossible even if the
+  property is missing: the player keeps their death spot, at full health, with their inputs back.
+
+The mock was part of why this was green: `getDefaultSpawnLocation()` answered `{ x: 0, y: 64, z: 0 }`, a
+landed position no world has, while `deathSystem.test.ts` asserted the player respawned onto it. It now
+returns the documented 32767 sentinel, which is what made the loop reproduce offline before the fix.
+
+Still open:
+
+- **Whether the engine puts a first-joining player at the world spawn.** The recorded position is that
+  player's join position, so it is the world spawn only if the engine chose that spot for them. A fresh
+  world is unaffected - its first join is at the spawn - but a world that had already been played writes the
+  property once, from whoever joins first after this update, and a returning player rejoins at their saved
+  position rather than at the spawn.
+- **What `getSpawnPoint()` answers for a player with no bed.** The documentation only promises
+  `DimensionLocation | undefined`; `respawnTarget` takes it whenever it is present. If the engine ever
+  answers with the unresolved world spawn there, the same void loop is reachable through the bed branch.
+- **Whether a bed spawn wants the era's `+0.5 / +1 / +0.5` offset.** §19 already carries this one for the
+  respawn as a whole; the recorded world spawn does not add it either.
 
 ## Why this file exists
 

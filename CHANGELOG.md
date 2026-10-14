@@ -2,6 +2,31 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.8 — 2026-10-14
+
+5.8 fixes the death loop that sends players without a bed above the world, makes signs writable again, and keeps extended pistons intact.
+
+### Respawn
+
+- Fixed players without a bed being stuck in a slowly voiding world with no possibility of return.
+- Added a world spawn recorded on the world's first join, where a player without a bed or respawn anchor now respawns.
+- Changed a join position the dimension cannot hold to never become that world spawn.
+- Changed a respawn with no bed and no recorded world spawn to leave the player where they died.
+
+### Signs
+
+- Fixed clicks on standing and wall signs being swallowed, which left signs nobody could write on.
+- Changed the top face to place the standing sign turned to the placing player's rotation, as Beta's `ItemSign` did.
+- Fixed a sign placed against a block being written twice, once by the pack and once by the item's own placer.
+
+### Blocks
+
+- Fixed an extended piston losing its head when a chunk loaded, which left a broken piston behind.
+
+### Tooling
+
+- Fixed the test mock answering a resolved world spawn, which kept the death loop passing offline.
+
 ## 5.7 — 2026-10-13
 
 5.7 adds Beta-style death behavior, adjusts mob movement, and fixes several rendering and item-drop issues.

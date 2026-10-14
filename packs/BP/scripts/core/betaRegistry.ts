@@ -233,6 +233,9 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:lever", "minecraft:stone_button", "minecraft:stone_pressure_plate", "minecraft:wooden_pressure_plate",
     "minecraft:redstone_torch", "minecraft:unlit_redstone_torch", "minecraft:redstone_wire", "minecraft:repeater",
     "minecraft:piston", "minecraft:sticky_piston", "minecraft:rail", "minecraft:golden_rail", "minecraft:detector_rail",
+    // Beta's piston extension (block 34) is its own block on this engine, so a base without its arm
+    // is a broken piston. Both heads belong to the era even though neither has an item form.
+    "minecraft:piston_arm_collision", "minecraft:sticky_piston_arm_collision",
     "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door",
     "minecraft:standing_sign", "minecraft:wall_sign"
 ]));

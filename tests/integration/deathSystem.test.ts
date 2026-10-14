@@ -11,7 +11,8 @@ import {
     mockPlayers,
     mockSpawnedItems,
     resetMocks,
-    scheduledTimeouts
+    scheduledTimeouts,
+    world
 } from "../mocks/minecraftServer.js";
 import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
 import { TELEPORT_DELAY_TICKS } from "../../packs/BP/scripts/core/quietTeleport.js";
@@ -137,6 +138,14 @@ function runDeathStatePass(): void {
     runTicks(20);
 }
 
+/** What the first join records, so a bed-less respawn has somewhere real to land. */
+const WORLD_SPAWN_PROPERTY = "betafied:world_spawn";
+
+function joinWorld(player: Player): void {
+    eventBus.dispatch("playerSpawn", { player, initialSpawn: true });
+    drainDeferred();
+}
+
 function hurtEvent(player: Player, damage: number) {
     return { cancel: false, damage, hurtEntity: player, damageSource: { cause: "entityAttack" } } as any;
 }
@@ -255,7 +264,10 @@ describe("Player death state machine", () => {
 
     it("respawns the player without announcing the move", () => {
         const { player } = makeHarness();
+        player.location = { x: 4, y: 70, z: -9 };
+        joinWorld(player);
 
+        player.location = { x: 900, y: 12, z: 900 };
         enterDeathState(player);
         respawnPlayer(player);
 
@@ -329,16 +341,75 @@ describe("Player death state machine", () => {
         assert.deepEqual(player.getRotation(), { x: 0, y: 0 }, "a corpse's view must not be inherited");
     });
 
-    it("falls back to the world spawn when the player has no spawn point", () => {
+    it("respawns a player with no spawn point at the world spawn the first join recorded", () => {
         const { player } = makeHarness();
+        player.location = { x: 4, y: 70, z: -9 };
+        joinWorld(player);
 
+        player.location = { x: 900, y: 12, z: 900 };
         enterDeathState(player);
         respawnPlayer(player);
 
         drainNextTick();
 
-        assert.deepEqual(player.location, { x: 0, y: 64, z: 0 });
+        assert.deepEqual(player.location, { x: 4, y: 70, z: -9 });
         assert.equal(player.getGameMode(), GameMode.Survival);
+    });
+
+    it("keeps the first join's world spawn for everyone who joins later", () => {
+        const { player } = makeHarness();
+        player.location = { x: 4, y: 70, z: -9 };
+        joinWorld(player);
+
+        const later = new Player("death_player_later", "alex");
+        later.location = { x: 900, y: 64, z: 900 };
+        mockPlayers.push(later);
+        joinWorld(later);
+
+        assert.deepEqual(
+            world.getDynamicProperty(WORLD_SPAWN_PROPERTY),
+            { x: 4, y: 70, z: -9 },
+            "the world spawn is the first join's, not the latest one's"
+        );
+    });
+
+    it("never records a join the dimension could not hold", () => {
+        const { player } = makeHarness();
+        player.location = { x: 0, y: 32767, z: 0 };
+        joinWorld(player);
+
+        assert.equal(
+            world.getDynamicProperty(WORLD_SPAWN_PROPERTY),
+            undefined,
+            "a save parked above the world is not a world spawn"
+        );
+
+        player.location = { x: 4, y: 70, z: -9 };
+        enterDeathState(player);
+        respawnPlayer(player);
+        drainNextTick();
+
+        assert.deepEqual(
+            player.location,
+            { x: 4, y: 70, z: -9 },
+            "with no world spawn to move to, the player stays where they died rather than above the world"
+        );
+        assert.equal(player.getGameMode(), GameMode.Survival, "and the respawn still hands the player back");
+    });
+
+    it("sends a player who has a bed home rather than to the world spawn", () => {
+        const { player } = makeHarness();
+        player.location = { x: 4, y: 70, z: -9 };
+        joinWorld(player);
+
+        player.spawnPoint = { dimension: player.dimension, x: 10, y: 64, z: -20 };
+        player.location = { x: 900, y: 12, z: 900 };
+        enterDeathState(player);
+        respawnPlayer(player);
+
+        drainNextTick();
+
+        assert.deepEqual(player.location, { x: 10, y: 64, z: -20 });
     });
 
     it("hands back the mode the player died in", () => {

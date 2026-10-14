@@ -166,6 +166,7 @@ const FACE_OFFSETS: Readonly<Record<string, { x: number; y: number; z: number }>
 
 export class MockDimension {
     readonly id: string;
+    readonly heightRange = { min: -64, max: 319 };
     public blocks = new Map<string, any>();
 
     constructor(id: string) {
@@ -318,8 +319,14 @@ export const world = {
             mockDynamicProperties.set(identifier, value);
         }
     },
+    /**
+     * The engine's documented default: the Overworld spawn's Y stays unresolved at 32767 until something
+     * fixes it, which means "the height is determined by surrounding blocks" — a teleport to that value
+     * drops the player above the world. The mock answered a landed 64 for the whole 5.7 cycle, which is
+     * what let the respawn's void loop pass offline.
+     */
     getDefaultSpawnLocation() {
-        return { x: 0, y: 64, z: 0 };
+        return { x: 0, y: 32767, z: 0 };
     },
     /**
      * The `sendcommandfeedback` gamerule, as a player-move helper sees it. Bedrock's own default is on and
