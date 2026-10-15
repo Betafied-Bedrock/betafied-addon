@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-15T12:15:31.201Z",
+  "updatedAt": "2026-10-15T12:16:13.228Z",
   "downloads": {
     "assetCounts": {
       "5.9/Betafied_5.9.mcaddon": 3,
@@ -89,6 +89,10 @@
       },
       {
         "at": 1792066531201,
+        "total": 1473
+      },
+      {
+        "at": 1792066573228,
         "total": 1473
       }
     ]
