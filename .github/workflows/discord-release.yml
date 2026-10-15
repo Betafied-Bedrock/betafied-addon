@@ -6,63 +6,48 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to announce (re-posts the announcement, for testing)
+        description: Existing release tag to announce (updates its post, for testing)
         required: true
         type: string
+      dry_run:
+        description: Print the payload instead of posting it
+        required: false
+        default: false
+        type: boolean
 
+# The post is edited in place from then on by the hourly statistics run, so this workflow writes the
+# message id it posts back to the `stats` branch — the same place the readings live, and never the
+# working branch.
 permissions:
-  contents: read
+  contents: write
 
-# No `username` or `avatar_url` is set on the payload on purpose: Discord then renders the
-# message with the name and icon configured on the webhook itself instead of a GitHub identity.
 jobs:
   announce:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
-      DISCORD_WEBHOOK: ${{ secrets.CHANGELOG_WEBHOOK }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_WEBHOOK: ${{ secrets.RELEASE_WEBHOOK }}
     steps:
-      # The embed images are uploaded with the message rather than linked, so the announcement
-      # never depends on an expiring Discord CDN URL. The ref is pinned to the default branch
-      # because a release event otherwise checks out the tag, which need not carry the images.
-      - name: Check out the embed images
-        uses: actions/checkout@v4
+      # Pinned to the default branch rather than the released tag: a release event otherwise checks
+      # out the tag, whose older copy of the script would post a payload the hourly refresh cannot
+      # keep in step with.
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
 
-      - name: Build the Discord payload from the release notes
+      # The post is built and published by the statistics tooling, which also refreshes it hourly:
+      # the download total sits in the same message as the download button, so they need one builder
+      # rather than two that drift apart.
+      - name: Publish the release post
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > release.json
-
-          jq '{
-            content: null,
-            embeds: [
-              { color: null, image: { url: "attachment://changelog.png" } },
-              {
-                title: ("Betafied - " + .tag_name),
-                description: ((((.body // "") | gsub("\r\n"; "\n")) | sub("[[:space:]]+$"; "")) + "\n\n## [DOWNLOAD](" + .html_url + ")"),
-                color: null,
-                image: { url: "attachment://divider.png" }
-              }
-            ],
-            attachments: []
-          }' release.json > payload.json
-
-      - name: Post to the Discord changelog webhook
-        run: |
-          set -euo pipefail
-          if [ -z "${DISCORD_WEBHOOK}" ]; then
-            echo "::error::The CHANGELOG_WEBHOOK repository secret is not set."
-            exit 1
+          options=(--release "${TAG}")
+          if [ "${DRY_RUN}" = "true" ]; then
+            options+=(--dry-run)
           fi
-          # `payload_json=<file` sends the file's *contents* as a form field; `@file` sends it as
-          # an uploaded file part, which Discord files away as an attachment and renders no embeds.
-          curl --fail-with-body --silent --show-error \
-            --form "payload_json=<payload.json" \
-            --form "files[0]=@assets/discord/changelog.png;type=image/png" \
-            --form "files[1]=@assets/discord/divider.png;type=image/png" \
-            "${DISCORD_WEBHOOK}"
+          node scripts/statistics.mjs "${options[@]}"

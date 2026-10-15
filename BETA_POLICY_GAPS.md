@@ -62,7 +62,9 @@ the custom block. `tests/policy/inventoryManager.test.ts` pins the retyping.
 Still open: the **chunk scrubber** keeps world-placed vanilla fences, because `normalizeBlock` treats
 `minecraft:oak_fence` as authentic terrain. A fence generated into the world therefore still cannot
 connect to a `bh:fence` line, which is the only remaining way two fence families can coexist. Decide
-whether the scrubber should convert them.
+whether the scrubber should convert them. The question is Nether-only now (the scrubber is Nether-only,
+since the Overworld ships pre-generated in the world template): an Overworld fence line that predates
+the template is never rewritten at all.
 
 ## 6. Fence connectivity stays in script, deliberately
 
@@ -109,45 +111,21 @@ Still open, and genuinely engine-dependent: the pack's own fishing tables sit at
 override is placed on the vanilla path. Confirm in-game which tables the hook uses, then either move
 these onto the vanilla path or delete them.
 
-## 7. Ore generation (partly resolved — needs an in-game look)
+## 7. Resolved by removal: Overworld generation is vanilla again
 
-Beta 1.7.3 had no emerald (arrived in 1.3) and no copper (1.17), but both still generate on modern
-terrain. Two mechanisms now cover that, deliberately at different layers:
+Emerald (arrived in 1.3) and copper (1.17) are back on the Overworld, and every other generation-side
+override went with them: the stub `features/*.json` (ores, vine, glow lichen, fallen tree, dungeon,
+monster room, sugar cane, grass), the 20 `feature_rules/` that retuned Beta's vein density, and the six
+`bh:beta_*_ore_feature.json` files those rules placed.
 
-- **Generation:** `features/emerald_ore_feature.json`, `copper_ore_feature.json` and
-  `dripstone_caves_copper_ore_feature.json` are inert `ore_feature` stubs, following the same
-  override-by-identifier pattern as the vine, glow-lichen and fallen-tree stubs. This keeps the ores
-  out of *new* chunks instead of generating and then erasing them.
-- **Scrubber (the guaranteed net):** `BLOCK_BULK_REPLACEMENTS` maps `emerald_ore` and
-  `deepslate_emerald_ore` to `minecraft:stone`. The old table sent `emerald_ore` through
-  `normalizeBlock`, which had no entry for it and defaulted to `remove` — every emerald vein in
-  already-generated ground was being scrubbed to **air**, punching ore-shaped holes in terrain.Still engine-dependent: whether a behavior pack's ore-feature stub actually pre-empts vanilla's ore feature rule has to be confirmed in-game, the same caveat the vine/lichen stubs carry. If it does not, the scrubber mapping above is what keeps the world correct.
-
-**Retuned (needs an in-game look).** Vanilla spreads each surviving Beta ore across several modern
-split rules, so overriding one file would only move part of the density. The pack now owns both
-halves:
-
-- `feature_rules/` carries one override per vanilla rule identifier — the primary rule for coal,
-  iron, gold, redstone, diamond and lapis keeps its `minecraft:` identifier and scatters a new
-  `bh:beta_*_ore_feature` with Beta's per-chunk attempt count and height band; the 14 split
-  variants (upper/lower/middle/small/buried/large/square, plus the mesa and mountains specials)
-  are neutered with a biome filter on a tag no biome carries, so nothing double-fires on top of
-  Beta's counts.
-- The six `features/beta_*_ore_feature.json` files set Beta's vein sizes and only replace the
-  stone family, so a vein never eats surface blocks. The numbers: coal 20 attempts × 16 blocks,
-  y 0–128; iron 20 × 8, y 0–64; gold 2 × 8, y 0–32; redstone 8 × 7, y 0–16; diamond 1 × 7,
-  y 0–16; lapis 1 × 6, scattered as a triangle over y 0–32 so it clusters around y16 the way
-  Beta's did. Y-bands are half-open and match Java's `nextInt(max - min) + min` exactly.
-  The height bands and the redstone-8/diamond-1 attempt counts are verified against the
-  pre-Caves-&-Cliffs distribution tables; the 7/7/6 vein sizes for redstone, diamond and lapis
-  are the classic pre-1.8 figures and are the least certain entry here — confirm them in-game.
-
-Three things to confirm in-game, in order of blast radius: (1) that a pack file overriding a
-vanilla feature *rule* by identifier actually replaces it (the recipe and feature stubs rely on
-the same mechanism, but no rule override has been proven yet); (2) that no modern variant rule
-outside the 14 listed in `tests/smoke/fallenTrees.test.ts` still fires — the `/place` command's
-rule list is where those identifiers came from; (3) that the triangle scatter lands lapis's peak
-where intended.
+That is the deliberate consequence of the world template. The Overworld ships pre-generated, so the
+pack stopped shaping Overworld terrain, biomes and ore spread, and a chunk generated past the
+template's edge now carries vanilla decoration, vanilla ore density and the modern dungeon and
+monster-room features the pack used to suppress. The scrubber that was once the catch-up net for
+already-generated ground is Nether-only, and `BLOCK_BULK_REPLACEMENTS` still maps `emerald_ore` and
+`deepslate_emerald_ore` to `minecraft:stone`, but neither ore generates in the Nether, so nothing
+reaches an Overworld vein. Reinstating any of this means reinstating the feature files, not editing a
+table entry.
 
 ## 8. Farmland trampling is re-added by script, and only half of it (needs an in-game look)
 
@@ -231,7 +209,8 @@ item, and mining it pays the two halves back through its loot table.
 Still open: a **vanilla** half never merges with a `bh:` one. The inventory sweep retypes every held
 `*_slab` onto its `bh:` id and the scrubber leaves world-placed `minecraft:*_slab` alone because
 `BETA_BLOCK_IDS` calls it authentic terrain, so the only vanilla halves left are ones a structure,
-an old save or a command placed — the same coexistence §4 describes for fences. Plumbing a mixed pair
+an old save or a command placed — the same coexistence §4 describes for fences. As there, the
+scrubber's half of that is Nether-only: nothing rewrites an Overworld slab any more. Plumbing a mixed pair
 would first have to answer which family the full block belongs to, so the two families stay apart
 until someone decides that.
 

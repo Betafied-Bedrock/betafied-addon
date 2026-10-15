@@ -29,10 +29,12 @@ import {
 import {
   applyManifestVersion,
   applyWelcomeVersion,
+  applyWorldTemplateManifest,
   compareTriples,
   latestReleaseTag,
   nextReleaseVersion,
   versionTriple,
+  worldTemplateManifestProblems,
 } from "./lib/version.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -252,12 +254,26 @@ function packageWorldTemplate(tag, triple, outDir, sources) {
   fs.writeFileSync(path.join(staging, "world_behavior_packs.json"), `${JSON.stringify(bpEntry, null, 4)}\n`);
   fs.writeFileSync(path.join(staging, "world_resource_packs.json"), `${JSON.stringify(rpEntry, null, 4)}\n`);
 
-  const templateManifestPath = path.join(staging, "manifest.json");
-  if (fs.existsSync(templateManifestPath)) {
-    const raw = JSON.parse(fs.readFileSync(templateManifestPath, "utf8"));
-    const updated = applyManifestVersion(raw, triple, { name: `Betafied ${tag}` });
-    fs.writeFileSync(templateManifestPath, `${JSON.stringify(updated, null, 4)}\n`);
+  // The game rewrites a world's icon on every save, so the copy inside `template/` is whatever
+  // was last played rather than the art the release ships. The icon comes from the tracked asset.
+  const worldIcon = path.join(ROOT, "assets", "world_icon.jpeg");
+  if (!fs.existsSync(worldIcon)) {
+    fail("no assets/world_icon.jpeg — the template would ship without a world icon");
   }
+  fs.copyFileSync(worldIcon, path.join(staging, "world_icon.jpeg"));
+
+  const templateManifestPath = path.join(staging, "manifest.json");
+  if (!fs.existsSync(templateManifestPath)) {
+    fail("the template export has no manifest.json — the game never lists a template without one");
+  }
+  const updated = applyWorldTemplateManifest(JSON.parse(fs.readFileSync(templateManifestPath, "utf8")), triple, {
+    name: `Betafied ${tag}`,
+  });
+  const templateProblems = worldTemplateManifestProblems(updated);
+  if (templateProblems.length > 0) {
+    fail(`the world template manifest would not be listed in game: ${templateProblems.join(", ")}`);
+  }
+  fs.writeFileSync(templateManifestPath, `${JSON.stringify(updated, null, 4)}\n`);
 
   const leaked = unwantedPackFiles(staging);
   if (leaked.length > 0) {

@@ -127,7 +127,7 @@ betafied/
 │   ├── BP/                     # Behavior Pack source
 │   │   ├── manifest.json
 │   │   ├── entities/           # Bedrock entity definitions & components
-│   │   ├── biomes/             # Beta biome definitions
+│   │   ├── biomes/             # Nether biome overrides (the Overworld is template-generated)
 │   │   ├── loot_tables/        # Era-accurate loot and mob drop tables
 │   │   └── scripts/            # TypeScript source code (compiled to JS by Regolith)
 │   │       ├── main.ts         # Central entry point (load order is deliberate!)
@@ -135,7 +135,7 @@ betafied/
 │   │       ├── player/         # Food & health, inventory stripping, welcome system
 │   │       ├── combat/         # Armor reduction formula, rapid-fire bow
 │   │       ├── interactions/   # Furnace minecart, boat collision, bonemeal, chests
-│   │       ├── world/          # Chunk scrubber, bedrock floor, void fog, borders
+│   │       ├── world/          # Nether scrubber, void fog, dimension borders
 │   │       └── mobs/           # Beta spawn rules, wander AI, nightmare ambushes
 │   └── RP/                     # Resource Pack source
 │       ├── manifest.json

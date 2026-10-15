@@ -2,6 +2,30 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.9.1 — 2026-10-15
+
+5.9.1 removes the chunk scrubber and the biome and feature overrides for the Overworld, which the world template now supplies. It adds the Discord statistics card and hardens the world template packaging.
+
+### Terrain
+
+- Removed the Overworld chunk scrubber, leaving the Nether sweep and the Nether ice mechanics as they were.
+- Removed the ragged bedrock floor at Y=0 and the fallen-log sweep that ran beside it.
+- Removed the 84 Overworld biome definitions, so biome tags, ore spread and decoration come from the game.
+- Removed the 53 feature overrides and 20 feature rules that suppressed modern decoration and retuned Beta's ore spread, so dungeons, monster rooms, emerald and copper generate again.
+- Kept Beta's grass, foliage and sky colours, which the client biomes and colormaps carry without a biome definition.
+
+### Tooling
+
+- Added a Discord statistics card with all-time downloads, downloads in the past 24 hours and page views for the last 30 days, refreshed hourly.
+- Changed the release post to carry the standing download total beside its download button, and to be edited in place instead of re-posted.
+- Added `npm run stats` to publish or preview both messages by hand.
+- Changed the release workflow to publish its post through the statistics tooling, so one builder owns the button and the total.
+
+### Releases
+
+- Fixed world template packaging shipping a manifest the game will not list, by writing `lock_template_options` and checking the manifest before the template is packed.
+- Changed the world icon to come from `assets/world_icon.jpeg` rather than the copy the last play session left in the template folder.
+
 ## 5.9 — 2026-10-15
 
 5.9 restores native sign editing on ground and walls, packages a ready-to-play world template with releases, isolates the death screen UI from other server forms, and ships Beta's grass and foliage colormaps.

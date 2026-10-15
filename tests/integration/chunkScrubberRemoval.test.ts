@@ -87,8 +87,8 @@ function scrubDimension(blocks: Map<string, RecordedBlock>): TestDimension {
     };
 
     return {
-        id: "minecraft:overworld",
-        heightRange: { min: -64, max: 319 },
+        id: "minecraft:nether",
+        heightRange: { min: 0, max: 127 },
         commands,
         get containsBlockCalls() {
             return containsBlockCalls;
