@@ -50,7 +50,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>Combat & Health</h3>
+      <h3><img src="assets/icons/sword.svg" width="24" height="24" alt="" /> Combat & Health</h3>
       <ul>
         <li><b>Instant Food Healing</b>: Consuming food immediately restores hearts; hunger bar and natural health regeneration are completely removed.</li>
         <li><b>Rapid-Fire Bow</b>: Classic machine-gun bow mechanics without charging time.</li>
@@ -58,7 +58,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
       </ul>
     </td>
     <td width="50%" valign="top">
-      <h3>Classic Mobs & AI</h3>
+      <h3><img src="assets/icons/dog.svg" width="24" height="24" alt="" /> Classic Mobs & AI</h3>
       <ul>
         <li><b>Authentic Pre-1.8 Catalog</b>: Only Beta 1.7.3 creatures roam the world; modern species are culled automatically.</li>
         <li><b>Passive Mob Wandering</b>: Animals roam freely without breeding mechanics or artificial following.</li>
@@ -69,7 +69,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>World Generation & Limits</h3>
+      <h3><img src="assets/icons/earth.svg" width="24" height="24" alt="" /> World Generation & Limits</h3>
       <ul>
         <li><b>Beta Biome Palette</b>: Grass, foliage and sky colours sampled from the era's own climate colormaps.</li>
         <li><b>Nether Scrubber</b>: Dynamically restores modern Nether chunk features back to authentic Beta terrain.</li>
@@ -78,7 +78,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
       </ul>
     </td>
     <td width="50%" valign="top">
-      <h3>Period Mechanics</h3>
+      <h3><img src="assets/icons/tools.svg" width="24" height="24" alt="" /> Period Mechanics</h3>
       <ul>
         <li><b>Furnace Minecarts</b>: Real coal fueling, locomotive puffing, and cart collision impulse physics.</li>
         <li><b>Boat Impacts</b>: Classic wooden boats shatter into wooden planks and sticks upon high-speed collisions.</li>
@@ -89,8 +89,11 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
   </tr>
 </table>
 
-### Transparent Item & Block Normalization
+### <img src="assets/icons/refresh.svg" width="24" height="24" alt="" /> Transparent Item & Block Normalization
 When players pick up, mine, or encounter post-Beta items, blocks, or loot, Betafied's generator-driven normalization pipeline automatically converts them into their closest historical equivalents. Builders and staff can bypass conversion using privileged tags (`builder_exempt`).
+
+### <img src="assets/icons/cloud.svg" width="24" height="24" alt="" /> Something in the Fog...
+> *The changelog will only ever describe it as "something in the fog." Keep your torches lit.*
 
 ---
 
@@ -172,10 +175,10 @@ Betafied is structured into modular subsystems under `packs/BP/scripts/`. TypeSc
 
 ## Community & Support
 
-- 🌐 **Website**: [betafied.net](https://betafied.net)
-- 💬 **Discord**: [Join the Betafied Community](https://discord.gg/BxD7jKs2Rb) — chat with players, report bugs, share builds, and follow development.
-- 🐛 **Bug Tracker**: [GitHub Issues](https://github.com/retrofit-studios/betafied/issues) — report parity discrepancies or engine issues.
-- 📖 **Contributor Guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- <img src="assets/icons/globe.svg" width="24" height="24" alt="" /> **Website**: [betafied.net](https://betafied.net)
+- <img src="assets/icons/message.svg" width="24" height="24" alt="" /> **Discord**: [Join the Betafied Community](https://discord.gg/BxD7jKs2Rb) — chat with players, report bugs, share builds, and follow development.
+- <img src="assets/icons/bug.svg" width="24" height="24" alt="" /> **Bug Tracker**: [GitHub Issues](https://github.com/retrofit-studios/betafied/issues) — report parity discrepancies or engine issues.
+- <img src="assets/icons/book-open.svg" width="24" height="24" alt="" /> **Contributor Guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
@@ -184,14 +187,15 @@ Betafied is structured into modular subsystems under `packs/BP/scripts/`. TypeSc
 - **Origins**: Betafied originated from **cen0b**'s early Bedrock add-on.
 - **Evolution**: Expanded in 2025 by **xzelleiv**, **Arxance**, **uptightsuperlabs**, and contributors across the Bedrock add-on scene.
 - **Version 4.0 Rewrite**: The entire gameplay engine was rebuilt from the ground up on modern Bedrock Script APIs, establishing the current modular architecture.
+- **Icons**: The section icons come from **[pixelarticons](https://pixelarticons.com)** by Gerrit Halfmann, used under the MIT licence.
 
 ---
 
 ## A Note on AI Development
 
-Betafied is developed by a few people in close collaboration with AI coding agents.
+Betafied is a hobby project run by a few people, and like almost every modern codebase it uses agentic coding tools somewhere in the pipeline. Nobody is paid for this work and nothing is sold, so there is nothing to be gained from passing machine output off as hand-written; the aim is to let players who normally can't play Beta 1.7.3 play it in Bedrock.
 
-The agents help write automated test suites, draft changes, and run code-health scans that surface technical debt. Every commit is authored and reviewed by hand, agents do not commit or push independently, and nothing is merged unless the full quality gate (`npm run check`) is green. The AI sometimes writes code, but the behavior it targets comes directly from authentic Minecraft Beta 1.7.3.
+Agents draft code and tests and run code-health scans that surface technical debt. Every commit is authored and reviewed by hand, agents never commit or push on their own, and nothing merges unless the full quality gate (`npm run check`) is green.
 
 ---
 
