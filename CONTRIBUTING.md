@@ -53,13 +53,23 @@ git clone https://github.com/retrofit-studios/betafied.git
 cd betafied
 ```
 
-### 2. Install Node Dependencies
+### 2. Install the Git Hooks
+
+The tracked hooks enforce rules that `.gitignore` cannot: they refuse to commit agent
+instruction files or the local documentation corpus, and they reject agent attribution in a
+commit message.
+
+```bash
+git config core.hooksPath .githooks
+```
+
+### 3. Install Node Dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Install Regolith Filters
+### 4. Install Regolith Filters
 
 Betafied uses Regolith filters (such as `ts_transpiler`) to process TypeScript add-ons:
 
@@ -67,7 +77,7 @@ Betafied uses Regolith filters (such as `ts_transpiler`) to process TypeScript a
 npm run install-filters
 ```
 
-### 4. Configure Your Local Environment (`.env`)
+### 5. Configure Your Local Environment (`.env`)
 
 Copy the template environment file:
 
@@ -117,7 +127,7 @@ betafied/
 │   ├── BP/                     # Behavior Pack source
 │   │   ├── manifest.json
 │   │   ├── entities/           # Bedrock entity definitions & components
-│   │   ├── biomes/             # Beta biome definitions
+│   │   ├── biomes/             # Nether biome overrides (the Overworld is template-generated)
 │   │   ├── loot_tables/        # Era-accurate loot and mob drop tables
 │   │   └── scripts/            # TypeScript source code (compiled to JS by Regolith)
 │   │       ├── main.ts         # Central entry point (load order is deliberate!)
@@ -125,7 +135,7 @@ betafied/
 │   │       ├── player/         # Food & health, inventory stripping, welcome system
 │   │       ├── combat/         # Armor reduction formula, rapid-fire bow
 │   │       ├── interactions/   # Furnace minecart, boat collision, bonemeal, chests
-│   │       ├── world/          # Chunk scrubber, bedrock floor, void fog, borders
+│   │       ├── world/          # Nether scrubber, void fog, dimension borders
 │   │       └── mobs/           # Beta spawn rules, wander AI, nightmare ambushes
 │   └── RP/                     # Resource Pack source
 │       ├── manifest.json

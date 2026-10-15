@@ -1,10 +1,11 @@
 /**
- * Canonical Beta 1.7.3 Overworld biome table.
+ * Canonical Beta 1.7.3 biome climate table.
  *
- * Bedrock cannot reshape terrain from a biome file: the Overworld is carved first and a biome is
- * only painted onto a share of it (surface blocks, climate and tags). What this module therefore
- * controls is which blocks a biome is made of, how cold/wet it is, and which vanilla features and
- * spawn rules its tags unlock. Terrain height, biome size and the classic noise remain engine-side.
+ * The pack defines no Overworld biome any more. The world ships pre-generated in the world template,
+ * so nothing here can shape Overworld terrain, tags or spawning: those come from Bedrock's own biome
+ * definitions. What survives is the half a template cannot carry — the colour a biome renders.
+ * `OVERWORLD_BIOME_PROFILE` maps every vanilla Overworld biome id onto one of Beta's profiles, and
+ * that profile's climate is the coordinate its grass, foliage and sky are read at.
  *
  * Beta 1.7.3 defined ten Overworld biomes in code, but only five ever generated. The Adventure
  * Update's changelog is explicit that Rain Forest, Seasonal Forest, Shrubland, Savanna, Tundra and
@@ -12,136 +13,29 @@
  * Ice Desert and Sky were never reachable at all. That leaves the five real land biomes — Forest,
  * Plains, Desert, Taiga and Swampland — and snowy ground only ever appeared as Taiga.
  *
- * A biome file whose identifier matches a vanilla one replaces that definition outright, so every
- * Bedrock Overworld biome is remapped here onto one of those five. Oceans, beaches and rivers were
- * terrain features in Beta rather than biomes and get dedicated profiles so their surfaces stay
- * era-correct. This table is the single source of truth; `scripts/generate-biomes.mjs` emits the
- * JSON and the smoke test fails if the two drift apart.
+ * The Nether is still generated live, so its five definitions are still emitted from this table by
+ * `scripts/generate-biomes.mjs`; the Overworld half feeds the appearance generators in
+ * `scripts/generate-client-biomes.mjs` and `scripts/generate-colormaps.mjs` only.
  */
-
-const GRASS_SURFACE = Object.freeze({
-    type: "minecraft:overworld",
-    sea_floor_depth: 7,
-    top_material: "minecraft:grass_block",
-    mid_material: "minecraft:dirt",
-    foundation_material: "minecraft:stone",
-    sea_material: "minecraft:water",
-    sea_floor_material: "minecraft:gravel"
-});
-
-const SAND_SURFACE = Object.freeze({
-    type: "minecraft:overworld",
-    sea_floor_depth: 7,
-    top_material: "minecraft:sand",
-    mid_material: "minecraft:sand",
-    foundation_material: "minecraft:sandstone",
-    sea_material: "minecraft:water",
-    sea_floor_material: "minecraft:sand"
-});
-
-const GRAVEL_SURFACE = Object.freeze({
-    type: "minecraft:overworld",
-    sea_floor_depth: 7,
-    top_material: "minecraft:gravel",
-    mid_material: "minecraft:gravel",
-    foundation_material: "minecraft:stone",
-    sea_material: "minecraft:water",
-    sea_floor_material: "minecraft:gravel"
-});
-
-const SEABED_SURFACE = Object.freeze({
-    type: "minecraft:overworld",
-    sea_floor_depth: 7,
-    top_material: "minecraft:dirt",
-    mid_material: "minecraft:dirt",
-    foundation_material: "minecraft:stone",
-    sea_material: "minecraft:water",
-    sea_floor_material: "minecraft:gravel"
-});
-
-const STONE_SURFACE = Object.freeze({
-    type: "minecraft:overworld",
-    sea_floor_depth: 7,
-    top_material: "minecraft:stone",
-    mid_material: "minecraft:stone",
-    foundation_material: "minecraft:stone",
-    sea_material: "minecraft:water",
-    sea_floor_material: "minecraft:gravel"
-});
-
-const SWAMP_SURFACE = Object.freeze({
-    type: "minecraft:swamp",
-    sea_floor_depth: 7,
-    top_material: "minecraft:grass_block",
-    mid_material: "minecraft:dirt",
-    foundation_material: "minecraft:stone",
-    sea_material: "minecraft:water",
-    sea_floor_material: "minecraft:gravel",
-    max_puddle_depth_below_sea_level: 2
-});
 
 /**
- * temperature/downfall are Bedrock's -0.5..2.0 and 0..1 ranges standing in for Beta's temperature
- * and rainfall percentages. Taiga sits at 0.05 so precipitation falls as snow, which is the only
- * way snow appeared on land in Beta; there was no separate tundra biome in practice.
+ * Beta's climate per profile, on Bedrock's -0.5..2.0 temperature and 0..1 downfall ranges, standing
+ * in for Beta's temperature and rainfall percentages. Climate is all that is left here: it is the
+ * coordinate the colormap and the derived tints are read at, so it is what decides the colour a
+ * player sees. Taiga sits at 0.05 so precipitation falls as snow, which is the only way snow
+ * appeared on land in Beta; there was no separate tundra biome in practice.
  */
 export const BETA_PROFILES = Object.freeze({
-    forest: {
-        climate: { temperature: 0.7, downfall: 0.8, snow_accumulation: [0, 0] },
-        surface: GRASS_SURFACE,
-        tags: ["overworld", "monster", "animal", "forest"],
-        creature_spawn_probability: 0.05
-    },
-    plains: {
-        climate: { temperature: 0.8, downfall: 0.4, snow_accumulation: [0, 0] },
-        surface: GRASS_SURFACE,
-        tags: ["overworld", "monster", "animal", "plains"],
-        creature_spawn_probability: 0.05
-    },
-    desert: {
-        climate: { temperature: 2.0, downfall: 0.0, snow_accumulation: [0, 0] },
-        surface: SAND_SURFACE,
-        tags: ["overworld", "monster", "desert"]
-    },
-    taiga: {
-        climate: { temperature: 0.05, downfall: 0.5, snow_accumulation: [0, 0.125] },
-        surface: GRASS_SURFACE,
-        tags: ["overworld", "monster", "animal", "taiga", "forest"],
-        creature_spawn_probability: 0.05
-    },
-    swampland: {
-        climate: { temperature: 0.65, downfall: 0.9, snow_accumulation: [0, 0] },
-        surface: SWAMP_SURFACE,
-        tags: ["overworld", "monster", "animal", "swamp"],
-        creature_spawn_probability: 0.05,
-        humidity: true
-    },
-    ocean: {
-        climate: { temperature: 0.5, downfall: 0.5, snow_accumulation: [0, 0] },
-        surface: SEABED_SURFACE,
-        tags: ["overworld", "monster"]
-    },
-    beach: {
-        climate: { temperature: 0.8, downfall: 0.4, snow_accumulation: [0, 0] },
-        surface: SAND_SURFACE,
-        tags: ["overworld", "monster", "beach"]
-    },
-    gravel_beach: {
-        climate: { temperature: 0.3, downfall: 0.4, snow_accumulation: [0, 0] },
-        surface: GRAVEL_SURFACE,
-        tags: ["overworld", "monster", "beach"]
-    },
-    river: {
-        climate: { temperature: 0.7, downfall: 0.6, snow_accumulation: [0, 0] },
-        surface: GRASS_SURFACE,
-        tags: ["overworld", "monster", "animal"],
-        creature_spawn_probability: 0.05
-    },
-    cave: {
-        climate: { temperature: 0.5, downfall: 0.5, snow_accumulation: [0, 0] },
-        surface: STONE_SURFACE,
-        tags: ["overworld", "monster"]
-    }
+    forest: { climate: { temperature: 0.7, downfall: 0.8, snow_accumulation: [0, 0] } },
+    plains: { climate: { temperature: 0.8, downfall: 0.4, snow_accumulation: [0, 0] } },
+    desert: { climate: { temperature: 2.0, downfall: 0.0, snow_accumulation: [0, 0] } },
+    taiga: { climate: { temperature: 0.05, downfall: 0.5, snow_accumulation: [0, 0.125] } },
+    swampland: { climate: { temperature: 0.65, downfall: 0.9, snow_accumulation: [0, 0] } },
+    ocean: { climate: { temperature: 0.5, downfall: 0.5, snow_accumulation: [0, 0] } },
+    beach: { climate: { temperature: 0.8, downfall: 0.4, snow_accumulation: [0, 0] } },
+    gravel_beach: { climate: { temperature: 0.3, downfall: 0.4, snow_accumulation: [0, 0] } },
+    river: { climate: { temperature: 0.7, downfall: 0.6, snow_accumulation: [0, 0] } },
+    cave: { climate: { temperature: 0.5, downfall: 0.5, snow_accumulation: [0, 0] } }
 });
 
 /**
@@ -260,71 +154,11 @@ export const OVERWORLD_BIOME_PROFILE = Object.freeze({
     sulfur_caves: "cave"
 });
 
-/**
- * Beta's coastlines were mostly sand with the occasional gravel shore, so gravel is a narrow band
- * of noise pinned to sea level rather than a second beach biome. Only profiles that own a waterline
- * receive it: applied to the land biomes it would sprout gravel wherever terrain happens to cross
- * sea level, which turns a lakeside into a quarry.
- */
-export const GRAVEL_BEACH_PROFILES = Object.freeze(["beach", "ocean", "river"]);
-
-const GRAVEL_BEACH_ADJUSTMENT = Object.freeze({
-    materials: { top_material: "minecraft:gravel", sea_floor_material: "minecraft:gravel" },
-    height_range: ["variable.sea_level - 3", "variable.sea_level + 2"],
-    // The same band the Nether's gravel shores use: vanilla hands over the whole lower half of the
-    // noise range, and Beta's gravel was rarer than that.
-    noise_frequency_scale: 0.03125,
-    noise_range: [-1.0, -0.6]
-});
-
 /** Land biomes that actually generated in Beta 1.7.3. */
 export const BETA_LAND_PROFILES = Object.freeze(["forest", "plains", "desert", "taiga", "swampland"]);
 
-/** Surface materials permitted anywhere in a Beta biome definition. */
-export const BETA_SURFACE_MATERIALS = Object.freeze(
-    new Set(["minecraft:grass_block", "minecraft:dirt", "minecraft:stone", "minecraft:sand", "minecraft:sandstone", "minecraft:gravel"])
-);
-
 export function biomeIdentifier(shortId) {
     return `minecraft:${shortId}`;
-}
-
-export function buildBiome(shortId, profileName) {
-    const profile = BETA_PROFILES[profileName];
-    if (!profile) {
-        throw new Error(`Unknown Beta biome profile '${profileName}' for '${shortId}'`);
-    }
-
-    const components = {
-        "minecraft:climate": { ...profile.climate },
-        "minecraft:surface_builder": { builder: { ...profile.surface } },
-        "minecraft:tags": { tags: [...profile.tags] }
-    };
-
-    if (GRAVEL_BEACH_PROFILES.includes(profileName)) {
-        components["minecraft:surface_material_adjustments"] = {
-            adjustments: [copyAdjustment(GRAVEL_BEACH_ADJUSTMENT)]
-        };
-    }
-
-    if (profile.humidity) {
-        components["minecraft:humidity"] = { is_humid: true };
-    }
-    if (profile.creature_spawn_probability !== undefined) {
-        components["minecraft:creature_spawn_probability"] = { probability: profile.creature_spawn_probability };
-    }
-
-    return {
-        // Village generation is gated on the `minecraft:village_type` component, which only takes
-        // effect for biome definitions at format version 1.26.0 or newer. Pinning an older version
-        // drops the biome back to the legacy biome-id village path, where omitting the component
-        // does nothing.
-        format_version: "1.26.0",
-        "minecraft:biome": {
-            description: { identifier: biomeIdentifier(shortId) },
-            components
-        }
-    };
 }
 
 /**

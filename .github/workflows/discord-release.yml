@@ -6,36 +6,51 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to announce (re-posts the announcement, for testing)
+        description: Existing release tag to announce (updates its post, for testing)
         required: true
         type: string
+      dry_run:
+        description: Print the payload instead of posting it
+        required: false
+        default: false
+        type: boolean
 
+# A release reaches two channels: the changelog one gets the notes, and the release one has its
+# single post per mod refreshed. The message id that post is edited by lives on the `stats` branch,
+# which is the only thing these steps write back — never the working branch.
 permissions:
-  contents: read
+  contents: write
 
-# No `username` or `avatar_url` is set on the payload on purpose: Discord then renders the
-# message with the name and icon configured on the webhook itself instead of a GitHub identity.
 jobs:
   announce:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
-      DISCORD_WEBHOOK: ${{ secrets.CHANGELOG_WEBHOOK }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_WEBHOOK: ${{ secrets.RELEASE_WEBHOOK }}
+      CHANGELOG_WEBHOOK: ${{ secrets.CHANGELOG_WEBHOOK }}
     steps:
-      # The embed images are uploaded with the message rather than linked, so the announcement
-      # never depends on an expiring Discord CDN URL. The ref is pinned to the default branch
-      # because a release event otherwise checks out the tag, which need not carry the images.
-      - name: Check out the embed images
-        uses: actions/checkout@v4
+      # Pinned to the default branch rather than the released tag: a release event otherwise checks
+      # out the tag, whose older copy of the script would post a payload the hourly refresh cannot
+      # keep in step with. The changelog embed images come from here for the same reason.
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
 
-      - name: Build the Discord payload from the release notes
+      # The notes go out before the release post, and first for a reason: this step needs nothing
+      # from the statistics tooling, so the announcement of record still lands on a default branch
+      # that has not caught up with it yet.
+      - if: ${{ !inputs.dry_run }}
+        name: Post the release notes to the changelog channel
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           set -euo pipefail
+          if [ -z "${CHANGELOG_WEBHOOK}" ]; then
+            echo "::error::The CHANGELOG_WEBHOOK repository secret is not set."
+            exit 1
+          fi
           gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > release.json
 
           jq '{
@@ -52,17 +67,28 @@ jobs:
             attachments: []
           }' release.json > payload.json
 
-      - name: Post to the Discord changelog webhook
-        run: |
-          set -euo pipefail
-          if [ -z "${DISCORD_WEBHOOK}" ]; then
-            echo "::error::The CHANGELOG_WEBHOOK repository secret is not set."
-            exit 1
-          fi
-          # `payload_json=<file` sends the file's *contents* as a form field; `@file` sends it as
-          # an uploaded file part, which Discord files away as an attachment and renders no embeds.
+          # The embed images are uploaded with the message rather than linked, so the announcement
+          # never depends on an expiring Discord CDN URL. `payload_json=<file` sends the file's
+          # *contents* as a form field; `@file` sends it as an uploaded file part, which Discord
+          # files away as an attachment and renders no embeds.
           curl --fail-with-body --silent --show-error \
             --form "payload_json=<payload.json" \
             --form "files[0]=@assets/discord/changelog.png;type=image/png" \
             --form "files[1]=@assets/discord/divider.png;type=image/png" \
-            "${DISCORD_WEBHOOK}"
+            "${CHANGELOG_WEBHOOK}"
+
+      # The release post is built and published by the statistics tooling, which also refreshes it
+      # hourly: the download total sits in the same message as the download button, so they need one
+      # builder rather than two that drift apart. The channel keeps one post per mod, so this edits
+      # the post it already has and relabels it with the version just released.
+      - name: Refresh the release post
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          options=(--release "${TAG}")
+          if [ "${DRY_RUN}" = "true" ]; then
+            options+=(--dry-run)
+          fi
+          node scripts/statistics.mjs "${options[@]}"

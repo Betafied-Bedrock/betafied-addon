@@ -67,9 +67,9 @@ describe("Heuristic Inverse Normalizer", () => {
             assert.deepEqual(normalizeItem("minecraft:bamboo_fence"), { action: "convert", targetId: "bh:fence" });
 
             // Beta cut one sign from any of its three woods and hung signs separately, so every modern
-            // species lands on the pack's single sign rather than a species of its own.
-            assert.deepEqual(normalizeItem("minecraft:cherry_sign"), { action: "convert", targetId: "bh:oak_sign" });
-            assert.deepEqual(normalizeItem("minecraft:crimson_sign"), { action: "convert", targetId: "bh:oak_sign" });
+            // species lands on the era's single oak sign rather than a species of its own.
+            assert.deepEqual(normalizeItem("minecraft:cherry_sign"), { action: "convert", targetId: "minecraft:oak_sign" });
+            assert.deepEqual(normalizeItem("minecraft:crimson_sign"), { action: "convert", targetId: "minecraft:oak_sign" });
         });
 
         it("sends every placer the era capped at one onto its pack item", () => {

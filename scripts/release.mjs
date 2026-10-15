@@ -12,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // redirect, which makes a stray remote look like a different repository. Pin the canonical
 // name so `gh` cannot resolve a remote to the wrong target; GH_REPO wins because the CLI
 // reads it itself.
-const REPO = process.env.GH_REPO ?? "INFDEV-STUDIOS/betafied";
+const REPO = process.env.GH_REPO ?? "relica-studios/betafied";
 
 const BANNER =
   "> **Note:** **Betafied** brings Minecraft Beta 1.7.3 to Bedrock Edition. When playing on the " +
@@ -20,8 +20,10 @@ const BANNER =
   "automatically upon joining. Download below for use in local **singleplayer** worlds.";
 
 const INSTALL =
-  "### Installation\n\nRun the `.mcaddon` file to install both the Behavior Pack and Resource Pack " +
-  "automatically. No download is needed when playing on the Betafied server.";
+  "### Installation\n\n" +
+  "- **New World:** Download and open the `.mctemplate` file to create a ready-to-play Betafied world with packs pre-configured.\n" +
+  "- **Existing Worlds:** Run the `.mcaddon` file to install both the Behavior Pack and Resource Pack automatically.\n\n" +
+  "No download is needed when playing on the Betafied server.";
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
@@ -47,15 +49,52 @@ function ghSucceeds(commandArgs) {
   }
 }
 
-/** The built pack assets for a version: `build/<version>/*.mcaddon` and `*.mcpack`. */
-function packAssets(version) {
+/** The built pack assets for a version: `build/<version>/*.mcaddon` and `*.mctemplate`. */
+export function packAssets(version) {
   const dir = path.join(ROOT, "build", version);
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
-    .filter((name) => /\.(mcaddon|mcpack)$/i.test(name))
+    .filter((name) => /\.(mcaddon|mctemplate)$/i.test(name))
     .sort()
     .map((name) => path.join(dir, name));
+}
+
+/**
+ * Prune `.mctemplate` assets from previous GitHub releases so only the latest release
+ * carries the large world template file.
+ */
+export function prunePreviousTemplateAssets(currentTag, dryRun = false) {
+  let releases;
+  try {
+    const raw = gh(["api", `repos/${REPO}/releases?per_page=30`]);
+    releases = JSON.parse(raw);
+  } catch (err) {
+    console.warn(`release: warning: could not query releases from GitHub API: ${err.message}`);
+    return;
+  }
+
+  if (!Array.isArray(releases)) return;
+
+  for (const release of releases) {
+    if (release.tag_name === currentTag) continue;
+    if (!Array.isArray(release.assets)) continue;
+
+    for (const asset of release.assets) {
+      if (asset.name?.toLowerCase().endsWith(".mctemplate")) {
+        if (dryRun) {
+          console.log(`release: would delete previous template asset '${asset.name}' from release '${release.tag_name}'`);
+        } else {
+          try {
+            gh(["release", "delete-asset", release.tag_name, asset.name, "--yes"]);
+            console.log(`release: deleted previous template asset '${asset.name}' from release '${release.tag_name}'`);
+          } catch (err) {
+            console.warn(`release: warning: failed to delete '${asset.name}' from release '${release.tag_name}': ${err.message}`);
+          }
+        }
+      }
+    }
+  }
 }
 
 function main() {
@@ -75,7 +114,7 @@ function main() {
 
   const assets = packAssets(version);
   if (assets.length === 0) {
-    fail(`no .mcaddon/.mcpack assets in build/${version}/ — run the build and package the pack first`);
+    fail(`no .mcaddon/.mctemplate assets in build/${version}/ — run the build and package the pack first`);
   }
 
   const title = `Betafied ${version}`;
@@ -85,6 +124,7 @@ function main() {
     console.log(`release: dry run for ${tag} (${assets.length} asset(s))`);
     for (const asset of assets) console.log(`   ${path.relative(ROOT, asset)}`);
     console.log(`\n--- notes ---\n${body}`);
+    prunePreviousTemplateAssets(tag, true);
     return;
   }
 
@@ -97,6 +137,10 @@ function main() {
     gh(["release", "create", tag, "--title", title, "--notes", body, ...assets]);
     console.log(`release: created ${title} with ${assets.length} asset(s)`);
   }
+
+  prunePreviousTemplateAssets(tag, false);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

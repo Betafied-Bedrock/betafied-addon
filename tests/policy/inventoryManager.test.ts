@@ -194,7 +194,6 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
 
     describe("Capped Item Unstacking", () => {
         const cappedPairs = [
-            ["minecraft:oak_sign", "bh:oak_sign"],
             ["minecraft:cake", "bh:cake"]
         ] as const;
 
@@ -257,6 +256,22 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             assert.equal(inv.getItem(3), undefined);
         });
 
+        it("holds a vanilla sign stack to one per slot without changing what the sign is", () => {
+            const stacked = evaluateItemAction(new ItemStack("minecraft:oak_sign", 3));
+
+            assert.equal(stacked.type, "unstack_utility");
+            if (stacked.type === "unstack_utility") {
+                assert.equal(stacked.targetId, "minecraft:oak_sign");
+                assert.equal(stacked.totalAmount, 3);
+            }
+
+            assert.equal(
+                evaluateItemAction(new ItemStack("minecraft:oak_sign", 1)).type,
+                "keep",
+                "a lone sign stays the engine's own item"
+            );
+        });
+
         it("spreads a swept vanilla sign stack one per slot", () => {
             const player = new Player();
             player.name = "SignSteve";
@@ -270,7 +285,7 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             sweepInventory(player);
 
             for (const slot of [0, 1, 2]) {
-                assert.equal(inv.getItem(slot)?.typeId, "bh:oak_sign");
+                assert.equal(inv.getItem(slot)?.typeId, "minecraft:oak_sign");
                 assert.equal(inv.getItem(slot)?.amount, 1, `slot ${slot} must hold one sign`);
             }
             assert.equal(inv.getItem(3), undefined);

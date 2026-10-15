@@ -1,6 +1,7 @@
 import { Direction } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { BETA_FLOOR_Y, BETA_HEIGHT_LIMIT, OVERWORLD_ID } from "../core/betaConstants.js";
+import { BETA_BED_BLOCK_IDS, BETA_SIGN_BLOCK_IDS } from "../core/betaRegistry.js";
 
 // Beta 1.7.3 bedrock floor veto at Y=0.
 eventBus.onPlayerBreakBlockBefore((event) => {
@@ -15,7 +16,17 @@ eventBus.onPlayerBreakBlockBefore((event) => {
 
 eventBus.onPlayerInteractWithBlock((event) => {
     try {
-        const { player, block, blockFace } = event;
+        const { player, block, blockFace, itemStack } = event;
+
+        // The ceiling is a veto on building, and neither an empty hand, a sign already standing nor
+        // a bed builds anything: cancelling a sign's click would swallow the text editor, and a
+        // bed's is the sleep that sets the spawn.
+        if (
+            !itemStack ||
+            BETA_SIGN_BLOCK_IDS.has(block.typeId) ||
+            BETA_BED_BLOCK_IDS.has(block.typeId)
+        ) return;
+
         let targetY = block.location.y;
         if (blockFace === Direction.Up) {
             targetY++;

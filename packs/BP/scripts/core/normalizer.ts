@@ -1,5 +1,5 @@
 import {
-    BH_BOW_ID, BH_CAKE_ID, BH_CHEST_ID, BH_FENCE_ID, BH_SIGN_ID, BH_WOODEN_DOOR_ID,
+    BH_BOW_ID, BH_CAKE_ID, BH_CHEST_ID, BH_FENCE_ID, BH_WOODEN_DOOR_ID,
     BETA_CAPPED_ITEM_OF, isBetaBlock, isBetaItem, isVanillaId, WOOD_SPECIES
 } from "./betaRegistry.js";
 
@@ -88,7 +88,7 @@ const SIMPLE_WOOD_ITEMS: Readonly<Record<string, string>> = Object.freeze({
     _leaves: "minecraft:oak_leaves",
     _door: BH_WOODEN_DOOR_ID,
     _trapdoor: "minecraft:trapdoor",
-    _sign: BH_SIGN_ID,
+    _sign: "minecraft:oak_sign",
     _boat: "minecraft:boat",
     _sapling: "minecraft:oak_sapling"
 });
@@ -159,10 +159,6 @@ export function resolvePlacerReplacement(id: string): string | undefined {
 
     if (bareId.endsWith("_door")) {
         return BETA_CAPPED_ITEM_OF[id] ?? BH_WOODEN_DOOR_ID;
-    }
-
-    if (bareId.endsWith("_sign")) {
-        return BH_SIGN_ID;
     }
 
     if (bareId === "cake") {

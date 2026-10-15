@@ -68,23 +68,83 @@ describe("Beta death screen - resource pack contract", () => {
         assert.equal(screenControl.$screen_bg_content, "bfui-death_screen.screen_underlay");
     });
 
-    it("keeps the factory and replaces only the tree behind it", () => {
+    it("keeps the factory's data context, but points it at a control of its own", () => {
         const content = serverForm.main_screen_content;
         assert.deepEqual(content.size, ["100%", "100%"]);
 
         const factory = content.controls[0].server_form_factory;
         assert.equal(factory.type, "factory");
         assert.deepEqual(factory.control_ids, {
-            long_form: "@server_form.long_form",
+            long_form: "@bfui-death_screen.form_root",
             custom_form: "@server_form.custom_form"
         });
+    });
 
-        const longForm = serverForm.long_form;
-        assert.deepEqual(longForm.size, ["100%", "100%"]);
-        assert.equal(longForm.layer, 2);
-        assert.ok(
-            longForm.controls.some((control: any) => "death_screen@bfui-death_screen.root_panel" in control),
-            "long_form is where the death screen tree is mounted"
+    // `server_form.long_form` is the engine's own name for the tree every ActionFormData in the game is
+    // drawn through, and another pack's form router legitimately owns it. Redefining it here is what put
+    // the death screen on top of every other pack's form; the router below is the death screen's, and
+    // everything else has to reach the name untouched.
+    it("leaves the engine's long_form name to whoever else defines it", () => {
+        assert.equal(serverForm.long_form, undefined, "the pack must not claim server_form.long_form");
+
+        const fallback = screen.form_root.controls.find((control: any) => "other_form@server_form.long_form" in control);
+        assert.ok(fallback, "every other form has to be handed on to server_form.long_form");
+    });
+
+    it("shows the death tree only for the death form, and hands every other title on", () => {
+        const root = screen.form_root;
+        assert.deepEqual(root.size, ["100%", "100%"]);
+        assert.equal(root.layer, 2, "the content's own layer is what puts it above the background slot");
+        assert.equal(
+            root.$death_title,
+            DEATH_SCREEN_COPY.title,
+            "the router keys on the title the script sends, so the two cannot drift"
+        );
+
+        const death = root.controls.find((control: any) => "death_screen@bfui-death_screen.root_panel" in control);
+        assert.ok(death, "the death screen tree lives in the router");
+        assert.deepEqual(death["death_screen@bfui-death_screen.root_panel"].bindings, [
+            {
+                binding_type: "view",
+                source_property_name: "(#title_text = $death_title)",
+                target_property_name: "#visible"
+            },
+            { binding_type: "view", source_property_name: "#visible", target_property_name: "#enabled" }
+        ]);
+
+        const other = root.controls.find((control: any) => "other_form@server_form.long_form" in control);
+        assert.deepEqual(other["other_form@server_form.long_form"].bindings, [
+            {
+                binding_type: "view",
+                source_property_name: "(not (#title_text = $death_title))",
+                target_property_name: "#visible"
+            },
+            { binding_type: "view", source_property_name: "#visible", target_property_name: "#enabled" }
+        ]);
+    });
+
+    // The background slot is shared by every form the screen draws, modal forms included, so the wash and
+    // the redrawn HUD can only exist for the death form's own title. Left unset, the slot's `common.base_screen`
+    // default is an empty panel - which is the whole background vanilla's `third_party_server_screen` has.
+    it("draws the wash and the redrawn HUD for the death form only", () => {
+        const underlay = screen.screen_underlay;
+        assert.equal(underlay.$death_title, DEATH_SCREEN_COPY.title);
+
+        const names = underlay.controls.map((control: any) => Object.keys(control)[0]);
+        assert.deepEqual(names, ["death_underlay"]);
+
+        const deathUnderlay = underlay.controls[0].death_underlay;
+        assert.deepEqual(deathUnderlay.bindings, [
+            {
+                binding_type: "view",
+                source_property_name: "(#title_text = $death_title)",
+                target_property_name: "#visible"
+            }
+        ]);
+        assert.deepEqual(
+            deathUnderlay.controls.map((control: any) => Object.keys(control)[0]),
+            ["hud@bfui-death_screen.hud", "wash@bfui-death_screen.wash"],
+            "the era's paint order: the HUD, then the wash over it"
         );
     });
 
@@ -227,7 +287,7 @@ describe("Beta death screen - resource pack contract", () => {
         const names = controls.map((control: any) => Object.keys(control)[0]);
         assert.equal(names[0], "hotbar@bfui-death_screen.hotbar");
 
-        const underlay = screen.screen_underlay.controls.map((control: any) => Object.keys(control)[0]);
+        const underlay = screen.screen_underlay.controls[0].death_underlay.controls.map((control: any) => Object.keys(control)[0]);
         assert.deepEqual(underlay, ["hud@bfui-death_screen.hud", "wash@bfui-death_screen.wash"]);
 
         for (const name of ["title@bfui-death_screen.title", "button_layout@bfui-death_screen.button_layout"]) {

@@ -1,0 +1,39 @@
+name: Publish statistics on Discord
+
+# Runs from the default branch only, which is how `schedule` works: the hourly reading is the
+# default branch's copy of this file, whatever else the repository is doing.
+on:
+  schedule:
+    # Off the hour on purpose — GitHub queues scheduled runs and delays the busiest minutes, so a
+    # run at :00 is the one that gets dropped when the queue is long.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+# The readings and the message ids accumulate on a `stats` branch, which is the one thing here that
+# writes; nothing in this workflow touches the working branch.
+permissions:
+  contents: write
+
+# Two runs at once would each read the same state blob and the later one would write back from a
+# stale sha, losing the other's readings. Queue them instead of cancelling.
+concurrency:
+  group: discord-statistics
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      STATISTICS_WEBHOOK: ${{ secrets.STATISTICS_WEBHOOK }}
+      RELEASE_WEBHOOK: ${{ secrets.RELEASE_WEBHOOK }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Both messages are edited in place rather than re-posted, so a channel keeps one card.
+      - name: Publish the statistics card and the download counter
+        run: node scripts/statistics.mjs

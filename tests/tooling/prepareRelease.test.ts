@@ -13,10 +13,12 @@ import {
 import {
   applyManifestVersion,
   applyWelcomeVersion,
+  applyWorldTemplateManifest,
   compareTriples,
   latestReleaseTag,
   nextReleaseVersion,
-  versionTriple
+  versionTriple,
+  worldTemplateManifestProblems
 } from "../../scripts/lib/version.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -96,6 +98,58 @@ describe("Version carriers", () => {
   });
 });
 
+describe("World template icon", () => {
+  it("ships the tracked world icon, since the game overwrites the one inside a played world", () => {
+    const icon = fs.readFileSync(path.join(ROOT, "assets", "world_icon.jpeg"));
+
+    assert.equal(icon.subarray(0, 2).toString("hex"), "ffd8", "world_icon.jpeg must be a JPEG");
+    assert.ok(icon.length > 1024, "a file this small is a placeholder, not the shipped icon");
+  });
+});
+
+describe("World template manifest", () => {
+  const template = {
+    format_version: 2,
+    header: {
+      name: "Betafied 5.4",
+      description: "Betafied recreates Minecraft Beta 1.7.3 in Bedrock Edition.",
+      uuid: "4c6e0bf1-5dfa-45c5-bf6e-6c61f2f81490",
+      version: [5, 4, 0]
+    },
+    modules: [{ type: "world_template", uuid: "7c5e2365-2766-4c4b-b0b3-f72534594619", version: [5, 4, 0] }]
+  };
+
+  it("carries lock_template_options, without which the engine drops the whole template", () => {
+    const updated = applyWorldTemplateManifest(template, [5, 5, 0], { name: "Betafied 5.5" });
+
+    assert.equal(updated.header.lock_template_options, false, "the template is never listed without this field");
+    assert.equal(updated.header.name, "Betafied 5.5");
+    assert.deepEqual(worldTemplateManifestProblems(updated), []);
+  });
+
+  it("keeps an explicit lock_template_options rather than forcing one", () => {
+    const locked = applyWorldTemplateManifest(
+      { ...template, header: { ...template.header, lock_template_options: true } },
+      [5, 5, 0]
+    );
+
+    assert.equal(locked.header.lock_template_options, true);
+  });
+
+  it("names everything that would keep the template out of the Create New list", () => {
+    const problems = worldTemplateManifestProblems({ format_version: 2, header: { name: "x" }, modules: [] });
+
+    assert.ok(problems.some((problem) => problem.includes("header.uuid")));
+    assert.ok(problems.some((problem) => problem.includes("header.lock_template_options")));
+    assert.ok(problems.some((problem) => problem.includes("world_template module")));
+    assert.deepEqual(
+      worldTemplateManifestProblems({ ...applyWorldTemplateManifest(template, [5, 4, 0]), format_version: 3 }),
+      ["format_version must be 2, not 3"],
+      "an otherwise valid template reports only what is actually wrong with it"
+    );
+  });
+});
+
 describe("Changelog preparation", () => {
   const markdown = "# Changelog\n\nIntro that belongs to no release.\n\n## 5.4 — 2026-10-10\n\nNotes.\n";
 
@@ -160,6 +214,20 @@ describe("Every version carrier in the checkout agrees", () => {
       .forEach((dependency: any) => check(`packs/BP dependency ${dependency.uuid}`, dependency.version));
     check("packs/RP manifest header", resource.header.version);
     resource.modules.forEach((module: any, index: number) => check(`packs/RP module ${index}`, module.version));
+
+    if (fs.existsSync(path.join(ROOT, "template/manifest.json"))) {
+      const templateManifest = JSON.parse(fs.readFileSync(path.join(ROOT, "template/manifest.json"), "utf8"));
+      check("template manifest header", templateManifest.header?.version);
+      templateManifest.modules?.forEach((module: any, index: number) =>
+        check(`template module ${index}`, module.version)
+      );
+      assert.equal(templateManifest.modules?.[0]?.type, "world_template");
+      assert.equal(
+        templateManifest.header?.lock_template_options,
+        false,
+        "a world template needs this header field or the game never lists it"
+      );
+    }
 
     assert.deepEqual(mismatches, [], "a release that bumps only some carriers ships a pack the engine will ignore");
     assert.ok(

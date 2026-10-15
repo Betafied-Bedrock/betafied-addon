@@ -183,15 +183,21 @@ export function toArgbBuffer(decoded) {
 }
 
 /**
- * Reproduce one Beta colorizer lookup. Inputs are temperature and humidity in 0..1; values outside
- * that would index off the end of the buffer in Java, so they are clamped rather than trusted.
+ * The colormap pixel a climate addresses. Inputs are temperature and rainfall in 0..1; values
+ * outside that would index off the end of the buffer in Java, so they are clamped rather than
+ * trusted. Rainfall is folded into humidity first, exactly as the engine did, which is why every
+ * address lands on or below the image's main diagonal.
  */
+export function colormapCoordinate(temperature, rainfall) {
+    const t = Math.min(1, Math.max(0, temperature));
+    const h = Math.min(1, Math.max(0, rainfall)) * t;
+    return { x: Math.trunc((1 - t) * 255), y: Math.trunc((1 - h) * 255) };
+}
+
+/** Reproduce one Beta colorizer lookup. */
 export function createColorizer(argbBuffer) {
-    return (temperature, humidity) => {
-        const t = Math.min(1, Math.max(0, temperature));
-        const h = Math.min(1, Math.max(0, humidity)) * t;
-        const x = Math.trunc((1 - t) * 255);
-        const y = Math.trunc((1 - h) * 255);
+    return (temperature, rainfall) => {
+        const { x, y } = colormapCoordinate(temperature, rainfall);
         return argbBuffer[(y << 8) | x];
     };
 }

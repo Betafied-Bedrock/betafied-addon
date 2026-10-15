@@ -6,10 +6,10 @@
     },
     "components": {
       "minecraft:grass_appearance": {
-        "color": "#89BA6F"
+        "color": "#8EB971"
       },
       "minecraft:foliage_appearance": {
-        "color": "#6CA84B"
+        "color": "#71A74D"
       },
       "minecraft:sky_color": {
         "sky_color": "#7BA5FF"

@@ -14,35 +14,40 @@ function captureWarnings(): { lines: string[]; restore: () => void } {
     return { lines, restore: () => { console.warn = original; } };
 }
 
+interface ChunkVisit {
+    visited: string[];
+    fills: string[];
+}
+
+function chunkKey(volume: { from: { x: number; z: number } }): string {
+    return `${volume.from.x / 16},${volume.from.z / 16}`;
+}
+
 /**
- * Minimal dimension stub for the scan loop. The floor seal only needs runCommand, and the fine sweep
- * needs to answer "is there anything to inspect" - saying no everywhere lets one pass finish so the
- * order of the chunks can be read straight off the fill commands.
+ * Minimal dimension stub for the scan loop. The fine sweep is the only pass the scrubber still makes,
+ * and it queries one volume per band per chunk, so a chunk it claims shows up as one entry in
+ * `visited`. Answering "the chunk holds nothing to scrub" everywhere keeps a pass short enough that
+ * the visit order can be read straight off that list.
  */
 function scanDimension(
-    commands: string[],
-    isUnloaded: (location: { x: number; y: number; z: number }) => boolean = () => false
+    log: ChunkVisit,
+    isUnloaded: (location: { x: number; y: number; z: number }) => boolean = () => false,
+    id = "minecraft:nether"
 ) {
     return {
-        id: "minecraft:overworld",
-        heightRange: { min: -64, max: 319 },
-        fillBlocks(
-            volume: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } },
-            block: string
-        ) {
-            const { from, to } = volume;
-            commands.push(`fill ${from.x} ${from.y} ${from.z} ${to.x} ${to.y} ${to.z} ${block}`);
+        id,
+        heightRange: { min: 0, max: 127 },
+        fillBlocks(volume: { from: { x: number; y: number; z: number }; to: { x: number; y: number; z: number } }, block: string) {
+            log.fills.push(`fill ${volume.from.x} ${volume.from.y} ${volume.from.z} ${block}`);
         },
         isChunkLoaded(location: { x: number; y: number; z: number }) {
             return !isUnloaded(location);
         },
-        containsBlock(_volume: unknown, filter?: { excludeTypes?: string[] }) {
-            // The seal probe asks for anything that is not bedrock in the Y=0 layer. Report the base as
-            // unsealed so every pass lays its floor and the visit order can be read off the fills; every
-            // other probe (the bulk table, the fallen-log scan) still answers "nothing present".
-            return Boolean(filter?.excludeTypes?.includes("minecraft:bedrock"));
+        containsBlock() {
+            return false;
         },
-        getBlocks() {
+        getBlocks(volume: { from: { x: number; y: number; z: number } }) {
+            log.visited.push(chunkKey(volume));
             return { getBlockLocationIterator: () => ([] as { x: number; y: number; z: number }[])[Symbol.iterator]() };
         },
         getBlock() {
@@ -57,14 +62,8 @@ function drain(job: Generator<void, void, unknown>): void {
     }
 }
 
-/** The base seal is the only fill that spans a single Y=0 layer; the bumps all sit above it. */
-function baseChunks(commands: string[]): Set<string> {
-    return new Set(
-        commands
-            .map(command => command.split(" "))
-            .filter(parts => parts[0] === "fill" && parts[2] === "0" && parts[5] === "0")
-            .map(parts => `${Number(parts[1]) / 16},${Number(parts[3]) / 16}`)
-    );
+function visitedChunks(log: ChunkVisit): Set<string> {
+    return new Set(log.visited);
 }
 
 describe("Chunk scrubber - visit order", () => {
@@ -79,9 +78,9 @@ describe("Chunk scrubber - visit order", () => {
         warnings.restore();
     });
 
-    it("seals the player's own chunk before the ring around it", () => {
-        const commands: string[] = [];
-        const dimension = scanDimension(commands);
+    it("visits the player's own chunk before the ring around it", () => {
+        const log: ChunkVisit = { visited: [], fills: [] };
+        const dimension = scanDimension(log);
 
         mockPlayers.push({
             isValid: true,
@@ -92,24 +91,25 @@ describe("Chunk scrubber - visit order", () => {
         drain(chunkScanJob());
 
         assert.equal(
-            commands[0],
-            "fill -48 0 0 -33 0 15 minecraft:bedrock",
-            `expected the player's own chunk first, got: ${commands.slice(0, 2).join(" | ")}`
+            log.visited[0],
+            "-3,0",
+            `expected the player's own chunk first, got: ${log.visited.slice(0, 2).join(" | ")}`
         );
+        assert.deepEqual(log.fills, [], "a chunk that holds nothing to scrub must not be filled against");
     });
 
-    it("seals the ring around the player's own chunk", () => {
-        const commands: string[] = [];
-        const dimension = scanDimension(commands);
+    it("sweeps the ring around the player's own chunk", () => {
+        const log: ChunkVisit = { visited: [], fills: [] };
+        const dimension = scanDimension(log);
 
-        // Far from the previous case's chunk so no seal is already marked done.
+        // Far from the previous case's chunk so no visit is already marked done.
         mockPlayers.push({
             isValid: true,
             location: { x: 1000, y: 13, z: 1000 },
             dimension
         } as never);
 
-        // One chunk is sealed per pass, so the whole neighbourhood takes one pass per chunk.
+        // One chunk is swept per pass, so the whole neighbourhood takes one pass per chunk.
         for (let pass = 0; pass < 9; pass++) {
             drain(chunkScanJob());
         }
@@ -117,33 +117,34 @@ describe("Chunk scrubber - visit order", () => {
         const playerChunkX = Math.floor(1000 / 16);
         const playerChunkZ = Math.floor(1000 / 16);
 
-        const sealed = baseChunks(commands);
+        const visited = visitedChunks(log);
 
-        assert.equal(sealed.size, 9, `expected a 3x3 neighbourhood, got ${sealed.size}: ${[...sealed].join(" ")}`);
+        assert.equal(visited.size, 9, `expected a 3x3 neighbourhood, got ${visited.size}: ${[...visited].join(" ")}`);
 
         for (let dx = -1; dx <= 1; dx++) {
             for (let dz = -1; dz <= 1; dz++) {
                 assert.ok(
-                    sealed.has(`${playerChunkX + dx},${playerChunkZ + dz}`),
-                    `expected chunk ${dx},${dz} to be sealed`
+                    visited.has(`${playerChunkX + dx},${playerChunkZ + dz}`),
+                    `expected chunk ${dx},${dz} to be swept`
                 );
             }
         }
     });
 
     it("reports a refused fine query once for the whole neighbourhood", () => {
-        const commands: string[] = [];
-        const dimension = scanDimension(commands);
+        const log: ChunkVisit = { visited: [], fills: [] };
+        const dimension = scanDimension(log);
         // The engine refuses the volume query on every band of every chunk. Reported per chunk that
         // was nine lines per neighbourhood sweep, forever; the refusal is one condition about the
         // engine, so it is one line.
-        dimension.getBlocks = () => {
+        dimension.getBlocks = (volume: { from: { x: number; y: number; z: number } }) => {
+            log.visited.push(chunkKey(volume));
             throw new Error("the volume query is unavailable");
         };
 
         mockPlayers.push({ isValid: true, location: { x: 3000, y: 13, z: 3000 }, dimension } as never);
 
-        // One chunk is sealed per pass, so the neighbourhood takes one pass per chunk.
+        // One chunk is swept per pass, so the neighbourhood takes one pass per chunk.
         for (let pass = 0; pass < 9; pass++) {
             drain(chunkScanJob());
         }
@@ -154,36 +155,36 @@ describe("Chunk scrubber - visit order", () => {
             `expected one line for nine chunks, got: ${warnings.lines.join(" | ")}`
         );
         // The sweep still did its work; silencing the report must not be done by skipping the pass.
-        assert.equal(baseChunks(commands).size, 9, "the whole neighbourhood must still be sealed");
+        assert.equal(visitedChunks(log).size, 9, "the whole neighbourhood must still be swept");
     });
 
     it("moves on while the chunk under the player is still mid-sweep", () => {
-        const commands: string[] = [];
-        const dimension = scanDimension(commands);
+        const log: ChunkVisit = { visited: [], fills: [] };
+        const dimension = scanDimension(log);
         mockPlayers.push({ isValid: true, location: { x: 2000, y: 13, z: 2000 }, dimension } as never);
 
         // A sweep yields mid-chunk, so the scheduler's next pass starts while this one still owns its
-        // chunk. It must claim the next one instead of re-sealing the same ground.
+        // chunk. It must claim the next one instead of re-sweeping the same ground.
         const first = chunkScanJob();
         first.next();
 
-        const before = commands.length;
+        const before = log.visited.length;
         drain(chunkScanJob());
 
         assert.notEqual(
-            commands[before],
-            commands[0],
-            `the second pass re-sealed the first pass's chunk: ${commands[before]}`
+            log.visited[before],
+            log.visited[0],
+            `the second pass re-swept the first pass's chunk: ${log.visited[before]}`
         );
     });
 
     it("reaches past a neighbour that is not loaded yet", () => {
-        const commands: string[] = [];
+        const log: ChunkVisit = { visited: [], fills: [] };
         const centerX = 150;
         const centerZ = 150;
         const westX = (centerX - 1) * 16;
 
-        const dimension = scanDimension(commands, location => location.x === westX && location.z === centerZ * 16);
+        const dimension = scanDimension(log, location => location.x === westX && location.z === centerZ * 16);
         mockPlayers.push({
             isValid: true,
             location: { x: centerX * 16 + 8, y: 13, z: centerZ * 16 + 8 },
@@ -193,10 +194,25 @@ describe("Chunk scrubber - visit order", () => {
         drain(chunkScanJob()); // the player's own chunk
         drain(chunkScanJob()); // the west neighbour is unloaded, so the pass must reach the next one
 
-        const sealed = baseChunks(commands);
+        const visited = visitedChunks(log);
 
-        assert.ok(sealed.has(`${centerX},${centerZ}`), "the player's chunk must be sealed");
-        assert.ok(sealed.has(`${centerX},${centerZ - 1}`), "the pass must reach past the unloaded neighbour");
-        assert.ok(!sealed.has(`${centerX - 1},${centerZ}`), "an unloaded neighbour must not be filled against");
+        assert.ok(visited.has(`${centerX},${centerZ}`), "the player's chunk must be swept");
+        assert.ok(visited.has(`${centerX},${centerZ - 1}`), "the pass must reach past the unloaded neighbour");
+        assert.ok(!visited.has(`${centerX - 1},${centerZ}`), "an unloaded neighbour must not be read");
+    });
+
+    it("leaves the Overworld and the End alone", () => {
+        for (const id of ["minecraft:overworld", "minecraft:the_end"]) {
+            const log: ChunkVisit = { visited: [], fills: [] };
+            mockPlayers.length = 0;
+            mockPlayers.push({ isValid: true, location: { x: 0, y: 13, z: 0 }, dimension: scanDimension(log, undefined, id) } as never);
+
+            for (let pass = 0; pass < 9; pass++) {
+                drain(chunkScanJob());
+            }
+
+            // The Overworld ships pre-generated in the world template, so the sweep is Nether-only.
+            assert.deepEqual(log.visited, [], `${id} must not be swept`);
+        }
     });
 });

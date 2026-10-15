@@ -5,7 +5,7 @@ import { BLOCK_BULK_REPLACEMENTS, BLOCK_FINE_REPLACEMENTS } from "../core/compat
 import { normalizeBlock } from "../core/normalizer.js";
 import { reportError } from "../core/errorReporter.js";
 import { tickManager } from "../core/tickManager.js";
-import { BETA_FLOOR_Y, OVERWORLD_ID } from "../core/betaConstants.js";
+import { NETHER_ID } from "../core/betaConstants.js";
 
 const SCRUB_DUE_AT = new Map<string, number>();
 const MAX_TRACKED_CHUNKS = 8192;
@@ -39,25 +39,6 @@ function reverifyOffset(key: string): number {
     return (hash >>> 0) % REVERIFY_SPREAD_TICKS;
 }
 
-const BETA_FLOOR_LAYERS = 2;
-
-/** Filter for horizontal logs (modern fallen trees). */
-function buildHorizontalLogFilter(): BlockFilter {
-    const includePermutations: BlockPermutation[] = [];
-    for (const type of ["minecraft:oak_log", "minecraft:birch_log", "minecraft:spruce_log"]) {
-        for (const axis of ["x", "z"]) {
-            try {
-                includePermutations.push(BlockPermutation.resolve(type, { pillar_axis: axis }));
-            } catch {
-                // Log type or axis permutation unavailable in current engine build.
-            }
-        }
-    }
-    return Object.freeze({ includePermutations });
-}
-
-const HORIZONTAL_LOG_FILTER: BlockFilter = buildHorizontalLogFilter();
-
 /** Filter for authentic Beta blocks preserved by fine pass volume queries. */
 function buildUntouchedFilter(): BlockFilter {
     const excludeTypes: string[] = [];
@@ -86,9 +67,6 @@ function buildUntouchedFilter(): BlockFilter {
 }
 
 const UNTOUCHED_FILTER: BlockFilter = buildUntouchedFilter();
-
-/** Filter to test if floor is already sealed with bedrock. */
-const NOT_BEDROCK_FILTER: BlockFilter = Object.freeze({ excludeTypes: ["minecraft:bedrock"] });
 
 const PLANKS_TARGET = BLOCK_BULK_REPLACEMENTS.find(([target]) => target.endsWith("_planks"))?.[1] ?? "minecraft:planks";
 
@@ -190,81 +168,6 @@ function fill(dim: Dimension, x1: number, y1: number, z1: number, x2: number, y2
         );
     } catch {
         // Outside loaded chunks; retried on later pass.
-    }
-}
-
-function floorNoise(cx: number, cz: number, gx: number, gz: number): number {
-    let h = (cx * 374761393 + cz * 668265263 + gx * 1274126177 + gz * 1013904223) | 0;
-    h = (h ^ (h >>> 13)) * 1274126177;
-    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-function floorHeight(noise: number): number {
-    if (noise < 0.3) return 0;
-    return noise < 0.72 ? 1 : BETA_FLOOR_LAYERS;
-}
-
-/** Generates a ragged bedrock floor at Y=0 matching Beta 1.7.3. */
-export function solidifyBetaFloor(dim: Dimension, cx: number, cz: number): void {
-    if (dim.id !== OVERWORLD_ID) return;
-
-    const originX = cx * CHUNK_SIZE;
-    const originZ = cz * CHUNK_SIZE;
-
-    if (
-        !containsBlocksIn(
-            dim,
-            new BlockVolume(
-                { x: originX, y: BETA_FLOOR_Y, z: originZ },
-                { x: originX + CHUNK_SIZE - 1, y: BETA_FLOOR_Y, z: originZ + CHUNK_SIZE - 1 }
-            ),
-            NOT_BEDROCK_FILTER
-        )
-    ) {
-        return;
-    }
-
-    fill(dim, originX, BETA_FLOOR_Y, originZ, originX + CHUNK_SIZE - 1, BETA_FLOOR_Y, originZ + CHUNK_SIZE - 1, "minecraft:bedrock");
-
-    for (let z = 0; z < CHUNK_SIZE; z++) {
-        let runStart = -1;
-        let runHeight = 0;
-
-        for (let x = 0; x <= CHUNK_SIZE; x++) {
-            // The trailing sentinel of height zero flushes whatever run is still open.
-            const height = x === CHUNK_SIZE ? 0 : floorHeight(floorNoise(cx, cz, x, z));
-
-            if (runStart >= 0 && height === runHeight) continue;
-
-            if (runStart >= 0) {
-                fill(dim, originX + runStart, BETA_FLOOR_Y + 1, originZ + z, originX + x - 1, runHeight, originZ + z, "minecraft:bedrock");
-            }
-
-            runStart = height > 0 ? x : -1;
-            runHeight = height;
-        }
-    }
-}
-
-export function clearFallenLogs(dim: Dimension, cx: number, cz: number): void {
-    if (dim.id !== OVERWORLD_ID) return;
-
-    const permutations = HORIZONTAL_LOG_FILTER.includePermutations;
-    if (!permutations || permutations.length === 0) return;
-
-    const { max: yMax } = dim.heightRange;
-    const x1 = cx * CHUNK_SIZE;
-    const z1 = cz * CHUNK_SIZE;
-    const x2 = x1 + CHUNK_SIZE - 1;
-    const z2 = z1 + CHUNK_SIZE - 1;
-
-    for (let y = BETA_FLOOR_Y; y <= yMax; y += BAND_HEIGHT) {
-        const bandTop = Math.min(y + BAND_HEIGHT - 1, yMax);
-        const volume = new BlockVolume({ x: x1, y, z: z1 }, { x: x2, y: bandTop, z: z2 });
-
-        if (!containsBlocksIn(dim, volume, HORIZONTAL_LOG_FILTER)) continue;
-
-        fill(dim, x1, y, z1, x2, bandTop, z2, "minecraft:air", HORIZONTAL_LOG_FILTER);
     }
 }
 
@@ -371,16 +274,14 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
     const x1 = cx * CHUNK_SIZE;
     const z1 = cz * CHUNK_SIZE;
 
-    const startY = dimension.id === OVERWORLD_ID ? Math.max(yMin, BETA_FLOOR_Y) : yMin;
-
-    if (!dimension.isChunkLoaded({ x: x1, y: startY, z: z1 })) return false;
+    if (!dimension.isChunkLoaded({ x: x1, y: yMin, z: z1 })) return false;
 
     let refusedBands = 0;
     let refusedReads = 0;
     let refusedBlocks = 0;
     let firstError: unknown;
 
-    for (let y = startY; y <= yMax; y += BAND_HEIGHT) {
+    for (let y = yMin; y <= yMax; y += BAND_HEIGHT) {
         const bandTop = Math.min(y + BAND_HEIGHT - 1, yMax);
         const volume = new BlockVolume({ x: x1, y, z: z1 }, { x: x1 + CHUNK_SIZE - 1, y: bandTop, z: z1 + CHUNK_SIZE - 1 });
 
@@ -440,6 +341,10 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
 
 let playerCursor = 0;
 
+/**
+ * The Overworld ships pre-generated in the world template, so the sweep is Nether-only: new Overworld
+ * chunks are left to Bedrock's own generation the way the template world is.
+ */
 export function* chunkScanJob(): Generator<void, void, unknown> {
     let scrubbed = 0;
 
@@ -456,6 +361,8 @@ export function* chunkScanJob(): Generator<void, void, unknown> {
         if (!player.isValid) continue;
 
         const dimension = player.dimension;
+        if (dimension.id !== NETHER_ID) continue;
+
         const { x: playerX, z: playerZ } = player.location;
         const centerX = Math.floor(playerX / CHUNK_SIZE);
         const centerZ = Math.floor(playerZ / CHUNK_SIZE);
@@ -470,11 +377,9 @@ export function* chunkScanJob(): Generator<void, void, unknown> {
             const tick = system.currentTick;
             if (!needsScrub(key, tick) || isInFlight(key, tick)) continue;
 
-            if (!dimension.isChunkLoaded({ x: chunkX * CHUNK_SIZE, y: BETA_FLOOR_Y, z: chunkZ * CHUNK_SIZE })) continue;
+            if (!dimension.isChunkLoaded({ x: chunkX * CHUNK_SIZE, y: 0, z: chunkZ * CHUNK_SIZE })) continue;
 
             SCRUB_IN_FLIGHT.set(key, tick);
-            solidifyBetaFloor(dimension, chunkX, chunkZ);
-            clearFallenLogs(dimension, chunkX, chunkZ);
 
             const clean = yield* scrubFineDetails(dimension, chunkX, chunkZ);
             SCRUB_IN_FLIGHT.delete(key);

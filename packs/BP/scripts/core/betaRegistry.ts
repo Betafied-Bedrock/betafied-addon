@@ -4,7 +4,6 @@ export const BH_BOW_ID = "bh:bow";
 export const BH_CRAFTING_TABLE_ID = "bh:crafting_table";
 export const BH_WOODEN_DOOR_ID = "bh:wooden_door";
 export const BH_IRON_DOOR_ID = "bh:iron_door";
-export const BH_SIGN_ID = "bh:oak_sign";
 export const BH_CAKE_ID = "bh:cake";
 
 export const BETA_DOOR_BLOCK_OF: Readonly<Record<string, string>> = Object.freeze({
@@ -16,6 +15,23 @@ export const BETA_DOOR_BLOCK_IDS: ReadonlySet<string> = Object.freeze(
     new Set(Object.values(BETA_DOOR_BLOCK_OF))
 );
 
+/**
+ * A click on either of these is how the engine writes a sign's text, so no handler of the pack's may
+ * cancel one: the editor has no script equivalent to put in its place.
+ */
+export const BETA_SIGN_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
+    "minecraft:standing_sign",
+    "minecraft:wall_sign"
+]));
+
+/**
+ * A click on one of these is the era's own sleep-and-set-spawn use, never a placement, and the
+ * engine keeps the only sleep the era had — so no handler of the pack's may cancel one.
+ */
+export const BETA_BED_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
+    "minecraft:bed"
+]));
+
 export const BETA_USE_CONSUMING_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:wooden_door",
     "minecraft:iron_door",
@@ -25,12 +41,12 @@ export const BETA_USE_CONSUMING_BLOCK_IDS: ReadonlySet<string> = Object.freeze(n
 export const BETA_CAPPED_ITEM_OF: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:wooden_door": BH_WOODEN_DOOR_ID,
     "minecraft:iron_door": BH_IRON_DOOR_ID,
-    "minecraft:oak_sign": BH_SIGN_ID,
     "minecraft:cake": BH_CAKE_ID
 });
 
 export const BETA_CAPPED_VANILLA_IDS: ReadonlySet<string> = Object.freeze(new Set([
-    "minecraft:bucket"
+    "minecraft:bucket",
+    "minecraft:oak_sign"
 ]));
 
 export const BETA_CAPPED_ITEM_IDS: ReadonlySet<string> = Object.freeze(
@@ -135,7 +151,7 @@ export const BETA_ITEM_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:bucket", "minecraft:water_bucket", "minecraft:lava_bucket", "minecraft:milk_bucket",
     "minecraft:snowball", "minecraft:music_disc_13", "minecraft:music_disc_cat", "minecraft:painting", "minecraft:bed",
     "minecraft:oak_sign", "minecraft:wooden_door", "minecraft:iron_door",
-    BH_WOODEN_DOOR_ID, BH_IRON_DOOR_ID, BH_SIGN_ID, BH_CAKE_ID,
+    BH_WOODEN_DOOR_ID, BH_IRON_DOOR_ID, BH_CAKE_ID,
     "minecraft:empty_map", "minecraft:filled_map"
 ]));
 

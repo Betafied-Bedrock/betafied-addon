@@ -10,7 +10,7 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
 
     it("verifies every biome file defines non-empty minecraft:tags", () => {
         const biomeFiles = readdirSync(biomesDir).filter(f => f.endsWith(".json"));
-        assert.ok(biomeFiles.length >= 55, "Expected at least 55 biome definitions");
+        assert.ok(biomeFiles.length > 0, "Expected the pack's own biome definitions");
 
         for (const file of biomeFiles) {
             const content = JSON.parse(readFileSync(resolve(biomesDir, file), "utf-8"));
@@ -140,6 +140,13 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
             "wolf.json", "zombie.json", "zombie_pigman.json"
         ];
 
+        // The Overworld biome overrides are gone: the world ships pre-generated in the world
+        // template, so those tags now come from Bedrock's own biome definitions. These three are
+        // the ones the Beta mob rules filter on, read off the vanilla behaviour pack
+        // (reference-docs/bedrock-samples/behavior_pack/biomes). Without them the rules would never
+        // match, and the engine silently ignores a tag no biome declares.
+        const VANILLA_OVERWORLD_TAGS = new Set(["overworld", "forest", "taiga"]);
+
         // Collect all declared biome tags across BP biomes
         const declaredTags = new Set<string>();
         const biomeFiles = readdirSync(biomesDir).filter(f => f.endsWith(".json"));
@@ -160,8 +167,8 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
                 const checkFilter = (f: any) => {
                     if (f.test === "has_biome_tag" && f.operator === "==") {
                         assert.ok(
-                            declaredTags.has(f.value),
-                            `${file} references tag '${f.value}' which does not exist in any biome`
+                            declaredTags.has(f.value) || VANILLA_OVERWORLD_TAGS.has(f.value),
+                            `${file} references tag '${f.value}', which neither the pack nor the vanilla Overworld declares`
                         );
                     }
                     if (f.any_of) f.any_of.forEach(checkFilter);

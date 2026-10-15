@@ -71,8 +71,8 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
     <td width="50%" valign="top">
       <h3>🌍 World Generation & Limits</h3>
       <ul>
-        <li><b>Era Biomes & Ore Spread</b>: Faithful Beta biome layout and vein attempt counts.</li>
-        <li><b>Chunk Scrubber</b>: Dynamically restores modern chunk features back to authentic Beta terrain.</li>
+        <li><b>Beta Biome Palette</b>: Grass, foliage and sky colours sampled from the era's own climate colormaps.</li>
+        <li><b>Nether Scrubber</b>: Dynamically restores modern Nether chunk features back to authentic Beta terrain.</li>
         <li><b>Classic Build Limits</b>: 128-block height ceiling and uneven bedrock floor at Y=0.</li>
         <li><b>Dimension Enforcement</b>: Void fog simulation and Nether ice mechanics; The End is blocked.</li>
       </ul>
@@ -163,7 +163,7 @@ Betafied is structured into modular subsystems under `packs/BP/scripts/`. TypeSc
 | **Player** | `packs/BP/scripts/player/` | Instant food consumption, health restoration, off-hand stripping, and join banners. |
 | **Combat** | `packs/BP/scripts/combat/` | Rapid-fire bow logic and the linear armor damage reduction formula. |
 | **Interactions** | `packs/BP/scripts/interactions/` | Furnace minecarts, boat collisions, instant bonemeal, block placement rules, and double chests. |
-| **World** | `packs/BP/scripts/world/` | 128-block height ceiling, dimension boundary enforcement, chunk scrubber, bedrock floor, and void fog. |
+| **World** | `packs/BP/scripts/world/` | 128-block height ceiling, dimension boundary enforcement, Nether scrubber, and void fog. |
 | **Mobs** | `packs/BP/scripts/mobs/` | Mob spawning allowlists, post-Beta entity cleaner, animal wandering AI, and nightmare ambushes. |
 
 </details>

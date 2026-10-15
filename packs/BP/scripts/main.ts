@@ -31,7 +31,6 @@ import "./interactions/fenceConnectivity.js";
 import "./interactions/slabStacking.js";
 import "./interactions/doorPlacement.js";
 import "./interactions/doorPunch.js";
-import "./interactions/signPlacement.js";
 import "./interactions/cakeEating.js";
 import "./mobs/entitySpawnHandler.js";
 import "./mobs/entityCleaner.js";
