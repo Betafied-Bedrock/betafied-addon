@@ -1,11 +1,8 @@
 <p align="center">
   <a href="https://betafied.net">
-    <img src="https://betafied.net/images/betafied-logo-320.webp" alt="Betafied Logo" width="220" />
+    <img src="https://betafied.net/images/betafied-logo-320.webp" alt="Betafied Logo" width="420" />
   </a>
 </p>
-
-<h1 align="center">Betafied</h1>
-
 <p align="center">
   <strong>A love letter to Minecraft Beta 1.7.3, rebuilt for Bedrock Edition.</strong>
 </p>
