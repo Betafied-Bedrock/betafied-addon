@@ -13,6 +13,7 @@ build/
 *.mcpack
 *.mctemplate
 *.mcworld
+template/
 
 # AI & Agent configurations, prompts, and planning artifacts are excluded per-clone from
 # .git/info/exclude rather than here. Some agent read tooling refuses to return any path this

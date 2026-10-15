@@ -1,13 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { deflateSync } from "node:zlib";
+import { crc32 as zlibCrc32, deflateSync } from "node:zlib";
 import {
     betaBiomeAt,
     betaSkyColor,
+    colormapCoordinate,
     createColorizer,
     decodePng,
     toArgbBuffer
 } from "../../scripts/lib/betaColorizer.mjs";
+import { encodeColormapPng } from "../../scripts/lib/betaColormap.mjs";
 
 /**
  * The colorizer is a pure function of its inputs, so these cases are real evidence rather than a
@@ -86,6 +88,22 @@ describe("Beta colorizer", () => {
         });
     });
 
+    describe("colormap addressing", () => {
+        it("addresses the pixel Bedrock samples for a climate", () => {
+            // The same arithmetic Bedrock's own template prints for these biomes, read back as
+            // pixels: the map these values were checked against is the one the pack ships.
+            assert.deepEqual(colormapCoordinate(0.8, 0.4), { x: 50, y: 173 }, "plains");
+            assert.deepEqual(colormapCoordinate(0.7, 0.8), { x: 76, y: 112 }, "forest");
+            assert.deepEqual(colormapCoordinate(0.95, 0.9), { x: 12, y: 36 }, "jungle");
+            assert.deepEqual(colormapCoordinate(0.05, 0.3), { x: 242, y: 251 }, "snowy beach");
+        });
+
+        it("clamps a climate the map has no room for", () => {
+            assert.deepEqual(colormapCoordinate(2, 0), { x: 0, y: 255 }, "desert's climate is off the top of the scale");
+            assert.deepEqual(colormapCoordinate(-1, 1), { x: 255, y: 255 }, "a frozen climate bottoms out at the far corner");
+        });
+    });
+
     describe("getBiome classification", () => {
         it("matches the boundary cases from BiomeGenBase.getBiome", () => {
             assert.equal(betaBiomeAt(0.05, 0.9), "tundra", "temperature below 0.1 is always tundra");
@@ -132,6 +150,41 @@ describe("Beta colorizer", () => {
         it("rejects a colormap that is not 256x256", () => {
             const png = buildRgbaPng(2, 2, () => [0, 0, 0, 255]);
             assert.throws(() => toArgbBuffer(decodePng(png)), /256x256/);
+        });
+    });
+
+    describe("PNG encoding", () => {
+        it("round-trips an ARGB colormap through its own writer", () => {
+            const plane = new Uint32Array(65536).fill(0xff000000);
+            plane[(5 << 8) | 3] = 0xff0a141e;
+            plane[(112 << 8) | 76] = 0xff79c153;
+
+            const shipped = toArgbBuffer(decodePng(encodeColormapPng(plane)));
+
+            assert.equal(shipped[(5 << 8) | 3], 0xff0a141e, "pixel (3,5) survives the round trip");
+            assert.equal(shipped[(112 << 8) | 76], 0xff79c153, "pixel (76,112) survives the round trip");
+            assert.equal(shipped[(255 << 8) | 0], 0xff000000, "untouched pixels stay as they were");
+        });
+
+        it("checksums every chunk with the CRC-32 the PNG format requires", () => {
+            // Our own decoder ignores CRCs, so this is checked against the runtime's independent
+            // implementation: a bad checksum is a texture the game refuses to load.
+            const png = encodeColormapPng(new Uint32Array(65536).fill(0xff123456));
+            const types: string[] = [];
+            let offset = 8;
+
+            while (offset + 12 <= png.length) {
+                const length = png.readUInt32BE(offset);
+                const type = png.toString("latin1", offset + 4, offset + 8);
+                const body = png.subarray(offset + 8, offset + 8 + length);
+                const checksum = zlibCrc32(Buffer.concat([Buffer.from(type, "latin1"), body]));
+
+                assert.equal(png.readUInt32BE(offset + 8 + length), checksum, `${type} checksum`);
+                types.push(type);
+                offset += length + 12;
+            }
+
+            assert.deepEqual(types, ["IHDR", "IDAT", "IEND"], "IHDR first, IEND last");
         });
     });
 });

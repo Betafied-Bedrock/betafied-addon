@@ -191,15 +191,18 @@ if (asJson) {
 
     // The profile climates are Bedrock's scale, not Beta's, so this is a different reading from the
     // region averages above: it answers "what does the colormap say at the climate we declared?".
+    // These are the values the tint table carries for the terrain profiles, and the sky ones come
+    // from `getSkyColorByTemp` at the same temperature.
     console.log("\nDirect read at each profile's declared Bedrock climate (temperature/downfall clamped to 0..1)");
-    console.log("profile          climate        grass     foliage");
+    console.log("profile          climate        grass     foliage     sky");
     for (const profile of profileNames.sort()) {
         const climate = BETA_PROFILES[profile].climate;
         const temperature = Math.min(1, Math.max(0, climate.temperature));
         const humidity = Math.min(1, Math.max(0, climate.downfall));
         console.log(
             `${profile.padEnd(16)} ${`${climate.temperature}/${climate.downfall}`.padEnd(13)}  ` +
-                `${toHex(grass(temperature, humidity))}   ${toHex(foliage(temperature, humidity))}`
+                `${toHex(grass(temperature, humidity))}   ${toHex(foliage(temperature, humidity))}   ` +
+                `${toHex(betaSkyColor(temperature))}`
         );
     }
 }

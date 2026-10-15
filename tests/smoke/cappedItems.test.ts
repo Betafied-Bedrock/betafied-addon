@@ -9,7 +9,6 @@ import {
     BETA_ITEM_IDS,
     BH_CAKE_ID,
     BH_IRON_DOOR_ID,
-    BH_SIGN_ID,
     BH_WOODEN_DOOR_ID
 } from "../../packs/BP/scripts/core/betaRegistry.js";
 import { versionAtLeast } from "../support/text.js";
@@ -40,7 +39,6 @@ function declaredItems(): Map<string, any> {
 }
 
 const capped = [
-    { item: BH_SIGN_ID, icon: "sign", name: "Sign", recipe: "sign_oak", vanilla: "minecraft:sign_oak" },
     { item: BH_CAKE_ID, icon: "cake", name: "Cake", recipe: "cake", vanilla: "minecraft:cake" }
 ];
 
@@ -49,7 +47,6 @@ describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
         assert.deepEqual(BETA_CAPPED_ITEM_OF, {
             "minecraft:wooden_door": BH_WOODEN_DOOR_ID,
             "minecraft:iron_door": BH_IRON_DOOR_ID,
-            "minecraft:oak_sign": BH_SIGN_ID,
             "minecraft:cake": BH_CAKE_ID
         });
     });
@@ -57,12 +54,18 @@ describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
     it("leaves the era's capped vanilla bucket to the engine and holds its stack in the sweep", () => {
         // A bucket is the one capped item whose use is a fluid, so the engine's own item is the only one
         // that fills from a source block; the pack cannot own it, and the cap is the sweep's to keep.
-        assert.deepEqual([...BETA_CAPPED_VANILLA_IDS], ["minecraft:bucket"]);
+        assert.deepEqual([...BETA_CAPPED_VANILLA_IDS], ["minecraft:bucket", "minecraft:oak_sign"]);
         assert.equal(declaredItems().has("bh:bucket"), false, "the pack's own bucket item is gone");
+        assert.equal(declaredItems().has("bh:oak_sign"), false, "the pack's own sign item is gone");
         assert.equal(
             existsSync(resolve(root, "packs/BP/scripts/interactions/bucketUse.ts")),
             false,
             "the engine's own bucket fills from a source block, so the script that reimplemented it is gone"
+        );
+        assert.equal(
+            existsSync(resolve(root, "packs/BP/scripts/interactions/signPlacement.ts")),
+            false,
+            "the engine's own sign places on floor and wall and opens the editor, so the script that reimplemented it is gone"
         );
 
         assert.ok(BETA_ITEM_IDS.has("minecraft:bucket"), "a vanilla bucket would be stripped if the registry dropped it");
@@ -137,7 +140,7 @@ describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
         });
     }
 
-    it("places the cake and the standing sign, and leaves the wall sign to a script", () => {
+    it("places the cake with its block placer", () => {
         const items = declaredItems();
 
         assert.equal(
@@ -145,17 +148,10 @@ describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
             BH_CAKE_ID,
             "the cake places the pack's block, whose bites the engine cannot drive for a placer"
         );
-        assert.equal(
-            items.get(BH_SIGN_ID)!.components["minecraft:block_placer"].block,
-            "minecraft:standing_sign",
-            "a placer names one block, so it takes the standing sign: the engine's own placement is the only one that raises the sign editor, and signPlacement hangs the wall sign"
+        assert.ok(
+            versionAtLeast(readJson(resolve(root, "packs/BP/items/cake.json")).format_version, "1.21.50"),
+            "minecraft:block_placer needs format_version 1.21.50 or later"
         );
-        for (const file of ["cake", "oak_sign"]) {
-            assert.ok(
-                versionAtLeast(readJson(resolve(root, "packs/BP/items", `${file}.json`)).format_version, "1.21.50"),
-                `minecraft:block_placer needs format_version 1.21.50 or later (${file})`
-            );
-        }
     });
 
     it("hands the cake's empty containers back as the engine's own buckets", () => {

@@ -59,7 +59,7 @@ const MOCK_UNSTACKABLE_IDS = new Set([
     "bh:apple", "bh:bread", "bh:porkchop", "bh:cooked_porkchop",
     "bh:cod", "bh:cooked_cod", "bh:golden_apple", "bh:bow",
     "minecraft:bow", "bh:wooden_door", "bh:iron_door",
-    "bh:oak_sign", "bh:cake"
+    "bh:cake"
 ]);
 
 export class ItemStack {

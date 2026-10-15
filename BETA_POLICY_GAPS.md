@@ -245,34 +245,22 @@ The inventory sweep split those stacks in a *player's* slots and nowhere else, w
 read "doors stack in chests" next to "porkchops don't" — the porkchops are pack items and the doors
 were not.
 
-Decided and implemented: the crafted result is a pack item — `bh:wooden_door`, `bh:iron_door`,
-`bh:oak_sign`, `bh:cake` — carrying `minecraft:max_stack_size` 1, which the engine applies everywhere,
+Decided and implemented: the crafted result is a pack item for doors and cake — `bh:wooden_door`,
+`bh:iron_door`, `bh:cake` — carrying `minecraft:max_stack_size` 1, which the engine applies everywhere,
 so the chest half of the bug is fixed at the engine rather than by a sweep over other people's
 containers. `BETA_CAPPED_ITEM_OF` retypes every held vanilla one onto its pack item, splitting a stack
 as it converts, so the two ids cannot drift apart, and `packs/BP/items` now holds an item for every id
-in that table (asserted by a test, because a capped id with no item JSON would be a pickup the sweep
-throws away). The doors stay in the table even though the crafted item is the pack's: a `bh:` door is a
+in that table. The doors stay in the table even though the crafted item is the pack's: a `bh:` door is a
 `minecraft:block_placer` for the era's vanilla block, so a broken door drops the vanilla item and this
 retype is what keeps that drop at the era's one per slot.
 
-The bucket is the one of the four the pack does **not** own. It was a pack item (`bh:bucket`, one per
-slot, with `interactions/bucketUse.ts` filling from a still source and milking a cow by hand) and it is
-not any more, because the item's *use* is a fluid: the engine's own bucket is what fills from a water or
-lava source and pours it back, and no custom item can be given that behaviour. With the vanilla item
-back, filling, pouring and milking a cow are all the engine's own — `packs/BP/entities/cow.json` answers
-`bucket:0` with `bucket:1` the way vanilla always did — and the era's cap is the sweep's to keep
-instead of an item JSON's: `BETA_CAPPED_VANILLA_IDS` holds `minecraft:bucket` and
-`inventoryManager.ts` splits a stack of them one per slot, since modern empty buckets stack to sixteen.
-
-What the pack gave up with it, and may want back later: the era refused a *flowing* source (metadata 0
-was a still source; the engine takes either), and the scripted milk answered any cow it was pointed at.
-Both were the reason the item existed, so the removal is the trade, not an oversight.
-
-The placement rules the era applied are still enforced for the sign, which the engine cannot place for
-the pack: a custom item's `minecraft:block_placer` writes one block, never a wall sign, so
-`interactions/signPlacement.ts` writes the standing or the wall sign the way `ItemSign` did. It
-cancels the click to do it, because the placer reads that click for a cell of its own: leaving both
-runners on one click is the sign placed twice, and only the pack's half carries the era's rotation.
+The bucket and sign are the two of the four the pack does **not** own. A bucket's use is a fluid, and
+a sign's placement must raise the native text editor UI on both ground (`standing_sign`) and walls
+(`wall_sign`). A custom item's `minecraft:block_placer` can only name one block, which refuses wall
+faces and leaves wall signs with no editor UI (which no script API can open in its place). With the
+vanilla items back, fluid handling and sign placement are both the engine's own, and the era's cap is
+the sweep's to keep instead of an item JSON's: `BETA_CAPPED_VANILLA_IDS` holds `minecraft:bucket` and
+`minecraft:oak_sign`, and `inventoryManager.ts` splits a stack of them one per slot in player inventories.
 
 Still open, all of it engine-dependent and needing an in-game look:
 
@@ -290,13 +278,6 @@ Still open, all of it engine-dependent and needing an in-game look:
   workbench answered the click before `ItemSign` was reached, and no sign went down against any of
   them. `BETA_USE_CONSUMING_BLOCK_IDS` holds the doors and the trapdoor, where the engine is known to
   consume the click; the others join it once the same consumption is seen in game.
-- **The sign editor rides the player's own click on the sign, and the pack no longer swallows it.**
-  Beta's `ItemSign` called `EntityPlayer.func_4048_a(sign)` on the newly written tile entity, so the
-  editor opened with the placement. The engine does not raise it for the pack's placement — neither a
-  script-written sign nor one its own `minecraft:block_placer` writes — and no script API opens one,
-  so the click a player makes on a standing or wall sign is the only way to reach the editor and
-  `interactions/signPlacement.ts` leaves it to the engine. Cancelling that click, as the module did
-  while it read the editor as an era divergence, leaves a sign nobody can write on.
 - **Does the cake's `minecraft:block_placer` place on the faces `ItemReed` allowed?** Beta's cake went
   down on any face of a block, which is what the component has to reproduce; it is the one capped item
   whose placement is left entirely to the engine.
@@ -635,6 +616,24 @@ styling". That is no longer true. `ui/server_form.json` repoints the engine's fo
 the header at its doubled scale, the unscaled score row, and `GuiButton`'s 200x20 metrics including
 1.7.3's blue hover state.
 
+That screen is the engine's one screen for **every** server form in the game, so both slots the pack
+fills on it route on the form's title. The factory is pointed at the pack's own
+`bfui-death_screen.form_root` rather than at `server_form.long_form`, because `long_form` is the
+engine's name for the tree every `ActionFormData` is drawn through and another pack may own the name:
+while this pack redefined it, the death screen was what *that* pack's forms were drawn with, background
+slot included, which made the two unusable together. `form_root` draws the era's screen when the form's
+title is the era's own and hands every other title to `@server_form.long_form` — the engine's copy, or
+the pack that claimed it — and `screen_underlay` routes the shared background slot the same way, leaving
+that slot's `common.base_screen` default (an empty panel) for a form this pack did not put up. Both
+conditions are pinned to `DEATH_SCREEN_COPY.title` by `deathScreenUi.test.ts`, which also asserts the
+pack defines neither of the engine's two form names.
+
+Unverified in game: the title reading that routes the background slot. It is a different subtree of the
+screen from the content, and nothing to hand settles whether a form property resolves there; the content
+tree's copy of the same binding is the one the pack has already seen work. The failure is one-sided — a
+binding that never resolves leaves the slot at its default, so the death screen loses its wash rather
+than another pack's form gaining one.
+
 `tests/smoke/deathScreenUi.test.ts` pins those numbers against the recovered client rather than against
 the UI file, so a drift from the era has to change a literal in the test as well. The same test pins
 that the era's quarter-height offset is a percentage offset plus a fixed spacer, and that no asymmetric
@@ -672,7 +671,7 @@ What the archive settles about this screen:
   sprite. An earlier revision of this item blamed the size on percentages resolving against a parent that
   never resolved; the band's aspect is what disproves that, and the fix is in `ui/.bfui/death_screen.json`.
   Unverified in game after the change, since the reading above is of the broken state.
-- An `ActionFormData` body reaches a *replaced* `long_form` unreliably. The engine's own body label binds
+- An `ActionFormData` body reaches a form tree the pack mounts unreliably. The engine's own body label binds
   `#form_text`, but a label draws the value its `property_bag` declares when the binding that would fill
   it never runs, so the score row carries the era's line as that declared default and the test pins it to
   `DEATH_SCREEN_COPY.body`. The two are one string, so the row prints the era's copy either way.

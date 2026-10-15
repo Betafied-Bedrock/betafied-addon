@@ -88,6 +88,21 @@ describe("Player Client Entity - First-Person Animation Contract", () => {
         assert.deepEqual(missing, [], `player.entity.json is missing animation keys: ${missing.join(", ")}`);
     });
 
+    it("stays below the version ceiling that retires per-player skins", () => {
+        // The engine only hands a pack-declared player client entity its per-player skin
+        // data (character-creator and uploaded skins alike) while the definition sits at
+        // 1.13.0 or below. Above that the players fall back to `textures.default`, so
+        // everyone in the world renders as the Steve texture this file declares.
+        const declared = clientEntityDescription().min_engine_version;
+        assert.ok(declared, "player.entity.json must declare min_engine_version");
+
+        const [major, minor] = String(declared).split(".").map(Number);
+        assert.ok(
+            major < 1 || (major === 1 && minor <= 13),
+            `min_engine_version ${declared} retires per-player skins; it must not exceed 1.13.0`
+        );
+    });
+
     it("keeps the mine sweep entry point wired so the attack swing can run", () => {
         const animations = clientEntityDescription().animations;
 

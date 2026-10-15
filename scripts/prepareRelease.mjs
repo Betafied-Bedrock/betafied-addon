@@ -206,14 +206,69 @@ function zipInto(outDir, archive, ...entries) {
   createZip(path.join(outDir, archive), outDir, entries);
 }
 
+function cleanCruft(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      cleanCruft(full);
+    } else if (entry.name === ".DS_Store" || entry.name === "Thumbs.db") {
+      fs.rmSync(full, { force: true });
+    }
+  }
+}
+
 /** Copy an export into the release tree, without the desktop cruft a macOS folder picks up. */
 function copyExport(source, destination) {
   fs.cpSync(source, destination, { recursive: true });
-  for (const entry of fs.readdirSync(destination, { withFileTypes: true })) {
-    if (entry.isFile() && entry.name === ".DS_Store") {
-      fs.rmSync(path.join(destination, entry.name), { force: true });
-    }
+  cleanCruft(destination);
+}
+
+function packageWorldTemplate(tag, triple, outDir, sources) {
+  const templateDir = path.join(ROOT, "template");
+  if (!fs.existsSync(templateDir)) {
+    fail(`no template directory at ${templateDir} — create template/ before packaging`);
   }
+
+  const staging = path.join(outDir, "template_staging");
+  fs.rmSync(staging, { recursive: true, force: true });
+  copyExport(templateDir, staging);
+
+  const bpStaging = path.join(staging, "behavior_packs", "Betafied_BP");
+  const rpStaging = path.join(staging, "resource_packs", "Betafied_RP");
+  fs.mkdirSync(path.dirname(bpStaging), { recursive: true });
+  fs.mkdirSync(path.dirname(rpStaging), { recursive: true });
+
+  const bpSource = sources.find(([kind]) => kind === "bp")[1];
+  const rpSource = sources.find(([kind]) => kind === "rp")[1];
+  copyExport(bpSource, bpStaging);
+  copyExport(rpSource, rpStaging);
+
+  const bpManifest = JSON.parse(fs.readFileSync(path.join(bpStaging, "manifest.json"), "utf8"));
+  const rpManifest = JSON.parse(fs.readFileSync(path.join(rpStaging, "manifest.json"), "utf8"));
+
+  const bpEntry = [{ pack_id: bpManifest.header.uuid, version: bpManifest.header.version }];
+  const rpEntry = [{ pack_id: rpManifest.header.uuid, version: rpManifest.header.version }];
+
+  fs.writeFileSync(path.join(staging, "world_behavior_packs.json"), `${JSON.stringify(bpEntry, null, 4)}\n`);
+  fs.writeFileSync(path.join(staging, "world_resource_packs.json"), `${JSON.stringify(rpEntry, null, 4)}\n`);
+
+  const templateManifestPath = path.join(staging, "manifest.json");
+  if (fs.existsSync(templateManifestPath)) {
+    const raw = JSON.parse(fs.readFileSync(templateManifestPath, "utf8"));
+    const updated = applyManifestVersion(raw, triple, { name: `Betafied ${tag}` });
+    fs.writeFileSync(templateManifestPath, `${JSON.stringify(updated, null, 4)}\n`);
+  }
+
+  const leaked = unwantedPackFiles(staging);
+  if (leaked.length > 0) {
+    fail(
+      `the template export carries forbidden markdown/agent file(s): ${leaked.map((f) => path.relative(outDir, f)).join(", ")}`
+    );
+  }
+
+  const entries = fs.readdirSync(staging);
+  createZip(path.join(outDir, `${assetName(tag)}.mctemplate`), staging, entries);
+  fs.rmSync(staging, { recursive: true, force: true });
 }
 
 /**
@@ -222,7 +277,7 @@ function copyExport(source, destination) {
  * Pack source trees must never contain instruction or markdown files, and any leaked
  * files will fail packaging here before any archive is created.
  */
-function packageInstallers(tag) {
+function packageInstallers(tag, triple) {
   const mojang = mojangRoot();
   const names = exportNames();
   const sources = [
@@ -248,9 +303,10 @@ function packageInstallers(tag) {
       );
     }
     folders.push(folder);
-    zipInto(outDir, `${folder}.mcpack`, folder);
   }
   zipInto(outDir, `${assetName(tag)}.mcaddon`, ...folders);
+
+  packageWorldTemplate(tag, triple, outDir, sources);
 
   return outDir;
 }
@@ -288,7 +344,7 @@ function main() {
                packs/BP/scripts/player/welcome.ts
   would ${hasSection ? "keep   " : "insert "} the '## ${tag}' section in CHANGELOG.md
   would run    npm run check, npm run build
-  would write  build/${tag}/ (${assetName(tag)}.mcaddon, ${assetName(tag, "_BP")}.mcpack, ${assetName(tag, "_RP")}.mcpack)
+  would write  build/${tag}/ (${assetName(tag)}.mcaddon, ${assetName(tag)}.mctemplate)
 `);
     return;
   }
@@ -296,6 +352,9 @@ function main() {
   bumpPackageVersion(version);
   writeManifest(path.join(ROOT, "packs/BP/manifest.json"), triple, `Betafied ${tag}`);
   writeManifest(path.join(ROOT, "packs/RP/manifest.json"), triple, `Betafied ${tag} (Resources)`);
+  if (fs.existsSync(path.join(ROOT, "template/manifest.json"))) {
+    writeManifest(path.join(ROOT, "template/manifest.json"), triple, `Betafied ${tag}`);
+  }
   bumpWelcomeVersion(tag);
   const inserted = writeChangelogEntry(tag, date);
   console.log(`release:prepare: bumped every version carrier to ${tag}`);
@@ -304,9 +363,11 @@ function main() {
   run("npm", ["run", "check"]);
   run("npm", ["run", "build"]);
   assertArchiver();
-  const outDir = packageInstallers(tag);
+  const outDir = packageInstallers(tag, triple);
   console.log(`release:prepare: packaged ${path.relative(ROOT, outDir)}`);
   printNextSteps(tag);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

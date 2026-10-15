@@ -14,6 +14,12 @@
   // there when the player died and gone the instant `respawnPlayer` ran. The engine also only waits
   // for a close transition when the screen has one registered, so an empty list is what makes the
   // respawn exit instant rather than a slide.
+  //
+  // This screen is the one the engine draws _every_ server form on, this pack's and every other
+  // pack's, so each slot it fills here routes itself: where vanilla's own copy of the screen set
+  // nothing for the background slot and `common.base_screen` defaults it to an empty panel, this copy
+  // serves the death wash and the redrawn HUD from that slot for the death form's own title only -
+  // see `screen_underlay`.
   "third_party_server_screen@common.base_screen": {
     "$screen_content": "server_form.main_screen_content",
     "$screen_bg_content": "bfui-death_screen.screen_underlay",
@@ -31,9 +37,19 @@
 
   // The factory is kept and only the tree behind it is replaced, because the factory is what
   // instantiates the form's control tree together with its data context: a screen mounted beside it
-  // gets the form title and its buttons but no body. ModalFormData still lands on vanilla's
-  // `custom_form`. Vanilla sizes this panel [0, 0] because its dialogs are a fixed size; a
-  // full-screen screen needs real bounds.
+  // gets the form title and its buttons but no body. Vanilla sizes this panel [0, 0] because its
+  // dialogs are a fixed size; a full-screen screen needs real bounds.
+  //
+  // What it instantiates is the pack's own `form_root` rather than `@server_form.long_form`, because
+  // `long_form` is the engine's name for the tree *every* ActionFormData in the game is drawn
+  // through. Another pack is free to own that name - a router of its own, a restyled dialog - and a
+  // control this file left there would be what that pack's forms were drawn with instead. `form_root`
+  // draws the death screen for the death form's title and hands every other title on to
+  // `@server_form.long_form`, which is the engine's copy or whichever pack claimed it. The pack
+  // defines neither of the engine's two form names, so this file cannot take either away.
+  //
+  // `custom_form` is restated at its own value for the same reason: ModalFormData is not this
+  // screen's business, and the name is left to the engine or to whoever else defines it.
   "main_screen_content": {
     "type": "panel",
     "size": [ "100%", "100%" ],
@@ -42,23 +58,11 @@
         "server_form_factory": {
           "type": "factory",
           "control_ids": {
-            "long_form": "@server_form.long_form",
+            "long_form": "@bfui-death_screen.form_root",
             "custom_form": "@server_form.custom_form"
           }
         }
       }
-    ]
-  },
-
-  // `layer: 2` is vanilla's own value for its dialog here, and it is what puts the content above the
-  // background slot: base_screen mounts that slot at layer 2 and the safezone matrix - which carries
-  // this screen's content - at the same layer, so the content's own layer decides where it lands.
-  "long_form": {
-    "type": "panel",
-    "size": [ "100%", "100%" ],
-    "layer": 2,
-    "controls": [
-      { "death_screen@bfui-death_screen.root_panel": {} }
     ]
   }
 }

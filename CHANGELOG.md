@@ -2,6 +2,33 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.9 — 2026-10-15
+
+5.9 restores native sign editing on ground and walls, packages a ready-to-play world template with releases, isolates the death screen UI from other server forms, and ships Beta's grass and foliage colormaps.
+
+### Signs
+
+- Replaced custom oak signs with vanilla oak signs to restore the native sign text editor on ground and walls.
+- Removed custom sign placement handling that intercepted clicks.
+- Changed oak signs in player inventories to stack to one item.
+- Changed the build height limit to allow interacting with signs and beds at the world ceiling.
+
+### Worlds
+
+- Added a `.mctemplate` world template package to release builds with behavior and resource packs pre-configured.
+- Added release tooling to remove world template assets from previous releases.
+
+### Interface
+
+- Changed the death screen UI routing to only match forms titled `Game over!`, leaving other server forms to standard layouts.
+- Changed death screen background wash bindings to prevent affecting third-party forms.
+
+### Environment
+
+- Added Beta 1.7.3 grass and foliage colormaps so biomes sample authentic climate tints.
+- Changed terrain biomes to use climate-derived grass and foliage tints instead of a single neutral color.
+- Removed an unreferenced third-party fog definition.
+
 ## 5.8 — 2026-10-14
 
 5.8 fixes the death loop that sends players without a bed above the world, makes signs writable again, and keeps extended pistons intact.

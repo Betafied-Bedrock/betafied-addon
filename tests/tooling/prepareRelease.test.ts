@@ -161,6 +161,15 @@ describe("Every version carrier in the checkout agrees", () => {
     check("packs/RP manifest header", resource.header.version);
     resource.modules.forEach((module: any, index: number) => check(`packs/RP module ${index}`, module.version));
 
+    if (fs.existsSync(path.join(ROOT, "template/manifest.json"))) {
+      const templateManifest = JSON.parse(fs.readFileSync(path.join(ROOT, "template/manifest.json"), "utf8"));
+      check("template manifest header", templateManifest.header?.version);
+      templateManifest.modules?.forEach((module: any, index: number) =>
+        check(`template module ${index}`, module.version)
+      );
+      assert.equal(templateManifest.modules?.[0]?.type, "world_template");
+    }
+
     assert.deepEqual(mismatches, [], "a release that bumps only some carriers ships a pack the engine will ignore");
     assert.ok(
       behavior.header.name.includes(tag) && resource.header.name.includes(tag),

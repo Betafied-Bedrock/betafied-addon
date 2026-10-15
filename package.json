@@ -1,6 +1,6 @@
 {
   "name": "betafied",
-  "version": "5.8.0",
+  "version": "5.9.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
@@ -11,6 +11,7 @@
     "check": "npm run typecheck && npm run lint && npm run test",
     "prebuild": "node scripts/pruneContentLogs.mjs",
     "build": "node scripts/regolith.mjs run",
+    "push": "npm --prefix betafied-manager run push",
     "release": "node scripts/release.mjs",
     "release:prepare": "node scripts/prepareRelease.mjs",
     "watch": "node scripts/watch.mjs",
@@ -20,7 +21,8 @@
     "install-filters": "node scripts/regolith.mjs install-all",
     "docs:fetch": "node scripts/fetch-reference-docs.mjs",
     "generate:biomes": "node scripts/generate-biomes.mjs",
-    "generate:client-biomes": "node scripts/generate-client-biomes.mjs"
+    "generate:client-biomes": "node scripts/generate-client-biomes.mjs",
+    "generate:colormaps": "node scripts/generate-colormaps.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

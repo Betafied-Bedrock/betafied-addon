@@ -14,11 +14,10 @@ import {
     biomeIdentifier,
     buildBiome
 } from "../../scripts/lib/betaBiomes.mjs";
-import {
-    BETA_NEUTRAL_TINT,
-    buildClientBiome,
-    resolveBiomeTint
-} from "../../scripts/lib/betaBiomeTints.mjs";
+import { BETA_PROFILE_TINTS, buildClientBiome, resolveBiomeTint } from "../../scripts/lib/betaBiomeTints.mjs";
+import { COLORMAP_TEXTURES, biomeSamplePoint, colormapWrites } from "../../scripts/lib/betaColormap.mjs";
+import { colormapCoordinate, decodePng, toArgbBuffer, toHex } from "../../scripts/lib/betaColorizer.mjs";
+import { measuredSamplePoint } from "../../scripts/lib/bedrockColormapSamples.mjs";
 
 // Every Overworld biome shipped in the vanilla behavior pack (Mojang/bedrock-samples). A biome
 // added upstream that is missing here keeps its vanilla definition, including `village_type` and
@@ -241,7 +240,7 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
     it("tints the sky with Beta's temperature-derived colour", () => {
         // Beta never stored a sky colour either: `World.getSkyColor` fed the climate temperature
         // under the player into `BiomeGenBase.getSkyColorByTemp`. Every biome must therefore carry
-        // the value derived from its own climate, and the terrain profiles the neutral average.
+        // the value derived from its own climate.
         for (const [shortId, profileName] of Object.entries(OVERWORLD_BIOME_PROFILE)) {
             const content = JSON.parse(readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8"));
             const sky = content["minecraft:client_biome"].components["minecraft:sky_color"].sky_color;
@@ -251,16 +250,22 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
                 `${shortId} (${profileName}) must carry its profile's derived Beta sky colour`
             );
         }
-
-        for (const profile of BETA_LAND_PROFILES) {
-            const entry = resolveBiomeTint(profile);
-            assert.notEqual(entry.sky, BETA_NEUTRAL_TINT.sky, `${profile} must not fall back to the neutral sky`);
-        }
     });
 
-    it("reserves distinct tints for the land biomes and folds terrain onto the neutral average", () => {
-        // Beta only gave the five generating biomes their own grass. Everything else is terrain and
-        // must fall back to the climate-plane average rather than growing a colour of its own.
+    it("has a derived tint for every profile the biome table defines, and no others", () => {
+        // A profile without an entry would throw in the generator, and an entry for a profile no
+        // biome uses is a value someone will copy from by mistake.
+        assert.deepEqual(
+            Object.keys(BETA_PROFILE_TINTS).sort(),
+            Object.keys(BETA_PROFILES).sort(),
+            "scripts/lib/betaBiomeTints.mjs must cover exactly the profiles in scripts/lib/betaBiomes.mjs"
+        );
+    });
+
+    it("keeps the five land biomes distinct and does not collapse terrain onto one colour", () => {
+        // Beta only gave the five generating biomes their own grass. The terrain profiles take the
+        // map's colour at the climate each one declares, so a river no longer reads as an ocean and
+        // a gravel shore no longer reads as a sand beach.
         const landTints = BETA_LAND_PROFILES.map(profile => resolveBiomeTint(profile).grass);
         assert.equal(
             new Set(landTints).size,
@@ -268,14 +273,11 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
             "the five land biomes must each have their own grass colour"
         );
 
-        for (const [shortId, profileName] of Object.entries(OVERWORLD_BIOME_PROFILE)) {
-            if (BETA_LAND_PROFILES.includes(profileName)) {
-                continue;
-            }
-            assert.equal(
-                resolveBiomeTint(profileName),
-                BETA_NEUTRAL_TINT,
-                `${shortId} (${profileName}) is terrain and must use the neutral Beta tint`
+        for (const [terrain, neighbour] of [["river", "ocean"], ["gravel_beach", "beach"]]) {
+            assert.notEqual(
+                resolveBiomeTint(terrain).grass,
+                resolveBiomeTint(neighbour).grass,
+                `${terrain} must not read as ${neighbour}`
             );
         }
     });
@@ -293,5 +295,114 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
                 `${file} defines '${identifier}', which the Beta biome table does not manage`
             );
         }
+    });
+});
+
+describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
+    const colormapDir = resolve(process.cwd(), "packs/RP/textures/colormap");
+    const clientBiomesDir = resolve(process.cwd(), "packs/RP/biomes");
+
+    /** The shipped map, as the `buffer[y << 8 | x]` array the engine indexes. */
+    function loadColormap(name: string) {
+        const path = resolve(colormapDir, `${name}.png`);
+        assert.ok(existsSync(path), `textures/colormap/${name}.png is missing; run \`npm run generate:colormaps\``);
+        return toArgbBuffer(decodePng(readFileSync(path)));
+    }
+
+    it("ships a 256x256 colour map for grass and foliage", () => {
+        for (const name of COLORMAP_TEXTURES) {
+            const decoded = decodePng(readFileSync(resolve(colormapDir, `${name}.png`)));
+            // The engine hard-codes a 256 stride, and `toArgbBuffer` rejects anything else.
+            assert.equal(decoded.width, 256, `${name}.png must be 256 wide`);
+            assert.equal(decoded.height, 256, `${name}.png must be 256 tall`);
+            loadColormap(name);
+        }
+    });
+
+    it("holds the planned tint at every pixel Bedrock samples", () => {
+        // The plan is what the generator writes, so this is the guard against a stale or hand-edited
+        // texture: `node scripts/generate-colormaps.mjs` restores it.
+        for (const name of COLORMAP_TEXTURES) {
+            const colormap = loadColormap(name);
+            for (const write of colormapWrites(name).values()) {
+                assert.equal(
+                    toHex(colormap[(write.y << 8) | write.x]),
+                    toHex(write.argb),
+                    `textures/colormap/${name}.png must hold ${write.biome}'s colour at (${write.x},${write.y})`
+                );
+            }
+        }
+    });
+
+    it("gives every biome its own tint wherever its sample pixel is not shared", () => {
+        for (const name of COLORMAP_TEXTURES) {
+            const colormap = loadColormap(name);
+            for (const shortId of OVERWORLD_BIOME_IDS) {
+                const [x, y] = biomeSamplePoint(shortId);
+                const write = colormapWrites(name).get(`${x},${y}`);
+                if (write.contested.includes(shortId)) {
+                    continue;
+                }
+                assert.equal(
+                    toHex(colormap[(y << 8) | x]),
+                    resolveBiomeTint(OVERWORLD_BIOME_PROFILE[shortId])[name],
+                    `${shortId} must read its own tint at (${x},${y})`
+                );
+            }
+        }
+    });
+
+    it("reads the terrain profiles' colour off the map at the climate they declare", () => {
+        // Beta gave terrain no biome of its own, so the profile's pinned colour *is* the map's
+        // answer at its declared climate — which is what makes these profiles verifiable offline.
+        for (const name of COLORMAP_TEXTURES) {
+            const colormap = loadColormap(name);
+            for (const [profile, entry] of Object.entries(BETA_PROFILES)) {
+                if (BETA_LAND_PROFILES.includes(profile)) {
+                    continue;
+                }
+                const { x, y } = colormapCoordinate(entry.climate.temperature, entry.climate.downfall);
+                assert.equal(
+                    toHex(colormap[(y << 8) | x]),
+                    resolveBiomeTint(profile)[name],
+                    `${profile} must carry the map's colour at its declared climate`
+                );
+            }
+        }
+    });
+
+    it("keeps a shared pixel from costing a biome its colour", () => {
+        // One pixel serves a whole group, and this pack renders some of those groups differently.
+        // The biome that lost the pixel still renders its own tint, because its client biome file
+        // pins it, and the group's pixel keeps the colour of the biome whose climate is nearest.
+        for (const name of COLORMAP_TEXTURES) {
+            const colormap = loadColormap(name);
+            for (const shortId of OVERWORLD_BIOME_IDS) {
+                const [x, y] = biomeSamplePoint(shortId);
+                if (!colormapWrites(name).get(`${x},${y}`).contested.includes(shortId)) {
+                    continue;
+                }
+                const content = JSON.parse(readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8"));
+                const component = name === "grass" ? "minecraft:grass_appearance" : "minecraft:foliage_appearance";
+                assert.equal(
+                    content["minecraft:client_biome"].components[component].color,
+                    resolveBiomeTint(OVERWORLD_BIOME_PROFILE[shortId])[name],
+                    `${shortId} lost the shared pixel at (${x},${y}) and must still pin its own tint`
+                );
+            }
+        }
+    });
+
+    it("leaves a biome we do not enumerate reading a Beta colour", () => {
+        // The End has no client biome file, so it reads the map. Its climate lands on the ocean's
+        // pixel, and the colour there is the ocean profile's — Beta's own answer for that climate.
+        const end = measuredSamplePoint("the_end");
+        assert.ok(end, "the template must still place the End");
+        const [x, y] = end;
+        assert.equal(
+            toHex(loadColormap("grass")[(y << 8) | x]),
+            resolveBiomeTint("ocean").grass,
+            "the End must read the map's colour for its climate"
+        );
     });
 });

@@ -4,7 +4,68 @@
   // rows at their scale and baseline, GuiButton's 200x20 metrics, and the HUD the era left visible
   // behind the screen. Values and their source lines are pinned by tests/smoke/deathScreenUi.test.ts so
   // a later edit has to change the test too.
+  //
+  // The form screen this is drawn on is the engine's one screen for every server form in the game, so
+  // both places this pack fills on it - the content `server_form.main_screen_content` instantiates, and
+  // the background slot `server_form.third_party_server_screen` serves - route on the form title and
+  // hand anything that is not the era's own title back untouched. `form_root` and `screen_underlay`
+  // below are that pair, and each keys on the same `$death_title`, which is the script's
+  // `DEATH_SCREEN_COPY.title`.
   "namespace": "bfui-death_screen",
+
+  // What `server_form.main_screen_content`'s factory instantiates for every ActionFormData in the game,
+  // in place of the engine's `server_form.long_form` - a name that is deliberately left to the engine
+  // and to any other pack, because it is what *their* forms are drawn through. The era's screen is
+  // chosen by the form's own title: the death form is the one form this pack shows, and every other
+  // title is a form this pack has no business drawing, so it is handed to `long_form`.
+  //
+  // `layer: 2` is vanilla's own value for its dialog here, and it is what puts the content above the
+  // background slot: base_screen mounts that slot at layer 2 and the safezone matrix - which carries
+  // this screen's content - at the same layer, so the content's own layer decides where it lands.
+  //
+  // Both branches are instantiated and one is hidden, because a binding chooses what is drawn and not
+  // what is built. `#enabled` follows `#visible` on each of them: a hidden branch that kept its form
+  // buttons would go on taking the focus and the clicks the visible branch's buttons are there for.
+  "form_root": {
+    "type": "panel",
+    "size": [ "100%", "100%" ],
+    "layer": 2,
+    "$death_title": "Game over!",
+    "controls": [
+      {
+        "death_screen@bfui-death_screen.root_panel": {
+          "bindings": [
+            {
+              "binding_type": "view",
+              "source_property_name": "(#title_text = $death_title)",
+              "target_property_name": "#visible"
+            },
+            {
+              "binding_type": "view",
+              "source_property_name": "#visible",
+              "target_property_name": "#enabled"
+            }
+          ]
+        }
+      },
+      {
+        "other_form@server_form.long_form": {
+          "bindings": [
+            {
+              "binding_type": "view",
+              "source_property_name": "(not (#title_text = $death_title))",
+              "target_property_name": "#visible"
+            },
+            {
+              "binding_type": "view",
+              "source_property_name": "#visible",
+              "target_property_name": "#enabled"
+            }
+          ]
+        }
+      }
+    ]
+  },
 
   // The screen's own content: the two text rows and the buttons. Everything the era drew *under* them -
   // the HUD and the wash - is mounted in `screen_underlay`, because that slot is the one rect in this
@@ -21,17 +82,39 @@
 
   // The era's paint order is the world, then the HUD (GuiIngame.renderGameOverlay), then the screen's
   // gradient over it, then the screen's own text and buttons. Everything below the text is mounted here,
-  // in the engine's background slot, for two reasons: base_screen mounts that slot as
+  // in the engine's background slot, for three reasons: base_screen mounts that slot as
   // `bg_no_safezone_screen_panel@$screen_bg_content` *outside* the safezone stack, so it is the one rect
-  // this screen resolves without the content's inset; and the wash can only cover the HUD if the two are
-  // drawn in one panel with the wash second. The era's HUD is redrawn at all because the dead player is
-  // parked in GameMode.Spectator, and spectator is what hides Bedrock's HUD.
+  // this screen resolves without the content's inset; the wash can only cover the HUD if the two are
+  // drawn in one panel with the wash second; and that slot's own default is an empty panel, so a form
+  // this pack does not own has only to be left alone to read the way the engine reads it. The era's HUD
+  // is redrawn at all because the dead player is parked in GameMode.Spectator, and spectator is what
+  // hides Bedrock's HUD.
+  //
+  // The slot belongs to the screen rather than to the death form, so what is served from it is routed
+  // the same way the content is - and by the same title, down to the string - because every other form
+  // the engine draws on this screen, modal forms included, comes through here too.
   "screen_underlay": {
     "type": "panel",
     "size": [ "100%", "100%" ],
+    "$death_title": "Game over!",
     "controls": [
-      { "hud@bfui-death_screen.hud": {} },
-      { "wash@bfui-death_screen.wash": {} }
+      {
+        "death_underlay": {
+          "type": "panel",
+          "size": [ "100%", "100%" ],
+          "controls": [
+            { "hud@bfui-death_screen.hud": {} },
+            { "wash@bfui-death_screen.wash": {} }
+          ],
+          "bindings": [
+            {
+              "binding_type": "view",
+              "source_property_name": "(#title_text = $death_title)",
+              "target_property_name": "#visible"
+            }
+          ]
+        }
+      }
     ]
   },
 
@@ -273,8 +356,8 @@
   //
   // The body arrives on `#form_text`, and the property bag carries the same string as its declared
   // default. A label draws the property bag's value when the binding that would fill it has not run,
-  // so a form body the engine does not push to a replaced `long_form` still prints the era's line
-  // rather than nothing. The two copies are pinned together by tests/smoke/deathScreenUi.test.ts.
+  // so a form body the engine does not push into this tree still prints the era's line rather than
+  // nothing. The two copies are pinned together by tests/smoke/deathScreenUi.test.ts.
   "score": {
     "type": "label",
     "size": [ "100%", "default" ],
