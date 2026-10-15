@@ -36,7 +36,7 @@
 
 **Betafied** is an authentic recreation of **Minecraft Beta 1.7.3** running inside modern **Bedrock Edition** (Script API 2.11.0-beta). 
 
-This is not a cosmetic texture pack with a nostalgia filter placed over modern gameplay. It is a ground-up behavioral reconstruction of how Minecraft actually behaved in the summer of 2011: the instant-heal food system, the machine-gun bow, Beta terrain generation, pre-1.8 mob AI, classic physics, and the atmospheric void fog. Modern items, blocks, and mobs are transparently converted to era-appropriate equivalents rather than deleted, keeping the experience pure and seamless.
+It is a ground-up behavioral reconstruction of how Minecraft actually behaved in the summer of 2011: the instant-heal food system, the machine-gun bow, Beta terrain generation, pre-1.8 mob AI, classic physics, and the atmospheric void fog. Modern items, blocks, and mobs are transparently converted to era-appropriate equivalents rather than deleted, keeping the experience pure and seamless.
 
 Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run your own server, and build something legendary with it.
 
