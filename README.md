@@ -50,7 +50,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>⚔️ Combat & Health</h3>
+      <h3>Combat & Health</h3>
       <ul>
         <li><b>Instant Food Healing</b>: Consuming food immediately restores hearts; hunger bar and natural health regeneration are completely removed.</li>
         <li><b>Rapid-Fire Bow</b>: Classic machine-gun bow mechanics without charging time.</li>
@@ -58,7 +58,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
       </ul>
     </td>
     <td width="50%" valign="top">
-      <h3>🐺 Classic Mobs & AI</h3>
+      <h3>Classic Mobs & AI</h3>
       <ul>
         <li><b>Authentic Pre-1.8 Catalog</b>: Only Beta 1.7.3 creatures roam the world; modern species are culled automatically.</li>
         <li><b>Passive Mob Wandering</b>: Animals roam freely without breeding mechanics or artificial following.</li>
@@ -69,7 +69,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>🌍 World Generation & Limits</h3>
+      <h3>World Generation & Limits</h3>
       <ul>
         <li><b>Era Biomes & Ore Spread</b>: Faithful Beta biome layout and vein attempt counts.</li>
         <li><b>Chunk Scrubber</b>: Dynamically restores modern chunk features back to authentic Beta terrain.</li>
@@ -78,7 +78,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
       </ul>
     </td>
     <td width="50%" valign="top">
-      <h3>🛠️ Period Mechanics</h3>
+      <h3>Period Mechanics</h3>
       <ul>
         <li><b>Furnace Minecarts</b>: Real coal fueling, locomotive puffing, and cart collision impulse physics.</li>
         <li><b>Boat Impacts</b>: Classic wooden boats shatter into wooden planks and sticks upon high-speed collisions.</li>
@@ -89,7 +89,7 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
   </tr>
 </table>
 
-### 🔄 Transparent Item & Block Normalization
+### Transparent Item & Block Normalization
 When players pick up, mine, or encounter post-Beta items, blocks, or loot, Betafied's generator-driven normalization pipeline automatically converts them into their closest historical equivalents. Builders and staff can bypass conversion using privileged tags (`builder_exempt`).
 
 ---
