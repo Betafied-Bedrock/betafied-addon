@@ -193,9 +193,9 @@ Betafied is structured into modular subsystems under `packs/BP/scripts/`. TypeSc
 
 ## A Note on AI Development
 
-Betafied is developed by a few people in close collaboration with AI coding agents.
+Betafied is a hobby project run by a few people, and like almost every modern codebase it uses agentic coding tools somewhere in the pipeline. Nobody is paid for this work and nothing is sold, so there is nothing to be gained from passing machine output off as hand-written; the aim is to let players who normally can't play Beta 1.7.3 play it in Bedrock.
 
-The agents help write automated test suites, draft changes, and run code-health scans that surface technical debt. Every commit is authored and reviewed by hand, agents do not commit or push independently, and nothing is merged unless the full quality gate (`npm run check`) is green. The AI sometimes writes code, but the behavior it targets comes directly from authentic Minecraft Beta 1.7.3.
+Agents draft code and tests and run code-health scans that surface technical debt. Every commit is authored and reviewed by hand, agents never commit or push on their own, and nothing merges unless the full quality gate (`npm run check`) is green.
 
 ---
 
