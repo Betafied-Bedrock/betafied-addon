@@ -672,8 +672,12 @@ export class Entity {
         this.isRemoved = true;
     }
 
+    // The engine answers with the entity's live motion. A case that reads speed (the boat pass does)
+    // sets this; everything else keeps reading a standstill.
+    velocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+
     getVelocity(): { x: number; y: number; z: number } {
-        return { x: 0, y: 0, z: 0 };
+        return { ...this.velocity };
     }
 
     nameTag: string = "";

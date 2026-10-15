@@ -84,7 +84,7 @@ describe("Canonical Beta 1.7.3 Registry Policy", () => {
                 "minecraft:diamond",
                 "minecraft:redstone",
                 "minecraft:bone_meal",
-                "minecraft:reeds"
+                "minecraft:sugar_cane"
             ];
             for (const id of classic) {
                 assert.ok(isBetaItem(id), `Expected ${id} to be recognized as a Beta item`);
@@ -105,9 +105,7 @@ describe("Canonical Beta 1.7.3 Registry Policy", () => {
                 "minecraft:amethyst_shard",
                 "minecraft:raw_iron",
                 "minecraft:raw_copper",
-                "minecraft:copper_ingot",
-                // Bedrock exposes sugar cane under this second item id; the era's own id is `reeds`.
-                "minecraft:sugar_cane"
+                "minecraft:copper_ingot"
             ];
             for (const id of modern) {
                 assert.equal(isBetaItem(id), false, `Expected ${id} to be rejected as post-Beta item`);

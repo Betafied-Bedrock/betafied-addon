@@ -97,12 +97,40 @@ describe("Drop conversion - picked-up items match their stack", () => {
         assert.equal(spawned.length, 0, "an already-final reeds stack needs no respawn");
     });
 
-    it("lands Bedrock's second sugar cane id on the era's reeds", () => {
-        const { entity, spawned, removed } = brokenDrop("minecraft:sugar_cane");
+    it("keeps the id this engine pays a broken cane in", () => {
+        // `minecraft:reeds` is this engine's cane BLOCK; the item a broken cane pays is
+        // `minecraft:sugar_cane`, and retyping that onto the block id handed the drop back to the
+        // engine as an id it will not build. The entity is the only copy of the item, so it stays.
+        const { entity, spawned, removed } = brokenDrop("minecraft:sugar_cane", 2);
         eventBus.dispatch("entitySpawn", { entity });
 
-        assert.equal(removed(), true, "the alias entity is replaced rather than kept");
-        assert.equal(spawned[0]?.typeId, "minecraft:reeds", "the ground stack must be the id the era knew");
+        assert.equal(removed(), false, "the engine's own cane item must survive the spawn pass");
+        assert.equal(spawned.length, 0, "an already-final cane stack needs no respawn");
+    });
+
+    it("leaves a drop alone when the id it would be retyped to cannot be built", () => {
+        // Stands in for the engine refusing a replacement id: the mock's ItemStack accepts anything,
+        // so only this patch can reach the ordering the fix is for. The source entity is removed to
+        // spawn a replacement, which means an unbuildable target may never be reached at all.
+        const original = Object.getOwnPropertyDescriptor(ItemStack.prototype, "maxAmount")!;
+        const originalGet = original.get!;
+        Object.defineProperty(ItemStack.prototype, "maxAmount", {
+            configurable: true,
+            get(this: ItemStack) {
+                if (this.typeId === "bh:oak_log") throw new Error("id this engine cannot build");
+                return originalGet.call(this);
+            }
+        });
+
+        try {
+            const { entity, spawned, removed } = brokenDrop("minecraft:oak_log", 3);
+            eventBus.dispatch("entitySpawn", { entity });
+
+            assert.equal(removed(), false, "a drop must outlive a replacement the engine refused");
+            assert.equal(spawned.length, 0, "nothing can be spawned under the refused id");
+        } finally {
+            Object.defineProperty(ItemStack.prototype, "maxAmount", original);
+        }
     });
 
     it("leaves an already-normalized bh drop untouched", () => {

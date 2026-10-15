@@ -2,6 +2,34 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.9.2 — 2026-10-15
+
+5.9.2 fixes boats breaking against any shore they came near, and the sugar cane, sugar and paper the pack was destroying or failing to craft. It also makes the packaged world template import again.
+
+### Boats
+
+- Fixed boats breaking whenever a solid block stood beside them, which destroyed boats moored at a dock, resting on a shore and drifting in a stream.
+- Changed the break to the era's own condition: a boat is destroyed by a blocked move above 0.15 blocks a tick, as `EntityBoat.onUpdate` did.
+- Changed the collision read to skip liquids, so flowing water no longer counts as a bank.
+- Changed the boat sweep from every 10 ticks to every 2, so a ramming boat is still moving when the pass sees it.
+
+### Sugar cane
+
+- Fixed broken sugar cane dropping nothing, because the cane was renamed to the reed block's id, which is not an item.
+- Fixed a conversion the game refuses destroying the drop it was meant to convert.
+- Changed the sugar and paper recipes to name the cane item, so both craft again.
+- Kept stacks of `minecraft:reeds` as they are, since the game still ships that block.
+
+### World template
+
+- Fixed the packaged world template being refused on import because its manifest carried no `base_game_version`.
+- Changed the template's base game version to come from the behavior pack being shipped, so a world never loads against older vanilla data than the packs were built for.
+
+### Tooling
+
+- Fixed each release posting a second Discord release post, instead of relabelling the one the mod already has.
+- Added the release notes to the changelog channel, posted ahead of the release post.
+
 ## 5.9.1 — 2026-10-15
 
 5.9.1 removes the chunk scrubber and the biome and feature overrides for the Overworld, which the world template now supplies. It adds the Discord statistics card and hardens the world template packaging.

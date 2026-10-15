@@ -1,4 +1,4 @@
-import { world, system, ItemStack, Dimension, Entity, EntityComponentTypes, Vector3 } from "@minecraft/server";
+import { world, system, ItemStack, Dimension, Entity, EntityComponentTypes } from "@minecraft/server";
 import { reportError } from "../core/errorReporter.js";
 import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
@@ -128,23 +128,36 @@ function handleItemDrop(entity: Entity, options: SanitizationOptions): void {
     if (resolution.action === "remove") {
         entity.remove();
     } else if (resolution.action === "convert" && resolution.targetId !== undefined) {
+        const stacks = planStackedDrops(resolution.targetId, ORE_DROP_AMOUNT[itemId] ?? amount);
+
+        // The entity holds the only copy of the item, so a target this engine cannot build leaves the
+        // drop as the engine spawned it rather than removing it for a replacement that never lands.
+        if (stacks === undefined) return;
+
         const loc = entity.location;
         const dim = entity.dimension;
         entity.remove();
-        spawnStackedDrop(dim, loc, resolution.targetId, ORE_DROP_AMOUNT[itemId] ?? amount);
+        for (const stack of stacks) dim.spawnItem(stack, loc);
     }
 }
 
 // Splits drops exceeding target item max stack size (e.g. unstackable bh:porkchop).
-function spawnStackedDrop(dim: Dimension, loc: Vector3, itemId: string, amount: number): void {
-    const maxStack = Math.max(1, new ItemStack(itemId, 1).maxAmount);
-    let remaining = amount;
+function planStackedDrops(itemId: string, amount: number): ItemStack[] | undefined {
+    const stacks: ItemStack[] = [];
 
-    while (remaining > 0) {
-        const stackSize = Math.min(remaining, maxStack);
-        dim.spawnItem(new ItemStack(itemId, stackSize), loc);
-        remaining -= stackSize;
+    try {
+        const maxStack = Math.max(1, new ItemStack(itemId, 1).maxAmount);
+        for (let remaining = amount; remaining > 0; ) {
+            const stackSize = Math.min(remaining, maxStack);
+            stacks.push(new ItemStack(itemId, stackSize));
+            remaining -= stackSize;
+        }
+    } catch {
+        // An id this engine has no item for: the caller keeps the engine's own drop instead.
+        return undefined;
     }
+
+    return stacks;
 }
 
 export function sanitizeWorldEntity(

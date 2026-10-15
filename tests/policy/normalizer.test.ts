@@ -11,7 +11,7 @@ import {
 describe("Heuristic Inverse Normalizer", () => {
     describe("Item Normalization", () => {
         it("keeps authentic Beta items unchanged", () => {
-            const betaItems = ["minecraft:iron_sword", "minecraft:diamond_pickaxe", "minecraft:bread", "minecraft:coal", "minecraft:reeds"];
+            const betaItems = ["minecraft:iron_sword", "minecraft:diamond_pickaxe", "minecraft:bread", "minecraft:coal", "minecraft:sugar_cane"];
             for (const item of betaItems) {
                 assert.deepEqual(normalizeItem(item), { action: "keep" });
             }
@@ -44,11 +44,13 @@ describe("Heuristic Inverse Normalizer", () => {
             }
         });
 
-        it("folds Bedrock's second sugar cane id back onto the era's reeds", () => {
-            // The block and the era's item are `minecraft:reeds`; `minecraft:sugar_cane` is the id a
-            // broken cane can carry, and reading it as post-Beta deleted the drop on chunk load.
-            assert.deepEqual(normalizeItem("minecraft:sugar_cane"), { action: "convert", targetId: "minecraft:reeds" });
-            assert.deepEqual(normalizeEntityDrop("minecraft:sugar_cane"), { action: "convert", targetId: "minecraft:reeds" });
+        it("keeps the era's reed item under the id this engine gives it", () => {
+            // The era's plant arrived under one id in Beta and is split across two here: the block is
+            // `minecraft:reeds`, the item a broken cane pays is `minecraft:sugar_cane`. Folding the
+            // item onto the block id changed the id the drop is carried as, into one the engine does
+            // not build an ItemStack for, and the drop died with the entity holding it.
+            assert.deepEqual(normalizeItem("minecraft:sugar_cane"), { action: "keep" });
+            assert.deepEqual(normalizeEntityDrop("minecraft:sugar_cane"), { action: "keep" });
         });
 
         it("converts modern wood items to authentic oak equivalents via pattern heuristics", () => {

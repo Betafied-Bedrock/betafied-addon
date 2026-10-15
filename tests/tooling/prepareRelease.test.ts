@@ -118,13 +118,25 @@ describe("World template manifest", () => {
     },
     modules: [{ type: "world_template", uuid: "7c5e2365-2766-4c4b-b0b3-f72534594619", version: [5, 4, 0] }]
   };
+  const baseGameVersion = [1, 26, 51];
 
-  it("carries lock_template_options, without which the engine drops the whole template", () => {
-    const updated = applyWorldTemplateManifest(template, [5, 5, 0], { name: "Betafied 5.5" });
+  it("carries both header fields the game requires of a template, lock_template_options and base_game_version", () => {
+    const updated = applyWorldTemplateManifest(template, [5, 5, 0], { name: "Betafied 5.5", baseGameVersion });
 
     assert.equal(updated.header.lock_template_options, false, "the template is never listed without this field");
     assert.equal(updated.header.name, "Betafied 5.5");
+    assert.deepEqual(
+      updated.header.base_game_version,
+      [1, 26, 51],
+      "the import is refused without this field, not just the listing"
+    );
     assert.deepEqual(worldTemplateManifestProblems(updated), []);
+  });
+
+  it("refuses to package a template that names no base game version", () => {
+    const problems = worldTemplateManifestProblems(applyWorldTemplateManifest(template, [5, 5, 0]));
+
+    assert.ok(problems.some((problem) => problem.includes("header.base_game_version")));
   });
 
   it("keeps an explicit lock_template_options rather than forcing one", () => {
@@ -141,9 +153,13 @@ describe("World template manifest", () => {
 
     assert.ok(problems.some((problem) => problem.includes("header.uuid")));
     assert.ok(problems.some((problem) => problem.includes("header.lock_template_options")));
+    assert.ok(problems.some((problem) => problem.includes("header.base_game_version")));
     assert.ok(problems.some((problem) => problem.includes("world_template module")));
     assert.deepEqual(
-      worldTemplateManifestProblems({ ...applyWorldTemplateManifest(template, [5, 4, 0]), format_version: 3 }),
+      worldTemplateManifestProblems({
+        ...applyWorldTemplateManifest(template, [5, 4, 0], { baseGameVersion }),
+        format_version: 3
+      }),
       ["format_version must be 2, not 3"],
       "an otherwise valid template reports only what is actually wrong with it"
     );
@@ -226,6 +242,10 @@ describe("Every version carrier in the checkout agrees", () => {
         templateManifest.header?.lock_template_options,
         false,
         "a world template needs this header field or the game never lists it"
+      );
+      assert.ok(
+        Array.isArray(templateManifest.header?.base_game_version),
+        "a world template needs base_game_version or the game refuses the import"
       );
     }
 

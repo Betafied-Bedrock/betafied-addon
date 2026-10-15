@@ -655,20 +655,16 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
     });
 
     describe("Sugar Cane Identity", () => {
-        it("keeps the era's reeds id in the inventory", () => {
-            // Bedrock's block and Beta's own item id are both `minecraft:reeds`; anything that read
-            // it as a modern id deleted the cane a player had just harvested.
-            assert.equal(evaluateItemAction(new ItemStack("minecraft:reeds", 64)).type, "keep");
+        it("keeps the cane item a harvested cane arrives as", () => {
+            // `minecraft:sugar_cane` is this engine's cane item; reading it as a modern id deleted
+            // the cane a player had just harvested.
+            assert.equal(evaluateItemAction(new ItemStack("minecraft:sugar_cane", 64)).type, "keep");
         });
 
-        it("retypes Bedrock's second sugar cane id onto reeds instead of deleting it", () => {
-            const action = evaluateItemAction(new ItemStack("minecraft:sugar_cane", 5));
-
-            assert.equal(action.type, "replace");
-            if (action.type === "replace") {
-                assert.equal(action.item.typeId, "minecraft:reeds");
-                assert.equal(action.item.amount, 5, "the whole stack must ride across");
-            }
+        it("keeps a legacy reeds stack instead of deleting it", () => {
+            // `minecraft:reeds` is the block, and an old world's saved inventory can still hold a
+            // stack under that spelling. It is the era's own plant either way.
+            assert.equal(evaluateItemAction(new ItemStack("minecraft:reeds", 64)).type, "keep");
         });
     });
 

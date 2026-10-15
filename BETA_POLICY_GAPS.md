@@ -436,21 +436,41 @@ survives in an existing world, and the player's 2x2 grid offers only them. That 
 single interface — the modern recipe set is not a second way to reach the era's items — but it does
 change what an existing world can craft without the pack's table.
 
-## 13. Resolved: sugar cane is `minecraft:reeds`, never `minecraft:sugar_cane`
+## 13. Sugar cane is two ids on this engine: `minecraft:reeds` (block) and `minecraft:sugar_cane` (item)
 
-Both tables registered the era's sugar cane as `minecraft:sugar_cane`, which is not the id the game
-uses. Bedrock's block is `minecraft:reeds` (its only state is `age`), the era's item is `minecraft:reeds`
-— Mojang's own `sugar.json` and `paper.json` recipes still name it — and `minecraft:sugar_cane` is a
-second, later item id for the same plant. The mismatch was invisible where it was most expensive:
-`resolveDropId("minecraft:reeds")` answered *remove*, so a broken cane was deleted at `entityLoad` (the
-chunk-loading pass, which is why the cane vanished as a player walked up to it), the drop entity was
-deleted again by the cleaner's 32-block sweep, and the inventory sweep reported the era's own item as
-nonexistent. Only the block path was masked, by a hand-written `"minecraft:reeds"` entry in the
-scrubber's exclude list.
+Beta 1.7.3 had one id for the plant — `Block.reed` and `Item.reed`, `minecraft:reeds` in the recovered
+client. This engine splits it. `minecraft:reeds` is the block and only the block: its only state is
+`age`, and it is the cane entry in the block-id enum. The item a broken cane pays is
+`minecraft:sugar_cane`, the id in the item-id enum and in `/loot`'s item list.
 
-`minecraft:reeds` now sits in both `BETA_ITEM_IDS` and `BETA_BLOCK_IDS`, the scrubber's duplicate entry
-is gone so the registry owns the fact, and `normalizer.ITEM_ID_ALIASES` folds `minecraft:sugar_cane`
-back onto it rather than deleting a stack that carries the newer id.
+Both halves of that split cost the drop on the way here:
+
+- Both tables first registered the era's cane as `minecraft:sugar_cane` and read `minecraft:reeds` as a
+  post-Beta id, so a broken cane was deleted at `entityLoad` (the chunk-loading pass, which is why the
+  cane vanished as a player walked up to it), deleted again by the cleaner's 32-block sweep, and
+  reported as nonexistent by the inventory sweep. Only the block path was masked, by a hand-written
+  `"minecraft:reeds"` entry in the scrubber's exclude list.
+- The repair inverted it, folding `minecraft:sugar_cane` onto the block id — which handed the ground
+  item to the engine under an id it has no item for. The drop arrived, was retyped, and left nothing
+  behind: `handleItemDrop` removed the entity before it built the replacement, and the replacement
+  could not be built. The offline suite could not see that, because the mock's `ItemStack` accepts any
+  id.
+
+Settled now, one owner each: `minecraft:sugar_cane` is in `BETA_ITEM_IDS`, `minecraft:reeds` is in
+`BETA_BLOCK_IDS` (the scrubber's duplicate entry is gone, so the registry owns the fact), and
+`normalizer.ITEM_ID_ALIASES` is deleted — the only fold it could make was onto an id that is not an
+item. The pack's own `sugar.json` and `paper.json` name `minecraft:sugar_cane`. Vanilla's copies of those
+two recipes still name `minecraft:reeds`, which stays the block's spelling and a recipe ingredient the
+engine resolves; they are not the pack's to fix.
+
+A conversion that cannot land no longer costs the item: `entitySpawnHandler` builds the replacement
+stacks before it removes the entity holding the drop, and leaves an engine-held drop alone when the
+target cannot be built. `tests/integration/dropConversion.test.ts` pins both — the second by patching
+the mock's `ItemStack` into an engine that refuses one id.
+
+**Needs an in-game look:** that a broken cane now drops `minecraft:sugar_cane`, and that a legacy save's
+`minecraft:reeds` stacks still open. `/give @s sugar_cane` and `/give @s reeds` are the two commands that
+settle which spelling this engine accepts; the inventory sweep keeps the old spelling either way.
 
 **Same shape, still open:** the scrubber's exclude list is a hand-maintained table of Bedrock's legacy
 spellings for blocks the registry names the Java way — `deadbush`, `web`, `mob_spawner`,
@@ -964,6 +984,35 @@ Still open:
   answers with the unresolved world spawn there, the same void loop is reachable through the bed branch.
 - **Whether a bed spawn wants the era's `+0.5 / +1 / +0.5` offset.** §19 already carries this one for the
   respawn as a whole; the recorded world spawn does not add it either.
+
+## 23. A boat breaks only on a blocked move above the era's collision speed
+
+`EntityBoat.onUpdate` destroyed a boat at `isCollidedHorizontally && var6 > 0.15D`, `var6` being
+`sqrt(motionX * motionX + motionZ * motionZ)` in blocks a tick and read before the collision's own damping;
+a slower contact fell to the `else` branch, which decayed the motion and left the boat alone.
+`boatCollision.ts` read no speed at all: any solid block in one of the four cells at the boat's own level
+broke the boat on the spot, so a boat moored against a dock, a boat resting on the shore and a boat in a
+stream all broke where the era kept them.
+
+The pass takes the era's threshold now. `BREAK_SPEED` gates the four-cell read, and the read no longer
+counts a liquid as shoreline - `minecraft:flowing_water` is a block id of its own here and is what a
+stream's surface cell carries, so the block's `isLiquid` decides instead of a list of ids - and
+`TICK_INTERVAL` came down from 10 to 2 for the same rule. At 0.4 blocks a tick a rammed boat covers four
+blocks between the old passes and has already stopped when the next one runs, so the era's condition could
+not have been read there at all; two ticks is 0.8 blocks and catches the approach inside the block-wide
+window the read covers. The mock was part of why this was invisible: `getVelocity()` answered a standstill
+for every entity, so no test could exercise a pass that decides on speed. It carries a settable per-entity
+`velocity` now.
+
+Still open:
+
+- **Whether `Entity.getVelocity()` still reports the travel of a boat a block has just stopped.** The era
+  read its motion on the tick the move was blocked, before the damping. If the engine answers zero by the
+  time the pass runs, a ram breaks nothing where the era broke the boat - the opposite complaint to this
+  one - and the check would have to compare successive positions instead. One in-game ram decides it.
+- **Whether the four-cell read matches a blocked move.** Beta tested the boat's own box against the block's,
+  which is why a boat sliding along a wall it already touched counted as blocked. The read here is
+  centre-plus-one in each of the four directions, so a wall the box is not touching reads as shoreline too.
 
 ## Why this file exists
 
