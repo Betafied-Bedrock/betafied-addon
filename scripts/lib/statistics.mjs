@@ -188,6 +188,18 @@ export function statisticsPayload(stats) {
 }
 
 /**
+ * The message a mod's release post lives in: the one the state records, on every run.
+ *
+ * The release channel keeps one post per mod, so a release that announces a version newer than the
+ * recorded one still edits that post — its heading and button carry the newest version, and the
+ * total beside the button is what the hourly refresh keeps current. Only having nothing to edit, on
+ * the first run or after a post Discord no longer has, is what makes a run publish a new one.
+ */
+export function releaseMessageToEdit(messages) {
+  return messages?.release?.id ?? null;
+}
+
+/**
  * The release post: the branding copy headed by the version, one download button labelled with it,
  * and the standing download total.
  *

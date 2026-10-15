@@ -27,6 +27,7 @@ import {
   historyWithReading,
   mergeAssetCounts,
   pageViewStats,
+  releaseMessageToEdit,
   releasePostPayload,
   statisticsPayload,
   webhookMessageUrl,
@@ -233,11 +234,11 @@ async function main() {
     pageViews: await fetchPageViews(env, now)
   };
 
-  // A refreshed release post is the newest one; an older release keeps the post it already has,
-  // which is what keeps the channel readable as a history of releases.
+  // The release channel keeps one post per mod, so a new tag relabels the message the state
+  // records rather than adding a second one, and the hourly run refreshes that same message.
   const releaseTag = RELEASE_TAG ?? messages.release?.tag ?? null;
   const release = releaseTag ? { tag: releaseTag, payload: releasePostPayload({ tag: releaseTag, downloads: total }) } : null;
-  const releaseMessageId = RELEASE_TAG && messages.release?.tag !== RELEASE_TAG ? null : messages.release?.id;
+  const releaseMessageId = releaseMessageToEdit(messages);
 
   if (DRY_RUN) {
     console.log(`statistics: dry run, ${total} downloads, page views ${stats.pageViews ? "read" : "unavailable"}`);

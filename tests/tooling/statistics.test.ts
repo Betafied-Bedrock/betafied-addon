@@ -6,6 +6,7 @@ import {
   historyWithReading,
   mergeAssetCounts,
   pageViewStats,
+  releaseMessageToEdit,
   releasePostPayload,
   statisticsPayload,
   webhookMessageUrl,
@@ -226,6 +227,27 @@ describe("The release post", () => {
     }
   });
 
+});
+
+describe("Which message the release post lives in", () => {
+  it("edits the mod's recorded post even when the tag it announces has changed", () => {
+    const state = { release: { id: "1560259613851389983", tag: "5.9" } };
+
+    assert.equal(
+      releaseMessageToEdit(state),
+      "1560259613851389983",
+      "the release channel keeps one post per mod, so a new version updates it instead of adding a second"
+    );
+  });
+
+  it("has nothing to edit on the first run, which is what makes the post get published", () => {
+    assert.equal(releaseMessageToEdit({}), null);
+    assert.equal(releaseMessageToEdit(undefined), null);
+  });
+
+  it("hands the refresh the post it recorded alongside the readings", () => {
+    assert.equal(releaseMessageToEdit({ statistics: "7", release: { id: "42", tag: "5.9.1" } }), "42");
+  });
 });
 
 describe("Webhook endpoints", () => {
