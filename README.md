@@ -92,9 +92,6 @@ Betafied is 100% open source under the **[GNU AGPLv3](LICENSE)**. Fork it, run y
 ### <img src="assets/icons/refresh.svg" width="24" height="24" alt="" /> Transparent Item & Block Normalization
 When players pick up, mine, or encounter post-Beta items, blocks, or loot, Betafied's generator-driven normalization pipeline automatically converts them into their closest historical equivalents. Builders and staff can bypass conversion using privileged tags (`builder_exempt`).
 
-### <img src="assets/icons/cloud.svg" width="24" height="24" alt="" /> Something in the Fog...
-> *The changelog will only ever describe it as "something in the fog." Keep your torches lit.*
-
 ---
 
 ## Quick Start
