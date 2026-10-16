@@ -1,7 +1,7 @@
 import { system, BlockPermutation, Block } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
-import { BH_FENCE_ID } from "../core/betaRegistry.js";
+import { BH_FENCE_ID } from "../policy/betaRegistry.js";
 
 const CONFIG = Object.freeze({
     FENCE_ID: BH_FENCE_ID,

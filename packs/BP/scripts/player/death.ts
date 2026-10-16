@@ -9,7 +9,7 @@ import {
     world
 } from "@minecraft/server";
 import type { DimensionLocation, Vector3 } from "@minecraft/server";
-import { OVERWORLD_KEY } from "../core/betaConstants.js";
+import { OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
 import { damageArmor } from "../combat/armor.js";
 import { eventBus } from "../core/eventBus.js";

@@ -6,7 +6,7 @@ import {
     normalizeEntityDrop,
     resolveHeldItem,
     resolvePlacerTarget
-} from "../../packs/BP/scripts/core/normalizer.js";
+} from "../../packs/BP/scripts/policy/normalizer.js";
 
 describe("Heuristic Inverse Normalizer", () => {
     describe("Item Normalization", () => {

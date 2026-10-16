@@ -1,7 +1,7 @@
 import { Direction } from "@minecraft/server";
 import { eventBus, guarded } from "../core/eventBus.js";
-import { BETA_FLOOR_Y, BETA_HEIGHT_LIMIT, OVERWORLD_ID } from "../core/betaConstants.js";
-import { BETA_BED_BLOCK_IDS, BETA_SIGN_BLOCK_IDS } from "../core/betaRegistry.js";
+import { BETA_FLOOR_Y, BETA_HEIGHT_LIMIT, OVERWORLD_ID } from "../policy/betaConstants.js";
+import { BETA_BED_BLOCK_IDS, BETA_SIGN_BLOCK_IDS } from "../policy/betaRegistry.js";
 
 const HEIGHT_MESSAGE = `§cHeight limit for building is ${BETA_HEIGHT_LIMIT} blocks`;
 

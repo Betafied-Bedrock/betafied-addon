@@ -1,5 +1,5 @@
 import { Entity, EntityComponentTypes } from "@minecraft/server";
-import { isBetaMob } from "../core/betaRegistry.js";
+import { isBetaMob } from "../policy/betaRegistry.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 
 export interface EntityPropertyRule {

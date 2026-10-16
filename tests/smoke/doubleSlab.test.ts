@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DOUBLE_SLAB_OF } from "../../packs/BP/scripts/interactions/slabStacking.js";
-import { BETA_BLOCK_IDS } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { BETA_BLOCK_IDS } from "../../packs/BP/scripts/policy/betaRegistry.js";
 
 const root = process.cwd();
 

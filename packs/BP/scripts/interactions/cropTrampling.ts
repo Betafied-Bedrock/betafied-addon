@@ -3,7 +3,7 @@ import type { Block, BlockPermutation, Dimension, Entity, Vector3 } from "@minec
 import { tickManager } from "../core/tickManager.js";
 import { eventBus } from "../core/eventBus.js";
 import { runCatching, reportError } from "../core/errorReporter.js";
-import { BH_FENCE_ID } from "../core/betaRegistry.js";
+import { BH_FENCE_ID } from "../policy/betaRegistry.js";
 import { eraRulesApply } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({

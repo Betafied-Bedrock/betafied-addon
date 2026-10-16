@@ -1,6 +1,6 @@
 import { ItemStack, EntityComponentTypes, EquipmentSlot } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
-import { BETA_PIGMAN_TYPES } from "../core/betaRegistry.js";
+import { BETA_PIGMAN_TYPES } from "../policy/betaRegistry.js";
 import { reportError } from "../core/errorReporter.js";
 
 eventBus.onEntitySpawn((event) => {

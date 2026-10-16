@@ -13,9 +13,9 @@ import { reportError } from "./errorReporter.js";
 import {
     BH_BOW_ID, BETA_CAPPED_ITEM_IDS, BETA_CAPPED_ITEM_OF, BETA_CAPPED_VANILLA_IDS,
     isBetaItem, isModItem, isVanillaId
-} from "./betaRegistry.js";
+} from "../policy/betaRegistry.js";
 import { ARMOR_SLOTS } from "./equipmentSlots.js";
-import { normalizeItem, resolvePlacerTarget, FOOD_CONVERSIONS } from "./normalizer.js";
+import { normalizeItem, resolvePlacerTarget, FOOD_CONVERSIONS } from "../policy/normalizer.js";
 import { tickManager } from "./tickManager.js";
 import { eventBus } from "./eventBus.js";
 

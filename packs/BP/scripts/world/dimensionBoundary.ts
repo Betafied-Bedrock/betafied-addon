@@ -1,7 +1,7 @@
 import { world } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { teleportQuietly } from "../core/quietTeleport.js";
-import { END_ID, OVERWORLD_ID, OVERWORLD_KEY } from "../core/betaConstants.js";
+import { END_ID, OVERWORLD_ID, OVERWORLD_KEY } from "../policy/betaConstants.js";
 
 eventBus.onPlayerDimensionChange((event) => {
     if (event.toDimension.id === END_ID) {

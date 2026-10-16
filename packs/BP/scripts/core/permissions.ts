@@ -2,8 +2,7 @@ import { Player, GameMode } from "@minecraft/server";
 
 /** Every player tag the pack reads, so a gate in another module cannot drift from its writer. */
 export const PLAYER_TAGS = Object.freeze({
-    BUILDER_EXEMPT: "builder_exempt",
-    VOIDED: "voided"
+    BUILDER_EXEMPT: "builder_exempt"
 } as const);
 
 export type PrivilegeReason = "creative" | "spectator" | "tag";

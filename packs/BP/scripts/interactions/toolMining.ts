@@ -2,7 +2,7 @@ import { world, Player, EquipmentSlot, EntityComponentTypes } from "@minecraft/s
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { runCatching } from "../core/errorReporter.js";
-import { BETA_PICKAXE_IDS, BETA_SWORD_IDS, WOOL_BY_COLOR } from "../core/betaRegistry.js";
+import { BETA_PICKAXE_IDS, BETA_SWORD_IDS, WOOL_BY_COLOR } from "../policy/betaRegistry.js";
 
 export const SLOW_BLOCKS = new Set([
     "minecraft:redstone_ore",

@@ -8,7 +8,7 @@ import type { Container } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
 import { tickManager } from "../core/tickManager.js";
-import { BH_BOW_ID } from "../core/betaRegistry.js";
+import { BH_BOW_ID } from "../policy/betaRegistry.js";
 import { getPrivilegeReason } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({

@@ -8,7 +8,7 @@ import {
     BETA_CAPPED_VANILLA_IDS,
     BETA_ITEM_IDS,
     BH_CAKE_ID
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 import { versionAtLeast } from "../support/text.js";
 
 const root = process.cwd();

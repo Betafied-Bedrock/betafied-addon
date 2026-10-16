@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 
 const LEGACY_ROSTER_IDS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:zombified_piglin": "minecraft:zombie_pigman"

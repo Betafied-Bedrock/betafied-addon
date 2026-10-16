@@ -3,7 +3,7 @@ import {
     PlayerInteractWithBlockBeforeEvent
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
-import { BETA_WOOD_SPECIES } from "../core/betaRegistry.js";
+import { BETA_WOOD_SPECIES } from "../policy/betaRegistry.js";
 
 const CEILING_RESTRICTED = Object.freeze(new Set([
     "minecraft:stone_button",

@@ -1,11 +1,11 @@
 import { world, system, BlockPermutation, BlockVolume, Dimension } from "@minecraft/server";
 import type { Block, BlockFilter, BlockLocationIterator } from "@minecraft/server";
-import { BETA_BLOCK_IDS, POST_BETA_WOOD_SPECIES } from "../core/betaRegistry.js";
-import { BLOCK_BULK_REPLACEMENTS, BLOCK_FINE_REPLACEMENTS } from "../core/compatibilityPolicy.js";
-import { normalizeBlock } from "../core/normalizer.js";
+import { BETA_BLOCK_IDS, POST_BETA_WOOD_SPECIES } from "../policy/betaRegistry.js";
+import { BLOCK_BULK_REPLACEMENTS, BLOCK_FINE_REPLACEMENTS } from "../policy/compatibilityPolicy.js";
+import { normalizeBlock } from "../policy/normalizer.js";
 import { reportError } from "../core/errorReporter.js";
 import { tickManager } from "../core/tickManager.js";
-import { NETHER_ID } from "../core/betaConstants.js";
+import { NETHER_ID } from "../policy/betaConstants.js";
 
 const SCRUB_DUE_AT = new Map<string, number>();
 const MAX_TRACKED_CHUNKS = 8192;

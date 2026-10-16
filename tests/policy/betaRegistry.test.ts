@@ -13,7 +13,7 @@ import {
     isBetaItem,
     isModItem,
     isVanillaId
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 
 describe("Canonical Beta 1.7.3 Registry Policy", () => {
     describe("Entity Registry", () => {

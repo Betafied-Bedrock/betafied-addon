@@ -10,7 +10,7 @@ import {
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
-import { FOOD_CONVERSIONS } from "../core/normalizer.js";
+import { FOOD_CONVERSIONS } from "../policy/normalizer.js";
 
 interface FoodConfig {
     health: number;

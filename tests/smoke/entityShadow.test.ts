@@ -6,7 +6,7 @@ import { inflateSync } from "node:zlib";
 import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 import { compareText, versionAtLeast } from "../support/text.js";
 
 const LEGACY_ROSTER_IDS: Readonly<Record<string, string>> = Object.freeze({

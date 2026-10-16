@@ -9,7 +9,7 @@ import {
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { BETA_HOSTILE_TYPES, BH_CAKE_ID, BH_CRAFTING_TABLE_ID } from "../core/betaRegistry.js";
+import { BETA_HOSTILE_TYPES, BH_CAKE_ID, BH_CRAFTING_TABLE_ID } from "../policy/betaRegistry.js";
 
 
 const ACHIEVEMENT_SWEEP_INTERVAL_TICKS = 100;

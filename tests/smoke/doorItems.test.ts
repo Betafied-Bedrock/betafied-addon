@@ -6,7 +6,7 @@ import {
     BETA_DOOR_BLOCK_OF,
     BH_IRON_DOOR_ID,
     BH_WOODEN_DOOR_ID
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 import { versionAtLeast } from "../support/text.js";
 
 const root = process.cwd();

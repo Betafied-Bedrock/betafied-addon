@@ -2,7 +2,7 @@ import { world, system, Dimension, Entity, Vector3, EntityComponentTypes } from 
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { END_KEY, NETHER_KEY, OVERWORLD_KEY } from "../core/betaConstants.js";
+import { END_KEY, NETHER_KEY, OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { magnitude, normalizeXZ, scale } from "../core/vectorMath.js";
 
 const CONFIG = Object.freeze({

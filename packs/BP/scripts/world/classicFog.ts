@@ -2,7 +2,7 @@ import { world } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { OVERWORLD_ID } from "../core/betaConstants.js";
+import { OVERWORLD_ID } from "../policy/betaConstants.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 20,

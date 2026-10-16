@@ -1,7 +1,7 @@
 import { world, system, ItemStack, Dimension, Entity, EntityComponentTypes } from "@minecraft/server";
-import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
-import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
-import { resolveDropTarget } from "../core/normalizer.js";
+import { isBetaEntity, isVanillaId } from "../policy/betaRegistry.js";
+import { isForeignOwnedEntity } from "../policy/compatibilityPolicy.js";
+import { resolveDropTarget } from "../policy/normalizer.js";
 import { eventBus, guarded } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
 import { migrateEntity } from "./entityMigration.js";

@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import {
     BLOCK_BULK_REPLACEMENTS,
     BLOCK_FINE_REPLACEMENTS
-} from "../../packs/BP/scripts/core/compatibilityPolicy.js";
-import { normalizeItem } from "../../packs/BP/scripts/core/normalizer.js";
+} from "../../packs/BP/scripts/policy/compatibilityPolicy.js";
+import { normalizeItem } from "../../packs/BP/scripts/policy/normalizer.js";
 import { sanitizeWorldEntity } from "../../packs/BP/scripts/mobs/entitySpawnHandler.js";
-import { BETA_BLOCK_IDS } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { BETA_BLOCK_IDS } from "../../packs/BP/scripts/policy/betaRegistry.js";
 
 /**
  * These cases describe the behaviour the game actually has. Every assertion goes through the same

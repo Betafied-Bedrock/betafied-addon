@@ -2,8 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { BH_CAKE_ID, isBetaBlock } from "../../packs/BP/scripts/core/betaRegistry.js";
-import { BLOCK_FINE_REPLACEMENTS } from "../../packs/BP/scripts/core/compatibilityPolicy.js";
+import { BH_CAKE_ID, isBetaBlock } from "../../packs/BP/scripts/policy/betaRegistry.js";
+import { BLOCK_FINE_REPLACEMENTS } from "../../packs/BP/scripts/policy/compatibilityPolicy.js";
 
 const root = process.cwd();
 

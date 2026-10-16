@@ -2,7 +2,7 @@ import { world, system, Entity, Player, ItemStack, EntityComponentTypes, Dimensi
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { WOOL_BY_COLOR } from "../core/betaRegistry.js";
+import { WOOL_BY_COLOR } from "../policy/betaRegistry.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 40,

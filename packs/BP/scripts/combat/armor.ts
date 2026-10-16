@@ -9,7 +9,7 @@ import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { runCatching } from "../core/errorReporter.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
-import { isBetaItem, isVanillaId } from "../core/betaRegistry.js";
+import { isBetaItem, isVanillaId } from "../policy/betaRegistry.js";
 import { getPrivilegeReason } from "../core/permissions.js";
 
 // Beta 1.7.3 base armor points are slot-indexed rather than material-indexed.

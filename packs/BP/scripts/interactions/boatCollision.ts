@@ -2,7 +2,7 @@ import { world, ItemStack, Entity, Block, Vector3 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { OVERWORLD_KEY } from "../core/betaConstants.js";
+import { OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { normalizeXZ, scale } from "../core/vectorMath.js";
 
 const CONFIG = Object.freeze({
