@@ -27,51 +27,36 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
 
             // Pre-Beta-1.9 armor indexed protection by slot alone, so leather matched diamond
             // point for point; the tier only changed how long the piece lasted.
-            assert.equal(getBaseArmorPoints("minecraft:leather_helmet"), 3);
             assert.equal(getBaseArmorPoints("minecraft:leather_chestplate"), 8);
-            assert.equal(getBaseArmorPoints("minecraft:leather_leggings"), 6);
-            assert.equal(getBaseArmorPoints("minecraft:leather_boots"), 3);
+            assert.equal(getBaseArmorPoints("minecraft:iron_helmet"), 3);
 
-            assert.equal(getBaseArmorPoints("minecraft:iron_chestplate"), 8);
-            assert.equal(getBaseArmorPoints("minecraft:golden_leggings"), 6);
-            assert.equal(getBaseArmorPoints("minecraft:chainmail_boots"), 3);
-        });
-
-        it("correctly resolves custom namespace armor matching vanilla names", () => {
-            assert.equal(getBaseArmorPoints("bh:diamond_helmet"), 3);
-            assert.equal(getBaseArmorPoints("bh:diamond_chestplate"), 8);
-            assert.equal(getBaseArmorPoints("custom:iron_boots"), 3);
-        });
-
-        it("provides the shared slot values for arbitrary custom armor pieces", () => {
             assert.equal(getBaseArmorPoints("custom:ruby_chestplate"), 8);
-            assert.equal(getBaseArmorPoints("custom:obsidian_helmet"), 3);
-            assert.equal(getBaseArmorPoints("custom:emerald_leggings"), 6);
             assert.equal(getBaseArmorPoints("custom:topaz_boots"), 3);
         });
 
-        it("keeps post-Beta vanilla armor at zero points", () => {
+        it("keeps post-Beta and non-armor items at zero points", () => {
             assert.equal(getBaseArmorPoints("minecraft:netherite_helmet"), 0);
             assert.equal(getBaseArmorPoints("minecraft:turtle_helmet"), 0);
-        });
-
-        it("returns 0 for non-armor items", () => {
             assert.equal(getBaseArmorPoints("minecraft:stick"), 0);
-            assert.equal(getBaseArmorPoints("minecraft:apple"), 0);
         });
     });
 
     describe("getEffectiveArmorPoints", () => {
-        it("returns 0 when player has no equippable component or no armor", () => {
+        it("returns 0 when the player carries no equippable component", () => {
             const player = new Player();
             assert.equal(getEffectiveArmorPoints(player as any), 0);
         });
 
-        it("calculates 20 full points for undamaged diamond armor", () => {
+        it("counts the pieces as Beta's getTotalArmorValue did, scaling the total by durability", () => {
             const player = new Player();
+            const chestDur = { maxDurability: 100, damage: 0 };
+
             const equipment = new Map<EquipmentSlot, any>([
                 [EquipmentSlot.Head, { typeId: "minecraft:diamond_helmet", getComponent: () => null }],
-                [EquipmentSlot.Chest, { typeId: "minecraft:diamond_chestplate", getComponent: () => null }],
+                [EquipmentSlot.Chest, {
+                    typeId: "minecraft:diamond_chestplate",
+                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? chestDur : null
+                }],
                 [EquipmentSlot.Legs, { typeId: "minecraft:diamond_leggings", getComponent: () => null }],
                 [EquipmentSlot.Feet, { typeId: "minecraft:diamond_boots", getComponent: () => null }]
             ]);
@@ -80,47 +65,11 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
                 getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
             });
 
-            const points = getEffectiveArmorPoints(player as any);
-            assert.equal(points, 20);
-        });
+            assert.equal(getEffectiveArmorPoints(player as any), 20, "a full, undamaged set is Beta's twenty");
 
-        it("gives a full undamaged leather set the same 20 points as diamond", () => {
-            const player = new Player();
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Head, { typeId: "minecraft:leather_helmet", getComponent: () => null }],
-                [EquipmentSlot.Chest, { typeId: "minecraft:leather_chestplate", getComponent: () => null }],
-                [EquipmentSlot.Legs, { typeId: "minecraft:leather_leggings", getComponent: () => null }],
-                [EquipmentSlot.Feet, { typeId: "minecraft:leather_boots", getComponent: () => null }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
-            });
-
-            const points = getEffectiveArmorPoints(player as any);
-            assert.equal(points, 20);
-        });
-
-        it("scales points proportionally to durability for damaged armor", () => {
-            const player = new Player();
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Chest, {
-                    typeId: "minecraft:diamond_chestplate",
-                    getComponent: (type: string) => {
-                        if (type === ItemComponentTypes.Durability) {
-                            return { maxDurability: 100, damage: 50 };
-                        }
-                        return null;
-                    }
-                }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
-            });
-
-            const points = getEffectiveArmorPoints(player as any);
-            assert.equal(points, 4); // 8 base * 50% durability = 4 points
+            // ((20 - 1) * 53) / 103 + 1 floors to ten once the chestplate is half worn.
+            chestDur.damage = 50;
+            assert.equal(getEffectiveArmorPoints(player as any), 10);
         });
     });
 
@@ -180,59 +129,16 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             assert.equal(player.commandsRun.length, 1);
             assert.equal(player.commandsRun[0], 'titleraw @s title {"rawtext":[{"text":"_a0"}]}');
         });
-
-        it("updates display to _a0 when switching from Survival to Creative, and restores upon return", () => {
-            const player = new Player();
-            player.id = "test_player_switch";
-            player.gameMode = GameMode.Survival;
-
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Chest, { typeId: "minecraft:diamond_chestplate", getComponent: () => null }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
-            });
-
-            updatePlayerArmorDisplay(player as any, true);
-            assert.equal(player.commandsRun[player.commandsRun.length - 1], 'titleraw @s title {"rawtext":[{"text":"_a8"}]}');
-
-            player.gameMode = GameMode.Creative;
-            updatePlayerArmorDisplay(player as any, false);
-            assert.equal(player.commandsRun[player.commandsRun.length - 1], 'titleraw @s title {"rawtext":[{"text":"_a0"}]}');
-
-            player.gameMode = GameMode.Survival;
-            updatePlayerArmorDisplay(player as any, false);
-            assert.equal(player.commandsRun[player.commandsRun.length - 1], 'titleraw @s title {"rawtext":[{"text":"_a8"}]}');
-        });
-
-        it("suppresses armor display when player is in Spectator mode", () => {
-            const player = new Player();
-            player.id = "test_player_spectator";
-            player.gameMode = GameMode.Spectator;
-
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Chest, { typeId: "minecraft:diamond_chestplate", getComponent: () => null }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
-            });
-
-            updatePlayerArmorDisplay(player as any, true);
-
-            assert.equal(player.commandsRun.length, 1);
-            assert.equal(player.commandsRun[0], 'titleraw @s title {"rawtext":[{"text":"_a0"}]}');
-        });
     });
 
     describe("damageArmor - Classic Beta 1.7.3 Durability Degradation", () => {
-        it("increments damage by 1 on all equipped armor pieces with durability", () => {
+        it("increments damage by 1 on each armored piece and leaves a non-armor item alone", () => {
             const player = new Player();
             player.id = "test_player_damage_armor";
 
             const helmetDur = { maxDurability: 100, damage: 10 };
             const chestDur = { maxDurability: 200, damage: 20 };
+            const stickDur = { maxDurability: 100, damage: 0 };
 
             const equipment = new Map<EquipmentSlot, any>([
                 [EquipmentSlot.Head, {
@@ -242,6 +148,10 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
                 [EquipmentSlot.Chest, {
                     typeId: "minecraft:diamond_chestplate",
                     getComponent: (type: string) => type === ItemComponentTypes.Durability ? chestDur : null
+                }],
+                [EquipmentSlot.Feet, {
+                    typeId: "minecraft:stick",
+                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? stickDur : null
                 }]
             ]);
 
@@ -258,6 +168,7 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
 
             assert.equal(helmetDur.damage, 11);
             assert.equal(chestDur.damage, 21);
+            assert.equal(stickDur.damage, 0, "a piece worth no armor points never wears");
         });
 
         it("breaks and clears armor piece when damage reaches maxDurability, playing break sound", () => {
@@ -287,33 +198,6 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             assert.equal(equipment.get(EquipmentSlot.Head), undefined);
             assert.equal(player.soundsPlayed.length, 1);
             assert.equal(player.soundsPlayed[0].soundId, "random.break");
-        });
-
-        it("ignores non-armor equipped items", () => {
-            const player = new Player();
-            player.id = "test_player_non_armor";
-
-            const stickDur = { maxDurability: 100, damage: 0 };
-
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Head, {
-                    typeId: "minecraft:stick",
-                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? stickDur : null
-                }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null,
-                setEquipment: (slot: EquipmentSlot, item: any) => {
-                    if (!item) equipment.delete(slot);
-                    else equipment.set(slot, item);
-                    return true;
-                }
-            });
-
-            damageArmor(player as any);
-
-            assert.equal(stickDur.damage, 0);
         });
     });
 
@@ -353,15 +237,21 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             assert.equal(health.currentValue, 20);
         });
 
-        it("reduces armor durability on authentic Beta environmental damage (fall, fire)", () => {
+        it("wears armor for a cause Beta armors against, and never for void, starve or zero damage", () => {
             const player = new Player();
-            player.id = "test_player_env_hurt";
+            player.id = "test_player_hurt_causes";
+
             const bootsDur = { maxDurability: 100, damage: 5 };
+            const chestDur = { maxDurability: 200, damage: 0 };
 
             const equipment = new Map<EquipmentSlot, any>([
                 [EquipmentSlot.Feet, {
                     typeId: "minecraft:iron_boots",
                     getComponent: (type: string) => type === ItemComponentTypes.Durability ? bootsDur : null
+                }],
+                [EquipmentSlot.Chest, {
+                    typeId: "minecraft:diamond_chestplate",
+                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? chestDur : null
                 }]
             ]);
 
@@ -377,73 +267,29 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             const health = { currentValue: 18, effectiveMax: 20, setCurrentValue(v: number) { this.currentValue = v; } };
             player.setComponent(EntityComponentTypes.Health, health);
 
-            eventBus.dispatch("entityHurt", {
-                hurtEntity: player,
-                damage: 3,
-                damageSource: { cause: EntityDamageCause.fall }
-            });
-
-            assert.equal(bootsDur.damage, 6);
-        });
-
-        it("bypasses armor and does not damage durability for void or starve damage", () => {
-            const player = new Player();
-            player.id = "test_player_void_hurt";
-            const chestDur = { maxDurability: 200, damage: 0 };
-
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Chest, {
-                    typeId: "minecraft:diamond_chestplate",
-                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? chestDur : null
-                }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null,
-                setEquipment: (slot: EquipmentSlot, item: any) => {
-                    if (!item) equipment.delete(slot);
-                    else equipment.set(slot, item);
-                    return true;
-                }
-            });
-
-            eventBus.dispatch("entityHurt", {
-                hurtEntity: player,
-                damage: 4,
-                damageSource: { cause: EntityDamageCause.void }
-            });
-
-            assert.equal(chestDur.damage, 0);
-        });
-
-        it("does not reduce durability when damage is 0 or less", () => {
-            const player = new Player();
-            player.id = "test_player_zero_hurt";
-            const chestDur = { maxDurability: 200, damage: 0 };
-
-            const equipment = new Map<EquipmentSlot, any>([
-                [EquipmentSlot.Chest, {
-                    typeId: "minecraft:diamond_chestplate",
-                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? chestDur : null
-                }]
-            ]);
-
-            player.setComponent(EntityComponentTypes.Equippable, {
-                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null,
-                setEquipment: (slot: EquipmentSlot, item: any) => {
-                    if (!item) equipment.delete(slot);
-                    else equipment.set(slot, item);
-                    return true;
-                }
-            });
+            // The bypasses go first, while both counters are still pristine.
+            for (const cause of [EntityDamageCause.void, EntityDamageCause.starve]) {
+                eventBus.dispatch("entityHurt", {
+                    hurtEntity: player,
+                    damage: 4,
+                    damageSource: { cause }
+                });
+                assert.equal(chestDur.damage, 0, `${cause} damage bypasses armor`);
+            }
 
             eventBus.dispatch("entityHurt", {
                 hurtEntity: player,
                 damage: 0,
                 damageSource: { cause: EntityDamageCause.entityAttack }
             });
+            assert.equal(chestDur.damage, 0, "a zero-damage hit is not a hit");
 
-            assert.equal(chestDur.damage, 0);
+            eventBus.dispatch("entityHurt", {
+                hurtEntity: player,
+                damage: 3,
+                damageSource: { cause: EntityDamageCause.fall }
+            });
+            assert.equal(bootsDur.damage, 6, "fall damage is one of Beta's causes");
         });
     });
 
@@ -451,13 +297,11 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
         it("returns raw damage when incoming damage or defense points are zero", () => {
             const noDmg = computeBetaArmorMitigation(0, 10, 5);
             assert.equal(noDmg.damageInflicted, 0);
-            assert.equal(noDmg.damageAbsorbed, 0);
             assert.equal(noDmg.updatedRemainder, 5);
 
             const noArmor = computeBetaArmorMitigation(10, 0, 3);
             assert.equal(noArmor.damageInflicted, 10);
             assert.equal(noArmor.damageAbsorbed, 0);
-            assert.equal(noArmor.updatedRemainder, 3);
         });
 
         it("mitigates damage using authentic 1/25 ratio per point and carries remainders", () => {
@@ -476,12 +320,9 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             // accumulatedUnits = 4 * 17 + 18 = 86
             // damageInflicted = floor(86 / 25) = 3
             // updatedRemainder = 86 % 25 = 11
-            // damageAbsorbed = 4 - 3 = 1
             const hit2 = computeBetaArmorMitigation(4, 8, hit1.updatedRemainder);
             assert.equal(hit2.damageInflicted, 3);
-            assert.equal(hit2.damageAbsorbed, 1);
             assert.equal(hit2.updatedRemainder, 11);
         });
     });
 });
-

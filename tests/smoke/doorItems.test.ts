@@ -21,11 +21,16 @@ const doors = [
 ];
 
 describe("Classic Item Contract - Beta 1.7.3 doors", () => {
-    it("keeps an atlas entry for every door icon the items ask for", () => {
+    it("registers a door icon and a language name for every door the pack ships", () => {
         const atlas = readJson(resolve(root, "packs/RP/textures/item_texture.json")).texture_data;
+        const lang = readFileSync(resolve(root, "packs/RP/texts/en_US.lang"), "utf-8");
 
         for (const door of doors) {
             assert.ok(atlas[door.icon], `door icon '${door.icon}' is missing from item_texture.json`);
+            assert.ok(
+                lang.includes(`item.${door.item}=${door.name}`),
+                `en_US.lang is missing item.${door.item}`
+            );
         }
     });
 
@@ -57,24 +62,13 @@ describe("Classic Item Contract - Beta 1.7.3 doors", () => {
             );
         });
 
-        it(`names ${door.item} in the language file`, () => {
-            const raw = readFileSync(resolve(root, "packs/RP/texts/en_US.lang"), "utf-8");
-            assert.ok(
-                raw.includes(`item.${door.item}=${door.name}`),
-                `en_US.lang is missing item.${door.item}`
-            );
-        });
-
         it(`crafts ${door.item} on the custom crafting table, one door at a time`, () => {
+            // The recipe replacing vanilla's rather than sitting beside it is recipeInterfaces' contract,
+            // which matches every vanilla override's identifier and type in one place.
             const recipe = readJson(resolve(root, "packs/BP/recipes", `${door.file}.json`))["minecraft:recipe_shaped"];
 
             assert.equal(recipe.result.item, door.item);
             assert.equal(recipe.result.count, 1, "Beta crafted a single door from six planks or ingots");
-            assert.equal(
-                recipe.description.identifier,
-                door.block,
-                "the recipe must override vanilla's door recipe rather than sit beside it"
-            );
             assert.deepEqual(
                 recipe.tags,
                 ["beta_crafting"],

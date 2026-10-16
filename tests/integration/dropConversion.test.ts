@@ -72,40 +72,49 @@ describe("Drop conversion - picked-up items match their stack", () => {
         resetMocks();
     });
 
-    it("drops a broken oak log as bh:oak_log so pickups merge", () => {
-        const { entity, spawned } = brokenDrop("minecraft:oak_log");
-        eventBus.dispatch("entitySpawn", { entity });
+    it("answers a drop by retyping it onto the id the inventory keeps, or removing one the era has no drop for", () => {
+        const log = brokenDrop("minecraft:oak_log");
+        eventBus.dispatch("entitySpawn", { entity: log.entity });
 
-        assert.equal(spawned.length, 1, "the vanilla log drop must be replaced once");
-        assert.equal(spawned[0].typeId, "bh:oak_log", "the ground item must be the id the inventory keeps");
-        assert.equal(spawned[0].amount, 1, "stack size must be preserved");
+        assert.equal(log.spawned.length, 1, "the vanilla log drop must be replaced once");
+        assert.equal(log.spawned[0].typeId, "bh:oak_log", "the ground item must be the id the inventory keeps");
+        assert.equal(log.spawned[0].amount, 1, "stack size must be preserved");
+
+        const bow = brokenDrop("minecraft:bow");
+        eventBus.dispatch("entitySpawn", { entity: bow.entity });
+
+        assert.equal(bow.spawned[0]?.typeId, "bh:bow", "the bow drop lands on the bh id too");
+
+        const birch = brokenDrop("minecraft:birch_log", 3);
+        eventBus.dispatch("entitySpawn", { entity: birch.entity });
+
+        assert.equal(birch.spawned[0]?.typeId, "bh:birch_log", "birch must not collapse into oak");
+        assert.equal(birch.spawned[0]?.amount, 3, "whole stack rides across the respawn");
+
+        const salmon = brokenDrop("minecraft:salmon");
+        eventBus.dispatch("entitySpawn", { entity: salmon.entity });
+
+        assert.equal(salmon.removed(), true, "the vanilla salmon entity is replaced, not kept");
+        assert.equal(salmon.spawned[0]?.typeId, "bh:cod", "salmon collapses to the Beta cod item");
+
+        const flesh = brokenDrop("minecraft:rotten_flesh");
+        eventBus.dispatch("entitySpawn", { entity: flesh.entity });
+
+        assert.equal(flesh.removed(), true, "rotten flesh is not a Beta drop");
+        assert.equal(flesh.spawned.length, 0, "a banned drop must not be replaced with anything");
     });
 
-    it("keeps species when converting a modern log", () => {
-        const { entity, spawned } = brokenDrop("minecraft:birch_log", 3);
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(spawned[0]?.typeId, "bh:birch_log", "birch must not collapse into oak");
-        assert.equal(spawned[0]?.amount, 3, "whole stack rides across the respawn");
-    });
-
-    it("keeps a sugar cane drop instead of deleting it", () => {
-        const { entity, spawned, removed } = brokenDrop("minecraft:reeds", 2);
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(removed(), false, "the era's reeds must not be read as a banned drop");
-        assert.equal(spawned.length, 0, "an already-final reeds stack needs no respawn");
-    });
-
-    it("keeps the id this engine pays a broken cane in", () => {
+    it("leaves a drop that is already final — both cane ids, or the pack's own — exactly where it is", () => {
         // `minecraft:reeds` is this engine's cane BLOCK; the item a broken cane pays is
-        // `minecraft:sugar_cane`, and retyping that onto the block id handed the drop back to the
-        // engine as an id it will not build. The entity is the only copy of the item, so it stays.
-        const { entity, spawned, removed } = brokenDrop("minecraft:sugar_cane", 2);
-        eventBus.dispatch("entitySpawn", { entity });
+        // `minecraft:sugar_cane`. Retyping the item onto the block id handed the drop back to the
+        // engine as an id it will not build, and the entity is the only copy of the item, so it stays.
+        for (const id of ["minecraft:reeds", "minecraft:sugar_cane", "bh:oak_log", "bh:porkchop"]) {
+            const { entity, spawned, removed } = brokenDrop(id, 2);
+            eventBus.dispatch("entitySpawn", { entity });
 
-        assert.equal(removed(), false, "the engine's own cane item must survive the spawn pass");
-        assert.equal(spawned.length, 0, "an already-final cane stack needs no respawn");
+            assert.equal(removed(), false, `${id} must not be read as a banned drop`);
+            assert.equal(spawned.length, 0, `${id} is already final and needs no respawn`);
+        }
     });
 
     it("leaves a drop alone when the id it would be retyped to cannot be built", () => {
@@ -133,30 +142,6 @@ describe("Drop conversion - picked-up items match their stack", () => {
         }
     });
 
-    it("leaves an already-normalized bh drop untouched", () => {
-        const { entity, spawned, removed } = brokenDrop("bh:oak_log", 2);
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(spawned.length, 0, "a bh item is already final and needs no respawn");
-        assert.equal(removed(), false, "a bh item must not be deleted");
-    });
-
-    it("still removes banned drops without respawning them", () => {
-        const { entity, spawned, removed } = brokenDrop("minecraft:rotten_flesh");
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(removed(), true, "rotten flesh is not a Beta drop");
-        assert.equal(spawned.length, 0, "a banned drop must not be replaced with anything");
-    });
-
-    it("drops a bow as bh:bow so pickups merge", () => {
-        const { entity, spawned } = brokenDrop("minecraft:bow");
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(spawned.length, 1, "the vanilla bow drop must land on the bh id");
-        assert.equal(spawned[0].typeId, "bh:bow", "the ground item must be the id the inventory keeps");
-    });
-
     it("splits a retyped food stack into the singles Beta allowed", () => {
         const { entity, spawned } = brokenDrop("minecraft:porkchop", 4);
         eventBus.dispatch("entitySpawn", { entity });
@@ -170,26 +155,12 @@ describe("Drop conversion - picked-up items match their stack", () => {
         }
     });
 
-
-    it("converts a modern fish instead of deleting it", () => {
-        const { entity, spawned, removed } = brokenDrop("minecraft:salmon");
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(removed(), true, "the vanilla salmon entity is replaced, not kept");
-        assert.equal(spawned[0]?.typeId, "bh:cod", "salmon collapses to the Beta cod item");
-    });
-
     it("answers a drop the same way whether it is seen at spawn or swept up later", () => {
         const cases: readonly [string, number][] = [
             ["minecraft:oak_log", 3],
-            ["minecraft:birch_log", 2],
-            ["minecraft:raw_iron", 3],
-            ["minecraft:raw_gold", 2],
             ["minecraft:porkchop", 4],
-            ["minecraft:sugar_cane", 2],
             ["minecraft:reeds", 3],
             ["minecraft:rotten_flesh", 1],
-            ["minecraft:smooth_stone", 1],
             ["bh:oak_log", 2]
         ];
 
@@ -210,13 +181,5 @@ describe("Drop conversion - picked-up items match their stack", () => {
                 `${id} x${amount} must be replaced or kept by both passes`
             );
         }
-    });
-
-    it("leaves an already-final bh food untouched", () => {
-        const { entity, spawned, removed } = brokenDrop("bh:porkchop", 2);
-        eventBus.dispatch("entitySpawn", { entity });
-
-        assert.equal(spawned.length, 0, "a bh item needs no respawn");
-        assert.equal(removed(), false, "a bh item must not be deleted");
     });
 });

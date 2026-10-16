@@ -114,7 +114,11 @@ export function* boatLoopJob(): Generator<void, void, unknown> {
     }
 }
 
-export function processBoats(): void {
+/**
+ * Runs the boat pass to completion in one go, which is how a test drives it: the tick pass registers
+ * the generator and yields every few boats instead.
+ */
+export function boatCollisionJob(): void {
     const job = boatLoopJob();
     while (!job.next().done) {
         // Drain generator synchronously

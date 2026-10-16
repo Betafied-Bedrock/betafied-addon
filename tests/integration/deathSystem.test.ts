@@ -30,11 +30,9 @@ import {
     PRE_DEATH_GAMEMODE_PROPERTY,
     isDead,
     enterDeathState,
-    assertDeathState,
     respawnPlayer
 } from "../../packs/BP/scripts/player/death.js";
 import {
-    DEATH_SCREEN_COPY,
     dismissDeathScreen,
     isDeathScreenPending,
     showDeathScreen
@@ -151,17 +149,36 @@ function hurtEvent(player: Player, damage: number) {
 }
 
 describe("Player death state machine", () => {
-    it("throws every stack and armor piece from chest height", () => {
-        const { player, container, equippable } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 3));
+    it("spills every occupied slot and the worn armor out of the corpse, scattered around it, exactly once", () => {
+        const { player, container, equippable, health } = makeHarness();
+        for (let slot = 0; slot < 12; slot += 1) {
+            container.setItem(slot, new ItemStack("bh:apple", 1));
+        }
         equippable.setEquipment(EquipmentSlot.Head, new ItemStack("minecraft:iron_helmet", 1));
 
         enterDeathState(player);
 
-        assert.equal(container.getItem(0), undefined);
+        assert.equal(container.getItem(0), undefined, "the corpse keeps nothing");
         assert.equal(equippable.getEquipment(EquipmentSlot.Head), undefined);
-        assert.equal(mockSpawnedItems.length, 2);
-        assert.equal(mockSpawnedItems[0].location.y, player.location.y + 1.44);
+        assert.equal(mockSpawnedItems.length, 13, "one drop per stack, plus the helmet");
+
+        const offsets = mockSpawnedItems.map(item => ({
+            dx: item.location.x - player.location.x,
+            dz: item.location.z - player.location.z
+        }));
+
+        for (const { dx, dz } of offsets) {
+            const distance = Math.hypot(dx, dz);
+            assert.ok(
+                distance <= 2,
+                `a stack spawned ${distance.toFixed(2)} blocks out, past the scatter radius`
+            );
+        }
+
+        const distinct = new Set(offsets.map(({ dx, dz }) => `${dx.toFixed(4)},${dz.toFixed(4)}`));
+        assert.ok(distinct.size > 1, "the drops must be spread around the player, not piled on one point");
+
+        assert.equal(mockSpawnedItems[0].location.y, player.location.y + 1.44, "the era throws from chest height");
 
         const impulse = mockSpawnedItems[0].impulse as { x: number; y: number; z: number };
         assert.equal(impulse.y, 0.2, "the era's throw always kicks upward by 0.2");
@@ -169,6 +186,17 @@ describe("Player death state machine", () => {
             Math.hypot(impulse.x, impulse.z) <= 0.5,
             `horizontal throw must stay within 0.5, got ${Math.hypot(impulse.x, impulse.z)}`
         );
+
+        enterDeathState(player);
+
+        assert.equal(mockSpawnedItems.length, 13, "a second death state must not drop the inventory again");
+
+        health.currentValue = 0;
+        const event = hurtEvent(player, 5);
+        eventBus.dispatch("entityHurtBefore", event);
+
+        assert.equal(event.cancel, false, "a dead player's hits are the engine's business again");
+        assert.equal(mockSpawnedItems.length, 13);
     });
 
     it("marks the player dead, remembers their mode, and parks them", () => {
@@ -187,117 +215,133 @@ describe("Player death state machine", () => {
         assert.equal(player.inputPermissions.isPermissionCategoryEnabled(InputPermissionCategory.Camera), true);
     });
 
-    it("spills the inventory over the two blocks around the corpse", () => {
-        const { player, container } = makeHarness();
-        for (let slot = 0; slot < 12; slot += 1) {
-            container.setItem(slot, new ItemStack("bh:apple", 1));
-        }
-
-        enterDeathState(player);
-
-        assert.equal(mockSpawnedItems.length, 12);
-
-        const offsets = mockSpawnedItems.map((item) => ({
-            dx: item.location.x - player.location.x,
-            dz: item.location.z - player.location.z
-        }));
-
-        for (const { dx, dz } of offsets) {
-            const distance = Math.hypot(dx, dz);
-            assert.ok(
-                distance <= 2,
-                `a stack spawned ${distance.toFixed(2)} blocks out, past the scatter radius`
-            );
-        }
-
-        const distinct = new Set(offsets.map(({ dx, dz }) => `${dx.toFixed(4)},${dz.toFixed(4)}`));
-        assert.ok(distinct.size > 1, "the drops must be spread around the player, not piled on one point");
-
-        assert.ok(
-            mockSpawnedItems.every(item => (item.impulse as { y: number }).y === 0.2),
-            "the era's upward kick survives the scatter"
-        );
-    });
-
-    it("reports the dead flag through isDead", () => {
-        const { player } = makeHarness();
-
-        assert.equal(isDead(player), false);
-        enterDeathState(player);
-        assert.equal(isDead(player), true);
-    });
-
-    it("drops once, however many lethal hits arrive", () => {
-        const { player, container } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 3));
-
-        enterDeathState(player);
-        enterDeathState(player);
-
-        assert.equal(mockSpawnedItems.length, 1);
-    });
-
-    it("respawns at the spawn point with full health and no dead property", () => {
+    it("respawns with full health, the mode they died in, a clean facing and the controls handed back, without announcing the move", () => {
         const { player, container, health } = makeHarness();
         container.setItem(0, new ItemStack("bh:apple", 1));
 
         enterDeathState(player);
         player.spawnPoint = { dimension: player.dimension, x: 10, y: 64, z: -20 };
+        player.setRotation({ x: 45, y: 137 });
 
         respawnPlayer(player);
 
         assert.equal(player.getDynamicProperty(DEAD_PROPERTY), undefined);
         assert.equal(player.getDynamicProperty(PRE_DEATH_GAMEMODE_PROPERTY), undefined);
         assert.equal(player.getGameMode(), GameMode.Survival);
+        assert.deepEqual(commandFeedbackWrites, [false], "the respawn must mute the engine's announcement");
 
         drainNextTick();
 
         assert.deepEqual(player.location, { x: 10, y: 64, z: -20 });
-        assert.equal(health.currentValue, health.effectiveMax);
+        assert.equal(health.currentValue, health.effectiveMax, "a respawn hands back full health");
+        assert.deepEqual(player.getRotation(), { x: 0, y: 0 }, "a corpse's view must not be inherited");
         assert.deepEqual(
             LOCKED_INPUT_CATEGORIES.filter(c => !player.inputPermissions.isPermissionCategoryEnabled(c)),
             [],
             "respawn must hand movement back"
         );
         assert.deepEqual(closedFormPlayers, [player.id]);
-    });
-
-    it("respawns the player without announcing the move", () => {
-        const { player } = makeHarness();
-        player.location = { x: 4, y: 70, z: -9 };
-        joinWorld(player);
-
-        player.location = { x: 900, y: 12, z: 900 };
-        enterDeathState(player);
-        respawnPlayer(player);
-
-        assert.deepEqual(commandFeedbackWrites, [false], "the respawn must mute the engine's announcement");
 
         drainDeferred();
 
         assert.deepEqual(commandFeedbackWrites, [false, true], "and put the gamerule back afterwards");
+
+        player.setGameMode(GameMode.Creative);
+        enterDeathState(player);
+        respawnPlayer(player);
+
+        assert.equal(player.getGameMode(), GameMode.Creative, "a Creative death must hand back Creative");
     });
 
-    it("flops the corpse over, and stands it back up on respawn", () => {
+    it("sends a corpse to its bed, else to the world spawn the first join recorded, else leaves it where it fell", () => {
+        const { player } = makeHarness();
+        player.location = { x: 4, y: 70, z: -9 };
+        joinWorld(player);
+
+        player.spawnPoint = { dimension: player.dimension, x: 10, y: 64, z: -20 };
+        player.location = { x: 900, y: 12, z: 900 };
+        enterDeathState(player);
+        respawnPlayer(player);
+        drainNextTick();
+
+        assert.deepEqual(player.location, { x: 10, y: 64, z: -20 }, "a player who slept gets their bed");
+
+        const later = new Player("death_player_later", "alex");
+        later.location = { x: 900, y: 64, z: 900 };
+        mockPlayers.push(later);
+        joinWorld(later);
+
+        assert.deepEqual(
+            world.getDynamicProperty(WORLD_SPAWN_PROPERTY),
+            { x: 4, y: 70, z: -9 },
+            "the world spawn is the first join's, not the latest one's"
+        );
+
+        enterDeathState(later);
+        respawnPlayer(later);
+        drainNextTick();
+
+        assert.deepEqual(later.location, { x: 4, y: 70, z: -9 }, "a bed-less player lands at the world spawn");
+
+        // A save the void bug parked above the world cannot be anybody's spawn.
+        const { player: stranded } = makeHarness();
+        stranded.location = { x: 0, y: 32767, z: 0 };
+        joinWorld(stranded);
+
+        assert.equal(
+            world.getDynamicProperty(WORLD_SPAWN_PROPERTY),
+            undefined,
+            "a save parked above the world is not a world spawn"
+        );
+
+        stranded.location = { x: 4, y: 70, z: -9 };
+        enterDeathState(stranded);
+        respawnPlayer(stranded);
+        drainNextTick();
+
+        assert.deepEqual(
+            stranded.location,
+            { x: 4, y: 70, z: -9 },
+            "with no world spawn to move to, the player stays where they died rather than above the world"
+        );
+        assert.equal(stranded.getGameMode(), GameMode.Survival, "and the respawn still hands the player back");
+    });
+
+    it("flops the corpse over and plays the era's death sound, then stands it back up on respawn", () => {
         const { player } = makeHarness();
 
         enterDeathState(player);
+
         assert.deepEqual(
             player.animationsPlayed.map(entry => entry.animationName),
             ["animation.player.death_flop"],
             "the era turns a dead body about Z, so the death has to take it off its feet"
         );
 
+        const played = player.dimension.soundsPlayed;
+        assert.equal(played.length, 1, "one death, one sound");
+        assert.equal(played[0].soundId, "random.hurt", "the player inherits the era's death sound");
+        assert.deepEqual(played[0].location, player.location, "played at the corpse, for everyone nearby");
+        const pitch = played[0].options.pitch;
+        assert.ok(
+            pitch >= 0.8 && pitch <= 1.2,
+            `the era's pitch jitter lands in [0.8, 1.2], got ${pitch}`
+        );
+
         respawnPlayer(player);
+
         assert.ok(
             player.animationsPlayed.some(entry => entry.animationName === "animation.player.death_flop_reset"),
             "and a respawn has to undo it, because the era deletes its corpse rather than reviving it"
         );
     });
 
-    it("puffs twenty particles through the corpse once the era would have removed it", () => {
+    it("puffs smoke through the corpse once the era would have removed it, and narrows the view on the era's curve", () => {
         const { player } = makeHarness();
         player.location = { x: 4, y: 70, z: -9 };
+
+        runTicks(40);
+        assert.deepEqual(player.camera.fovWrites, [], "only a dead player gets the death zoom");
 
         enterDeathState(player);
 
@@ -305,6 +349,19 @@ describe("Player death state machine", () => {
         assert.ok(
             scheduledTimeouts.some(entry => entry.timeout === 21),
             "the puff waits for the tick the era's deathTime passes 20"
+        );
+
+        runTicks(200);
+
+        const written = player.camera.fovWrites;
+        assert.ok(written.length > 0, "a death must move the field of view");
+        assert.ok(
+            Math.abs(written.at(-1) - 44.55) < 0.7,
+            `expected the era's 44.55 at t = 200, wrote ${written.at(-1)}`
+        );
+        assert.ok(
+            written.every((fov, index) => index === 0 || fov < written[index - 1]),
+            "the curve only ever narrows"
         );
 
         drainDeferred();
@@ -318,181 +375,9 @@ describe("Player death state machine", () => {
             assert.ok(puff.location.y >= 70 && puff.location.y <= 70 + 1.8, "y stays inside the player's box");
             assert.ok(puff.location.z >= -9 - 0.6 && puff.location.z <= -9 + 0.6, "z stays inside the player's box");
         }
-    });
-
-    it("withholds the puff from a player who is back on their feet before it lands", () => {
-        const { player } = makeHarness();
-
-        enterDeathState(player);
-        respawnPlayer(player);
-        drainDeferred();
-
-        assert.equal(player.dimension.particles.length, 0, "a respawn cancels the corpse's puff");
-    });
-
-    it("respawns the player facing yaw 0 and pitch 0", () => {
-        const { player } = makeHarness();
-
-        enterDeathState(player);
-        player.setRotation({ x: 45, y: 137 });
 
         respawnPlayer(player);
 
-        assert.deepEqual(player.getRotation(), { x: 0, y: 0 }, "a corpse's view must not be inherited");
-    });
-
-    it("respawns a player with no spawn point at the world spawn the first join recorded", () => {
-        const { player } = makeHarness();
-        player.location = { x: 4, y: 70, z: -9 };
-        joinWorld(player);
-
-        player.location = { x: 900, y: 12, z: 900 };
-        enterDeathState(player);
-        respawnPlayer(player);
-
-        drainNextTick();
-
-        assert.deepEqual(player.location, { x: 4, y: 70, z: -9 });
-        assert.equal(player.getGameMode(), GameMode.Survival);
-    });
-
-    it("keeps the first join's world spawn for everyone who joins later", () => {
-        const { player } = makeHarness();
-        player.location = { x: 4, y: 70, z: -9 };
-        joinWorld(player);
-
-        const later = new Player("death_player_later", "alex");
-        later.location = { x: 900, y: 64, z: 900 };
-        mockPlayers.push(later);
-        joinWorld(later);
-
-        assert.deepEqual(
-            world.getDynamicProperty(WORLD_SPAWN_PROPERTY),
-            { x: 4, y: 70, z: -9 },
-            "the world spawn is the first join's, not the latest one's"
-        );
-    });
-
-    it("never records a join the dimension could not hold", () => {
-        const { player } = makeHarness();
-        player.location = { x: 0, y: 32767, z: 0 };
-        joinWorld(player);
-
-        assert.equal(
-            world.getDynamicProperty(WORLD_SPAWN_PROPERTY),
-            undefined,
-            "a save parked above the world is not a world spawn"
-        );
-
-        player.location = { x: 4, y: 70, z: -9 };
-        enterDeathState(player);
-        respawnPlayer(player);
-        drainNextTick();
-
-        assert.deepEqual(
-            player.location,
-            { x: 4, y: 70, z: -9 },
-            "with no world spawn to move to, the player stays where they died rather than above the world"
-        );
-        assert.equal(player.getGameMode(), GameMode.Survival, "and the respawn still hands the player back");
-    });
-
-    it("sends a player who has a bed home rather than to the world spawn", () => {
-        const { player } = makeHarness();
-        player.location = { x: 4, y: 70, z: -9 };
-        joinWorld(player);
-
-        player.spawnPoint = { dimension: player.dimension, x: 10, y: 64, z: -20 };
-        player.location = { x: 900, y: 12, z: 900 };
-        enterDeathState(player);
-        respawnPlayer(player);
-
-        drainNextTick();
-
-        assert.deepEqual(player.location, { x: 10, y: 64, z: -20 });
-    });
-
-    it("hands back the mode the player died in", () => {
-        const { player } = makeHarness();
-        player.setGameMode(GameMode.Creative);
-
-        enterDeathState(player);
-        respawnPlayer(player);
-
-        assert.equal(player.getGameMode(), GameMode.Creative, "a Creative death must hand back Creative");
-    });
-
-    it("takes the controls away before it spills the inventory", () => {
-        const { player, container } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 1));
-
-        const stateWhileDropping: string[] = [];
-        const setItem = container.setItem;
-        container.setItem = (slot: number, item: any) => {
-            if (item === undefined) {
-                stateWhileDropping.push(
-                    `${player.getGameMode()}/${player.inputPermissions.isPermissionCategoryEnabled(InputPermissionCategory.Movement)}`
-                );
-            }
-            setItem(slot, item);
-        };
-
-        enterDeathState(player);
-
-        assert.deepEqual(stateWhileDropping, [`${GameMode.Spectator}/false`]);
-    });
-
-    it("plays the era's death sound, which the vetoed hit would have played itself", () => {
-        const { player } = makeHarness();
-
-        enterDeathState(player);
-
-        const played = player.dimension.soundsPlayed;
-        assert.equal(played.length, 1, "one death, one sound");
-        assert.equal(played[0].soundId, "random.hurt", "the player inherits the era's death sound");
-        assert.deepEqual(played[0].location, player.location, "played at the corpse, for everyone nearby");
-        assert.equal(played[0].options.volume, 1, "the era's volume for it");
-        const pitch = played[0].options.pitch;
-        assert.ok(
-            pitch >= 0.8 && pitch <= 1.2,
-            `the era's pitch jitter lands in [0.8, 1.2], got ${pitch}`
-        );
-    });
-
-    it("narrows the view along the era's death curve", () => {
-        const { player } = makeHarness();
-
-        enterDeathState(player);
-        runTicks(200);
-
-        const written = player.camera.fovWrites;
-        assert.ok(written.length > 0, "a death must move the field of view");
-        assert.ok(
-            Math.abs(written.at(-1) - 44.55) < 0.7,
-            `expected the era's 44.55 at t = 200, wrote ${written.at(-1)}`
-        );
-        assert.ok(
-            written.every((fov, index) => index === 0 || fov < written[index - 1]),
-            "the curve only ever narrows"
-        );
-        assert.ok(
-            written.every((fov) => fov < 70 && fov > 23.33),
-            "and it never leaves 70 heading for 23.3"
-        );
-        assert.ok(written.length < 60, `expected a stepped curve, got ${written.length} writes`);
-    });
-
-    it("hands the camera back on respawn, and never touches a living player's", () => {
-        const { player } = makeHarness();
-
-        runTicks(40);
-        assert.deepEqual(player.camera.fovWrites, [], "only a dead player gets the death zoom");
-
-        enterDeathState(player);
-        runTicks(40);
-        assert.ok(player.camera.fovWrites.length > 0);
-
-        respawnPlayer(player);
         assert.equal(player.camera.clears, 1, "respawn is the one path that hands the view back");
 
         const writesAtRespawn = player.camera.fovWrites.length;
@@ -502,50 +387,41 @@ describe("Player death state machine", () => {
             writesAtRespawn,
             "a respawned player must not be zoomed again"
         );
-    });
 
-    it("cancels a lethal hit and enters the death state out of the before-event", () => {
-        const { player, container, health } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 1));
-        health.currentValue = 0;
-
-        const event = hurtEvent(player, 5);
-        eventBus.dispatch("entityHurtBefore", event);
+        const { player: revived } = makeHarness();
+        enterDeathState(revived);
+        respawnPlayer(revived);
         drainDeferred();
 
-        assert.equal(event.cancel, true, "the lethal hit must be vetoed");
-        assert.equal(player.getGameMode(), GameMode.Spectator);
-        assert.equal(isDead(player), true);
+        assert.equal(revived.dimension.particles.length, 0, "a respawn cancels the corpse's puff");
+    });
+
+    it("cancels a lethal hit and leaves a survivable one to the engine", () => {
+        const lethal = makeHarness();
+        lethal.container.setItem(0, new ItemStack("bh:apple", 1));
+        lethal.health.currentValue = 0;
+
+        const lethalHit = hurtEvent(lethal.player, 5);
+        eventBus.dispatch("entityHurtBefore", lethalHit);
+        drainDeferred();
+
+        assert.equal(lethalHit.cancel, true, "the lethal hit must be vetoed");
+        assert.equal(lethal.player.getGameMode(), GameMode.Spectator);
+        assert.equal(isDead(lethal.player), true);
         assert.equal(mockSpawnedItems.length, 1);
+
+        const survivable = makeHarness();
+        survivable.health.currentValue = 15;
+
+        const survivableHit = hurtEvent(survivable.player, 5);
+        eventBus.dispatch("entityHurtBefore", survivableHit);
+
+        assert.equal(survivableHit.cancel, false);
+        assert.equal(isDead(survivable.player), false);
+        assert.equal(survivable.player.getGameMode(), GameMode.Survival);
     });
 
-    it("leaves a survivable hit to the engine", () => {
-        const { player, health } = makeHarness();
-        health.currentValue = 15;
-
-        const event = hurtEvent(player, 5);
-        eventBus.dispatch("entityHurtBefore", event);
-
-        assert.equal(event.cancel, false);
-        assert.equal(isDead(player), false);
-        assert.equal(player.getGameMode(), GameMode.Survival);
-    });
-
-    it("does not re-enter the death state for a hit on a dead player", () => {
-        const { player, container, health } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 1));
-
-        enterDeathState(player);
-        health.currentValue = 0;
-
-        const event = hurtEvent(player, 5);
-        eventBus.dispatch("entityHurtBefore", event);
-
-        assert.equal(event.cancel, false, "a dead player's hits are the engine's business again");
-        assert.equal(mockSpawnedItems.length, 1, "the inventory drops exactly once");
-    });
-
-    it("re-asserts spectator on the tick pass without dropping again", () => {
+    it("re-asserts the park on the tick pass and on a relog, for a dead player only", () => {
         const { player, container } = makeHarness();
         container.setItem(0, new ItemStack("bh:apple", 1));
 
@@ -563,38 +439,27 @@ describe("Player death state machine", () => {
             "the pass must take movement back, not only the game mode"
         );
         assert.equal(player.inputPermissions.isPermissionCategoryEnabled(InputPermissionCategory.Jump), false);
-        assert.equal(mockSpawnedItems.length, 1);
-    });
+        assert.equal(mockSpawnedItems.length, 1, "the pass must not drop the inventory again");
 
-    it("leaves a living player in whatever mode they are in on the tick pass", () => {
-        const { player } = makeHarness();
-        player.setGameMode(GameMode.Creative);
+        const living = new Player("death_player_living", "alex");
+        living.setGameMode(GameMode.Creative);
+        mockPlayers.push(living);
 
         runDeathStatePass();
 
-        assert.equal(player.getGameMode(), GameMode.Creative);
-    });
+        assert.equal(living.getGameMode(), GameMode.Creative, "a living player keeps the mode they chose");
 
-    it("assertDeathState leaves a living player alone directly", () => {
-        const { player } = makeHarness();
-        player.setGameMode(GameMode.Survival);
+        // A relog comes back through playerSpawn with the dead flag already set.
+        const { player: returning } = makeHarness();
+        returning.setDynamicProperty(DEAD_PROPERTY, true);
+        returning.setGameMode(GameMode.Survival);
 
-        assertDeathState(player);
-
-        assert.equal(player.getGameMode(), GameMode.Survival);
-    });
-
-    it("puts a returning dead player back in spectator without dropping again", () => {
-        const { player } = makeHarness();
-        player.setDynamicProperty(DEAD_PROPERTY, true);
-        player.setGameMode(GameMode.Survival);
-
-        eventBus.dispatch("playerSpawn", { player, initialSpawn: true });
+        eventBus.dispatch("playerSpawn", { player: returning, initialSpawn: true });
         drainDeferred();
 
-        assert.equal(player.getGameMode(), GameMode.Spectator);
+        assert.equal(returning.getGameMode(), GameMode.Spectator);
         assert.equal(
-            player.inputPermissions.isPermissionCategoryEnabled(InputPermissionCategory.Movement),
+            returning.inputPermissions.isPermissionCategoryEnabled(InputPermissionCategory.Movement),
             false,
             "a relog must come back locked too"
         );
@@ -611,59 +476,48 @@ describe("Player death state machine", () => {
 });
 
 describe("Death screen", () => {
-    it("shows the era's copy, with the buttons in the era's order", () => {
-        const { player } = makeHarness();
-        showDeathScreen(player, makeHandlers().handlers);
+    it("carries a lethal hit all the way back to a living player, from either button", async () => {
+        for (const selection of [0, 1]) {
+            const { player, container, health } = makeHarness();
+            container.setItem(0, new ItemStack("bh:apple", 1));
 
-        const form = formsShown.at(-1)!;
-        assert.equal(form.titleText, "Game over!");
-        assert.equal(form.titleText, DEATH_SCREEN_COPY.title);
-        assert.equal(form.bodyText, "Score: &e0");
-        assert.equal(form.bodyText, DEATH_SCREEN_COPY.body);
-        assert.deepEqual(form.buttons, ["Respawn", "Title menu"]);
+            setNextFormOutcome({ selection });
+            health.currentValue = 0;
+            const event = hurtEvent(player, 5);
+            eventBus.dispatch("entityHurtBefore", event);
+            drainDeferred();
+
+            assert.equal(event.cancel, true);
+            assert.equal(player.getGameMode(), GameMode.Spectator);
+            assert.equal(isDeathScreenPending(player.id), true, "the screen is the player's only way out");
+
+            const form = formsShown.at(-1)!;
+            assert.deepEqual(form.buttons, ["Respawn", "Title menu"], "the era's two ways out, in its order");
+
+            runDeathStatePass();
+            assert.equal(formsShown.length, 1, "a screen already in flight must not be pushed a second time");
+
+            await drainForm();
+
+            assert.equal(
+                player.getGameMode(),
+                GameMode.Survival,
+                `button ${selection} must not strand a dead player`
+            );
+            assert.equal(isDead(player), false);
+            assert.equal(health.currentValue, health.effectiveMax);
+            assert.equal(mockSpawnedItems.length, 1, "one death, one drop");
+
+            runDeathStatePass();
+            assert.equal(formsShown.length, 1, "a respawned player must never get the screen back");
+        }
     });
 
-    it("hands the first selection to onRespawn and the second to onTitleMenu", async () => {
+    it("tracks the pending form however it goes away, and never lets a dismissal be an escape", async () => {
         const { player } = makeHarness();
-        const { respawned, titled, handlers } = makeHandlers();
+        const { respawned, handlers } = makeHandlers();
 
         setNextFormOutcome({ selection: 0 });
-        showDeathScreen(player, handlers);
-        await drainForm();
-        assert.equal(respawned.length, 1);
-
-        setNextFormOutcome({ selection: 1 });
-        showDeathScreen(player, handlers);
-        await drainForm();
-        assert.equal(respawned.length, 1, "the screen must not respawn the player itself");
-        assert.equal(titled.length, 1);
-    });
-
-    it("leaves no form pending once the player dismisses it", async () => {
-        const { player } = makeHarness();
-        const { handlers } = makeHandlers();
-
-        setNextFormOutcome({ canceled: true, cancelationReason: FormCancelationReason.UserClosed });
-        showDeathScreen(player, handlers);
-        await drainForm();
-
-        assert.equal(isDeathScreenPending(player.id), false);
-    });
-
-    it("keeps a single show in flight per player", () => {
-        const { player } = makeHarness();
-        const { handlers } = makeHandlers();
-
-        showDeathScreen(player, handlers);
-        showDeathScreen(player, handlers);
-
-        assert.equal(formsShown.length, 1, "the second show would land as UserBusy and waste a pass");
-    });
-
-    it("closes the open form and clears the pending flag on dismiss", () => {
-        const { player } = makeHarness();
-        const { handlers } = makeHandlers();
-
         showDeathScreen(player, handlers);
         assert.equal(isDeathScreenPending(player.id), true);
 
@@ -671,110 +525,34 @@ describe("Death screen", () => {
 
         assert.equal(isDeathScreenPending(player.id), false);
         assert.deepEqual(closedFormPlayers, [player.id]);
-    });
 
-    it("ignores a click that arrives after the form was dismissed", async () => {
-        const { player } = makeHarness();
-        const { respawned, handlers } = makeHandlers();
-
-        setNextFormOutcome({ selection: 0 });
-        showDeathScreen(player, handlers);
-        dismissDeathScreen(player);
         await drainForm();
 
         assert.equal(respawned.length, 0, "a superseded form must not respawn the player");
-    });
-
-    it("puts the screen up as the player is parked, without waiting for a pass", () => {
-        const { player, container } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 1));
-
-        enterDeathState(player);
-
-        assert.equal(isDeathScreenPending(player.id), true, "the screen is the player's only way out");
-        assert.equal(formsShown.length, 1, "the death itself shows the screen, not the pass behind it");
-        assert.equal(formsShown.at(-1)?.titleText, DEATH_SCREEN_COPY.title);
-        assert.deepEqual(formsShown.at(-1)?.buttons, ["Respawn", "Title menu"]);
-
-        runDeathStatePass();
-
-        assert.equal(formsShown.length, 1, "a screen already in flight must not be pushed a second time");
-        assert.equal(mockSpawnedItems.length, 1, "showing the screen must never drop the inventory again");
-    });
-
-    it("puts a dismissed screen back on the tick pass", () => {
-        const { player } = makeHarness();
 
         enterDeathState(player);
         dismissDeathScreen(player);
+        const shownBefore = formsShown.length;
 
         runDeathStatePass();
 
         assert.equal(isDeathScreenPending(player.id), true, "Escape must not be an escape from a death");
-        assert.equal(formsShown.length, 2);
-    });
+        assert.equal(formsShown.length, shownBefore + 1, "and the pass puts the screen back up exactly once");
 
-    it("leaves a living player without a screen on the tick pass", () => {
+        setNextFormOutcome({ canceled: true, cancelationReason: FormCancelationReason.UserClosed });
+        showDeathScreen(player, handlers);
+        await drainForm();
+
+        assert.equal(isDeathScreenPending(player.id), false, "nor is one the player closed himself");
+
+        showDeathScreen(player, handlers);
+        eventBus.dispatch("playerLeave", { playerId: player.id, playerName: player.name });
+
+        assert.equal(isDeathScreenPending(player.id), false, "and a departed player's form is forgotten");
+
         makeHarness();
-
         runDeathStatePass();
 
         assert.equal(formsShown.length, 0, "only a dead player gets the death screen");
-    });
-
-    it("carries a lethal hit all the way back to a living player", async () => {
-        const { player, container, health } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 1));
-
-        setNextFormOutcome({ selection: 0 });
-        health.currentValue = 0;
-        const event = hurtEvent(player, 5);
-        eventBus.dispatch("entityHurtBefore", event);
-        drainDeferred();
-
-        assert.equal(event.cancel, true);
-        assert.equal(player.getGameMode(), GameMode.Spectator);
-        assert.equal(isDeathScreenPending(player.id), true, "the screen is the player's only way out");
-
-        await drainForm();
-
-        assert.equal(player.getGameMode(), GameMode.Survival);
-        assert.equal(isDead(player), false);
-        assert.equal(health.currentValue, health.effectiveMax);
-        assert.equal(mockSpawnedItems.length, 1, "one death, one drop");
-
-        runDeathStatePass();
-        assert.equal(formsShown.length, 1, "a respawned player must never get the screen back");
-    });
-
-    it("respawns from the era's Title menu button as well", async () => {
-        const { player, container, health } = makeHarness();
-        container.setItem(0, new ItemStack("bh:apple", 1));
-
-        setNextFormOutcome({ selection: 1 });
-        health.currentValue = 0;
-        eventBus.dispatch("entityHurtBefore", hurtEvent(player, 5));
-        drainDeferred();
-
-        assert.equal(isDeathScreenPending(player.id), true);
-
-        await drainForm();
-
-        assert.equal(player.getGameMode(), GameMode.Survival, "the second button must not strand a dead player");
-        assert.equal(isDead(player), false);
-        assert.equal(health.currentValue, health.effectiveMax);
-        assert.equal(mockSpawnedItems.length, 1, "one death, one drop");
-    });
-
-    it("forgets a departed player's form so a relog does not read as pending", () => {
-        const { player } = makeHarness();
-        const { handlers } = makeHandlers();
-
-        showDeathScreen(player, handlers);
-        assert.equal(isDeathScreenPending(player.id), true);
-
-        eventBus.dispatch("playerLeave", { playerId: player.id, playerName: player.name });
-
-        assert.equal(isDeathScreenPending(player.id), false);
     });
 });

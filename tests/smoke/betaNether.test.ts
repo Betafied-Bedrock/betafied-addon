@@ -35,20 +35,17 @@ describe("Beta 1.7.3 Nether Contract", () => {
         }
     });
 
-    it("generates only Beta terrain — netherrack, lava, and scattered soul sand and gravel", () => {
+    it("generates only Beta terrain — netherrack, lava, and a gravel beach on the lava seas", () => {
         for (const shortId of NETHER_BIOME_IDS) {
-            const builder = readBiome(shortId).components["minecraft:surface_builder"].builder;
+            const components = readBiome(shortId).components;
+            const builder = components["minecraft:surface_builder"].builder;
 
             assert.equal(builder.top_material, "minecraft:netherrack");
             assert.equal(builder.mid_material, "minecraft:netherrack");
             assert.equal(builder.foundation_material, "minecraft:netherrack");
             assert.equal(builder.sea_material, "minecraft:lava");
-        }
-    });
 
-    it("rings the lava seas with a gravel beach", () => {
-        for (const shortId of NETHER_BIOME_IDS) {
-            const adjustments = readBiome(shortId).components["minecraft:surface_material_adjustments"].adjustments;
+            const adjustments = components["minecraft:surface_material_adjustments"].adjustments;
             // Last entry wins where rules overlap, so the shoreline rule must come after the
             // scattered-gravel rule or the beach never gets a chance to apply.
             const beach = adjustments[adjustments.length - 1];
@@ -72,15 +69,13 @@ describe("Beta 1.7.3 Nether Contract", () => {
                 `${shortId} must use the Nether's red fog`
             );
         }
-    });
 
-    it("pins that fog to Beta's hardcoded Nether colour (0.2, 0.03, 0.03)", () => {
         const fog = JSON.parse(
             readFileSync(resolve(root, "packs/RP/fogs/hell_fog_setting.json"), "utf-8")
         )["minecraft:fog_settings"];
 
-        assert.equal(fog.description.identifier, "mgg:fog_hell");
-        assert.equal(fog.distance.air.fog_color.toLowerCase(), "#330808");
+        assert.equal(fog.description.identifier, "mgg:fog_hell", "the id the biomes above point at");
+        assert.equal(fog.distance.air.fog_color.toLowerCase(), "#330808", "Beta's hardcoded Nether colour, 0.2/0.03/0.03");
     });
 
     it("spawns only the classic Ghast and Zombie Pigman", () => {

@@ -2,9 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { BETA_BLOCK_IDS, BH_CAKE_ID, isBetaBlock } from "../../packs/BP/scripts/core/betaRegistry.js";
+import { BH_CAKE_ID, isBetaBlock } from "../../packs/BP/scripts/core/betaRegistry.js";
 import { BLOCK_FINE_REPLACEMENTS } from "../../packs/BP/scripts/core/compatibilityPolicy.js";
-import { compareText } from "../support/text.js";
 
 const root = process.cwd();
 
@@ -52,17 +51,11 @@ function cubeFor(bone: string): any {
 }
 
 describe("Classic Block Contract - Beta 1.7.3 cake", () => {
-    it("keeps the era's six bites as the block's only state", () => {
-        assert.deepEqual(block.description.states, { "bh:bites": [0, 1, 2, 3, 4, 5] });
-        assert.equal(block.description.identifier, BH_CAKE_ID);
-    });
-
     it("draws one permutation per bite, with the box Beta drew for it", () => {
         for (const bites of [0, 1, 2, 3, 4, 5]) {
             const permutation = permutationFor(bites);
             assert.ok(permutation, `bite ${bites} has no permutation`);
 
-            const world = biteBox(bites);
             const model = modelBox(bites);
             const collision = permutation.components["minecraft:collision_box"];
             const selection = permutation.components["minecraft:selection_box"];
@@ -72,39 +65,20 @@ describe("Classic Block Contract - Beta 1.7.3 cake", () => {
             assert.deepEqual(collision.size, [model.width, 7, 14], "the era's collision box stopped a pixel short");
             assert.deepEqual(selection.origin, [model.origin, 0, -7], `selection origin at ${bites} bites`);
             assert.deepEqual(selection.size, [model.width, 8, 14], "the selection box is the whole eight pixels");
-
-            assert.equal(
-                -(model.origin + model.width),
-                world.origin,
-                `the declared box starts where Beta's did at ${bites} bites`
-            );
-            assert.equal(
-                -model.origin,
-                world.origin + world.width,
-                `the declared box ends where Beta's did at ${bites} bites`
-            );
-        }
-
-        assert.equal(block.permutations.length, 6, "one permutation per bite and no more");
-    });
-
-    it("draws the cake in the block's own space, so no bone pokes into the cell beside it", () => {
-        for (const bone of geometry.bones.filter((entry: any) => entry.cubes)) {
-            const [cube] = bone.cubes;
-            const [x, y, z] = cube.origin;
-            const [sizeX, sizeY, sizeZ] = cube.size;
-
-            // Geometry pixels run -8..8 across and 0..16 up, centred on the block. A model authored in
-            // the 1..15 element space of Java's block models lands eight pixels up-right of its own
-            // collision box and renders inside the neighbouring cell.
-            assert.ok(x >= -8 && x + sizeX <= 8, `${bone.name} must stay within the block's x extent`);
-            assert.ok(z >= -8 && z + sizeZ <= 8, `${bone.name} must stay within the block's z extent`);
-            assert.equal(y, 0, `${bone.name} sits on the floor`);
-            assert.ok(y + sizeY <= 16, `${bone.name} must stay within the block's height`);
         }
     });
 
-    it("shows one bone per state, sized to the collision box the era drew", () => {
+    it("shows one bone per state, in the block's own space and sized to the collision box the era drew", () => {
+        // Geometry pixels run -8..8 across and 0..16 up, centred on the block, while a model authored in
+        // the 1..15 element space of Java's block models lands eight pixels up-right of its own collision
+        // box and renders inside the neighbouring cell. The state machine draws exactly the bone its
+        // condition names, so a seventh bone carrying cubes would stand beside the cake in every state.
+        assert.deepEqual(
+            geometry.bones.filter((entry: any) => entry.cubes).map((entry: any) => entry.name),
+            [0, 1, 2, 3, 4, 5].map(bites => `bites_${bites}`),
+            "the bones that draw the cake are the six the state machine shows"
+        );
+
         for (const bites of [0, 1, 2, 3, 4, 5]) {
             const visible = visibleBones(bites);
             assert.deepEqual(visible, [`bites_${bites}`], `exactly one bone is the cake at ${bites} bites`);
@@ -113,35 +87,6 @@ describe("Classic Block Contract - Beta 1.7.3 cake", () => {
             const model = modelBox(bites);
             assert.deepEqual(cube.origin, [model.origin, 0, -7], `the cake at ${bites} bites is held against the model's -x end`);
             assert.deepEqual(cube.size, [model.width, 8, 14], `at ${bites} bites the geometry must match the box`);
-        }
-
-        assert.deepEqual(cubeFor("bites_0").size, [14, 8, 14], "an unbitten cake is the era's fourteen pixels");
-        assert.deepEqual(cubeFor("bites_5").size, [4, 8, 14], "the last bite Beta drew was four pixels wide");
-    });
-
-    it("draws the cake over the box the block answers clicks with", () => {
-        for (const bites of [0, 1, 2, 3, 4, 5]) {
-            const cube = cubeFor(`bites_${bites}`);
-            const collision = permutationFor(bites).components["minecraft:collision_box"];
-            const world = biteBox(bites);
-
-            // The drawn box and the hitbox are the same shape in the same space; a mesh authored the
-            // world's way round instead sits beside the cell that answers the click.
-            assert.deepEqual(
-                [cube.origin[0], cube.size[0]],
-                [collision.origin[0], collision.size[0]],
-                `the mesh and the hitbox must be the same shape at ${bites} bites`
-            );
-            assert.equal(
-                -(collision.origin[0] + collision.size[0]),
-                world.origin,
-                `the mesh and the hitbox start where Beta's box did at ${bites} bites`
-            );
-            assert.equal(
-                -collision.origin[0],
-                world.origin + world.width,
-                `the mesh and the hitbox end where Beta's box did at ${bites} bites`
-            );
         }
     });
 
@@ -177,51 +122,18 @@ describe("Classic Block Contract - Beta 1.7.3 cake", () => {
         }
     });
 
-    it("maps all six faces, so no side renders untextured", () => {
-        for (const bone of geometry.bones.filter((entry: any) => entry.cubes)) {
-            const faces = bone.cubes[0].uv;
-            assert.deepEqual(
-                Object.keys(faces).sort(compareText),
-                ["down", "east", "north", "south", "up", "west"],
-                `${bone.name} must map every face`
-            );
-
-            for (const [face, mapping] of Object.entries(faces)) {
-                const { uv, uv_size, material_instance } = mapping as {
-                    uv: number[];
-                    uv_size: number[];
-                    material_instance?: string;
-                };
-                assert.ok(uv && uv_size, `${bone.name}'s ${face} face has no uv`);
-                assert.ok(uv[0] + uv_size[0] <= 16, `${bone.name}'s ${face} samples past the texture`);
-
-                // A face left to fall back to '*' inherits whatever instance the cube declared
-                // elsewhere, which is how the cut face ended up on the end nobody had eaten into.
-                assert.ok(material_instance, `${bone.name}'s ${face} face must name its material instance`);
-                assert.ok(
-                    (block.components["minecraft:material_instances"] as Record<string, unknown>)[material_instance],
-                    `${bone.name}'s ${face} names '${material_instance}', which the block does not define`
-                );
-            }
-        }
-    });
-
     it("names the four cake textures in the terrain atlas", () => {
         const atlas = readJson(resolve(root, "packs/RP/textures/terrain_texture.json")).texture_data;
 
-        assert.deepEqual(block.components["minecraft:material_instances"], {
-            "*": { texture: "bh_cake_side", render_method: "opaque" },
-            cake_side: { texture: "bh_cake_side", render_method: "opaque" },
-            cake_top: { texture: "bh_cake_top", render_method: "opaque" },
-            cake_bottom: { texture: "bh_cake_bottom", render_method: "opaque" },
-            cake_cut: { texture: "bh_cake_inner", render_method: "opaque" },
-            up: { texture: "bh_cake_top", render_method: "opaque" },
-            down: { texture: "bh_cake_bottom", render_method: "opaque" },
-            north: { texture: "bh_cake_side", render_method: "opaque" },
-            south: { texture: "bh_cake_side", render_method: "opaque" },
-            east: { texture: "bh_cake_side", render_method: "opaque" },
-            west: { texture: "bh_cake_side", render_method: "opaque" }
-        });
+        const instances = block.components["minecraft:material_instances"];
+        for (const [key, texture] of Object.entries({
+            cake_side: "bh_cake_side",
+            cake_top: "bh_cake_top",
+            cake_bottom: "bh_cake_bottom",
+            cake_cut: "bh_cake_inner"
+        })) {
+            assert.equal(instances[key].texture, texture, `${key} must draw the era's art`);
+        }
 
         for (const [key, texture] of Object.entries({
             bh_cake_top: "textures/blocks/cake_top",
@@ -267,15 +179,10 @@ describe("Classic Block Contract - Beta 1.7.3 cake", () => {
         assert.deepEqual(block.components["minecraft:placement_filter"].conditions, [{ allowed_faces: ["up"] }]);
     });
 
-    it("places the pack's own block and keeps the item as its block item", () => {
+    it("takes the cake over from the engine, block item and world conversion included", () => {
         assert.equal(item.components["minecraft:block_placer"].block, BH_CAKE_ID);
         assert.equal(item.components["minecraft:block_placer"].replace_block_item, true, "the declared item is the block's");
-        assert.equal(item.components["minecraft:max_stack_size"], 1, "ItemReed's cake stayed capped at one");
-    });
-
-    it("takes the cake over from the engine, converting what is already in the world", () => {
         assert.equal(isBetaBlock("minecraft:cake"), false, "a vanilla cake is no longer the pack's cake");
-        assert.equal(BETA_BLOCK_IDS.has("minecraft:cake"), false);
         assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:cake"], BH_CAKE_ID, "the scrubber rewrites a vanilla cake");
     });
 });

@@ -120,7 +120,7 @@ function fitsInventoryGrid(recipe: Recipe): boolean {
 describe("Classic Recipe Contract - one crafting interface", () => {
     const all = recipes();
 
-    it("registers the pack's recipes for the custom crafting table and nothing else", () => {
+    it("keeps the crafts Beta could make in the inventory grid reachable there, and no others", () => {
         const strays = all
             .filter(recipe => recipe.tags.includes("crafting_table"))
             .map(recipe => recipe.file)
@@ -128,9 +128,7 @@ describe("Classic Recipe Contract - one crafting interface", () => {
 
         // The list reads in bootstrap order; the comparison is by membership.
         assert.deepEqual(strays, [...INVENTORY_GRID_RECIPES].sort(compareText));
-    });
 
-    it("keeps the crafts Beta could make in the inventory grid reachable there", () => {
         for (const file of INVENTORY_GRID_RECIPES) {
             const recipe = all.find(r => r.file === file);
 
@@ -157,7 +155,7 @@ describe("Classic Recipe Contract - one crafting interface", () => {
         assert.equal(workbench?.output, "bh:crafting_table:0");
     });
 
-    it("keeps every other pack recipe on the custom table alone", () => {
+    it("keeps every other pack recipe on the custom table alone, and suppresses exactly the vanilla recipes the era did not have", () => {
         for (const recipe of all) {
             if (INVENTORY_GRID_RECIPES.includes(recipe.file)) continue;
             // Cooking recipes belong to the furnace, campfire and smoker interfaces, not to a
@@ -179,6 +177,19 @@ describe("Classic Recipe Contract - one crafting interface", () => {
                 `${recipe.file} must be craftable at the custom crafting table only`
             );
         }
+
+        const disabled = all.filter(recipe => recipe.tags.includes(DISABLED)).map(recipe => recipe.file);
+        assert.deepEqual(
+            disabled,
+            [
+                "crafting_table.json",
+                "crafting_table_default.json",
+                "cut_sandstone.json",
+                "gold_nugget.json",
+                "iron_nugget.json"
+            ],
+            "exactly the vanilla recipes this era did not have, and no others"
+        );
     });
 
     it("matches vanilla's identifier and recipe type wherever it replaces a vanilla recipe", () => {
@@ -193,18 +204,6 @@ describe("Classic Recipe Contract - one crafting interface", () => {
             );
             assert.equal(recipe.id, vanilla.id, `${file} must carry vanilla's identifier`);
         }
-    });
-
-    it("suppresses exactly the vanilla recipes the era did not have", () => {
-        const disabled = all.filter(recipe => recipe.tags.includes(DISABLED)).map(recipe => recipe.file);
-
-        assert.deepEqual(disabled, [
-            "crafting_table.json",
-            "crafting_table_default.json",
-            "cut_sandstone.json",
-            "gold_nugget.json",
-            "iron_nugget.json"
-        ]);
     });
 
     it("registers no two recipes for the same craft on the same interface", () => {

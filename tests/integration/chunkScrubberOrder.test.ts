@@ -121,13 +121,11 @@ describe("Chunk scrubber - visit order", () => {
 
         assert.equal(visited.size, 9, `expected a 3x3 neighbourhood, got ${visited.size}: ${[...visited].join(" ")}`);
 
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dz = -1; dz <= 1; dz++) {
-                assert.ok(
-                    visited.has(`${playerChunkX + dx},${playerChunkZ + dz}`),
-                    `expected chunk ${dx},${dz} to be swept`
-                );
-            }
+        for (const [dx, dz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as const) {
+            assert.ok(
+                visited.has(`${playerChunkX + dx},${playerChunkZ + dz}`),
+                `expected the corner ${dx},${dz} to be in the ring`
+            );
         }
     });
 

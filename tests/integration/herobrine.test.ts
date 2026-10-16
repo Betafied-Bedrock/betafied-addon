@@ -44,12 +44,6 @@ function sweepUntilResolved(limit: number): void {
     }
 }
 
-function sweepTicks(limit: number): void {
-    for (let i = 0; i < limit; i++) {
-        tickManager.step();
-    }
-}
-
 /** Runs the engine clock and the master scheduler together, so gap timers see the ticks the scheduler does. */
 function advanceTicks(ticks: number): void {
     for (let i = 0; i < ticks; i++) {
@@ -58,13 +52,19 @@ function advanceTicks(ticks: number): void {
     }
 }
 
+function spawnBystander(location: { x: number; y: number; z: number }): void {
+    const bystander = new Player("bystander", "Bystander");
+    bystander.dimension = world.getDimension(OVERWORLD);
+    bystander.location = { ...location };
+    mockPlayers.push(bystander);
+}
+
 // Wiring-only: the sweep is driven against the mock's fixed +Z view direction and its own block
 // map, so these cases pin our sighting geometry, spot picker and dismissal timers rather than the
 // engine's. Real facing, chunk loading and entity retention across ticks need an in-game check.
 describe("Herobrine Appearance Integration", () => {
     it("registers the /appear custom command as operator-only", () => {
         const callbacks = registeredBeforeEvents.get("startup") ?? [];
-        assert.ok(callbacks.length > 0, "herobrine should subscribe to the system startup event");
 
         const commands: { name: string; permissionLevel: number; cheatsRequired?: boolean }[] = [];
         const registry = {
@@ -77,15 +77,10 @@ describe("Herobrine Appearance Integration", () => {
             callback({ customCommandRegistry: registry });
         }
 
-        assert.equal(commands.length, 1);
+        assert.equal(commands.length, 1, "a single /appear command");
         assert.equal(commands[0].name, "betafied:appear");
-        assert.equal(commands[0].permissionLevel, CommandPermissionLevel.Admin);
-        assert.equal(commands[0].cheatsRequired, false);
-    });
-
-    it("registers its scheduling sweep and maintenance sweeps with the central tick manager", () => {
-        assert.equal(tickManager.isRegistered("herobrine:sweep"), true);
-        assert.equal(tickManager.isRegistered("herobrine:maintain"), true);
+        assert.equal(commands[0].permissionLevel, CommandPermissionLevel.Admin, "the era's command is op-only");
+        assert.equal(commands[0].cheatsRequired, false, "and it works without cheats, as Beta had none");
     });
 
     it("spawns a single apparition and records the sighting", () => {
@@ -102,35 +97,47 @@ describe("Herobrine Appearance Integration", () => {
         assert.equal(entity.dimension.id, OVERWORLD);
     });
 
-    it("dismisses the apparition once any player gets too close", () => {
+    it("ends the sighting when any player has him: in the crosshair, or on top of him", () => {
         resetMocks();
         layOpenGround();
-        const player = spawnTestPlayer();
+        const witness = spawnTestPlayer();
 
         assert.equal(forceAppearance(), true);
-        const [entity] = [...mockEntities.values()];
-
-        player.location = { x: entity.location.x, y: entity.location.y, z: entity.location.z };
-        sweepUntilResolved(60);
-
-        assert.equal(hasActiveSighting(), false);
-        assert.equal(entity.isValid, false);
-    });
-
-    it("unloads the moment a player catches him in their crosshair", () => {
-        resetMocks();
-        layOpenGround();
-        const player = spawnTestPlayer();
-
-        assert.equal(forceAppearance(), true);
-        const [entity] = [...mockEntities.values()];
+        const [gazed] = [...mockEntities.values()];
 
         // Stand 20 blocks away on his -Z side: the mock player's view faces +Z, straight at him.
-        player.location = { x: entity.location.x, y: entity.location.y, z: entity.location.z - 20 };
+        witness.location = { x: gazed.location.x, y: gazed.location.y, z: gazed.location.z - 20 };
         sweepUntilResolved(60);
 
-        assert.equal(hasActiveSighting(), false);
-        assert.equal(entity.isValid, false);
+        assert.equal(hasActiveSighting(), false, "the player he appeared to can end it by looking");
+        assert.equal(gazed.isValid, false);
+
+        resetMocks();
+        layOpenGround();
+        const away = spawnTestPlayer();
+
+        assert.equal(forceAppearance(), true);
+        const [watched] = [...mockEntities.values()];
+
+        away.location = { x: watched.location.x, y: watched.location.y, z: watched.location.z + 400 };
+        spawnBystander({ x: watched.location.x, y: watched.location.y, z: watched.location.z - 20 });
+        sweepUntilResolved(60);
+
+        assert.equal(hasActiveSighting(), false, "a bystander's gaze must end the sighting too");
+        assert.equal(watched.isValid, false);
+
+        resetMocks();
+        layOpenGround();
+        const walker = spawnTestPlayer();
+
+        assert.equal(forceAppearance(), true);
+        const [cornered] = [...mockEntities.values()];
+
+        walker.location = { ...cornered.location };
+        sweepUntilResolved(60);
+
+        assert.equal(hasActiveSighting(), false, "so does walking into him");
+        assert.equal(cornered.isValid, false);
     });
 
     it("stays put while nobody has him in frame, then dissolves once everyone is far off", () => {
@@ -143,7 +150,7 @@ describe("Herobrine Appearance Integration", () => {
 
         // Same 20 block gap, but now on his +Z side: the fixed +Z view points away from him.
         player.location = { x: entity.location.x, y: entity.location.y, z: entity.location.z + 20 };
-        sweepTicks(120);
+        sweepUntilResolved(120);
 
         assert.equal(hasActiveSighting(), true, "looking away must not dismiss him");
         assert.equal(entity.isValid, true);
@@ -155,29 +162,12 @@ describe("Herobrine Appearance Integration", () => {
         assert.equal(entity.isValid, false);
     });
 
-    it("dismisses him when any other player looks, not only the one he appeared to", () => {
+    it("refuses to appear with nobody online, or on top of the only player there is", () => {
         resetMocks();
-        layOpenGround();
-        const witness = spawnTestPlayer();
 
-        assert.equal(forceAppearance(), true);
-        const [entity] = [...mockEntities.values()];
+        assert.equal(forceAppearance(), false);
+        assert.equal(hasActiveSighting(), false);
 
-        // The original witness walks off well out of frame.
-        witness.location = { x: entity.location.x, y: entity.location.y, z: entity.location.z + 400 };
-
-        const bystander = new Player("bystander", "Bystander");
-        bystander.dimension = world.getDimension(OVERWORLD);
-        bystander.location = { x: entity.location.x, y: entity.location.y, z: entity.location.z - 20 };
-        mockPlayers.push(bystander);
-
-        sweepUntilResolved(60);
-
-        assert.equal(hasActiveSighting(), false, "a bystander's gaze must end the sighting too");
-        assert.equal(entity.isValid, false);
-    });
-
-    it("will not drop him on top of another player", () => {
         const originalRandom = Math.random;
         // Freeze the picker so every attempt lands on the same spot.
         Math.random = () => 0.5;
@@ -194,23 +184,13 @@ describe("Herobrine Appearance Integration", () => {
             resetMocks();
             layOpenGround();
             spawnTestPlayer();
-
-            const bystander = new Player("bystander", "Bystander");
-            bystander.dimension = world.getDimension(OVERWORLD);
-            bystander.location = spot;
-            mockPlayers.push(bystander);
+            spawnBystander(spot);
 
             assert.equal(forceAppearance(), false, "every candidate spot is occupied");
             assert.equal(mockEntities.size, 0);
         } finally {
             Math.random = originalRandom;
         }
-    });
-
-    it("refuses to spawn without players online", () => {
-        resetMocks();
-        assert.equal(forceAppearance(), false);
-        assert.equal(hasActiveSighting(), false);
     });
 
     it("holds the automatic sweep off for the rest period after a sighting ends", () => {

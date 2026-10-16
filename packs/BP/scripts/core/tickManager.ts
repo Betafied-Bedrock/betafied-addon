@@ -1,5 +1,5 @@
 import { system } from "@minecraft/server";
-import { runCatching } from "./errorReporter.js";
+import { reportError, runCatching } from "./errorReporter.js";
 import { JobRunner } from "./jobRunner.js";
 
 export type TaskCallback = () => void | Generator<void, void, unknown>;
@@ -19,6 +19,17 @@ export class TickManager {
     private currentTick: number = 0;
 
     register(id: string, intervalTicks: number, task: TaskCallback, offset?: number): void {
+        // A second registration under a live id would silently replace that schedule, so the first
+        // one keeps running and the collision is reported instead of losing a subsystem's ticks.
+        const existing = this.tasks.get(id);
+        if (existing) {
+            reportError(
+                { system: "tickManager", operation: "register", target: id },
+                new Error(`duplicate task id: a ${existing.intervalTicks}-tick schedule is already registered`)
+            );
+            return;
+        }
+
         const validInterval = Math.max(1, Math.floor(intervalTicks));
         const computedOffset = offset !== undefined ? Math.max(0, Math.floor(offset)) : this.tasks.size % validInterval;
 
@@ -67,7 +78,7 @@ export class TickManager {
                                 this.inFlightJobs.delete(task.id);
                             }
                         });
-                        if (jobId >= 0) {
+                        if (jobId !== undefined) {
                             this.inFlightJobs.set(task.id, jobId);
                         }
                     }

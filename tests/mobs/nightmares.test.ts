@@ -4,7 +4,7 @@ import {
     lightCheckGenerator,
     bedInteractions,
     nightmareJobRunner,
-    handleBedInteraction,
+    noteBedInteraction,
     handlePlayerLeave,
     tryTriggerNightmare
 } from "../../packs/BP/scripts/mobs/nightmares.js";
@@ -49,7 +49,7 @@ describe("Nightmares Spatial Job Tracking & Cancellation", () => {
             typeId: "minecraft:bed"
         } as any;
 
-        handleBedInteraction(player, bedBlock);
+        noteBedInteraction(player, bedBlock);
 
         const bedKey = "minecraft:overworld:10,64,10";
         const record = bedInteractions.get(bedKey);
@@ -59,7 +59,7 @@ describe("Nightmares Spatial Job Tracking & Cancellation", () => {
 
         assert.ok(nightmareJobRunner.has(activeJobId), "job registered in nightmareJobRunner");
 
-        handleBedInteraction(player, bedBlock);
+        noteBedInteraction(player, bedBlock);
 
         assert.equal(bedInteractions.has(bedKey), false, "record deleted on second interaction");
         assert.equal(nightmareJobRunner.has(activeJobId), false, "spatial job was cancelled in job runner");
@@ -76,7 +76,7 @@ describe("Nightmares Spatial Job Tracking & Cancellation", () => {
             typeId: "minecraft:bed"
         } as any;
 
-        handleBedInteraction(player, bedBlock);
+        noteBedInteraction(player, bedBlock);
         const bedKey = "minecraft:overworld:20,64,20";
         const record = bedInteractions.get(bedKey);
         assert.ok(record);

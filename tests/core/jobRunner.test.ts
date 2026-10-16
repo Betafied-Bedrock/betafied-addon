@@ -18,7 +18,7 @@ test("JobRunner cooperative time-slicing & lifecycle", async (t) => {
             steps.push(3);
         }
 
-        JobRunner.run(counter());
+        new JobRunner().run(counter());
 
         assert.deepEqual(steps, [], "job does not run synchronously on registration");
 
@@ -39,7 +39,7 @@ test("JobRunner cooperative time-slicing & lifecycle", async (t) => {
         const items = ["a", "b", "c", "d", "e"];
         const processed: string[] = [];
 
-        JobRunner.forEach(
+        new JobRunner().forEach(
             items,
             (item) => processed.push(item),
             { batchSize: 2 }

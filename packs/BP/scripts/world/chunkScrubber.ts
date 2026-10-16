@@ -39,19 +39,15 @@ function reverifyOffset(key: string): number {
     return (hash >>> 0) % REVERIFY_SPREAD_TICKS;
 }
 
-/** Filter for authentic Beta blocks preserved by fine pass volume queries. */
+/**
+ * Filter for authentic Beta blocks preserved by fine pass volume queries. Only air is added here: the
+ * registry already carries the era's ids in every spelling the engine answers to.
+ */
 function buildUntouchedFilter(): BlockFilter {
     const excludeTypes: string[] = [];
     const candidates = new Set<string>([
         "minecraft:air",
-        ...BETA_BLOCK_IDS,
-        "minecraft:deadbush",
-        "minecraft:web",
-        "minecraft:mob_spawner",
-        "minecraft:unpowered_repeater",
-        "minecraft:powered_repeater",
-        "minecraft:stone_block_slab",
-        "minecraft:brick_block"
+        ...BETA_BLOCK_IDS
     ]);
 
     for (const id of candidates) {
@@ -88,14 +84,14 @@ function buildPostBetaWoodTargets(): readonly (readonly [string, string])[] {
             }
 
             const norm = normalizeBlock(id);
-            if (norm.action === "keep" || !norm.targetId) continue;
+            if (norm.action !== "convert") continue;
             targets.push([id, norm.targetId]);
         }
 
         for (const spelling of [`stripped_${species}_log`, `stripped_${species}_stem`]) {
             const id = `minecraft:${spelling}`;
             const norm = normalizeBlock(id);
-            if (norm.action === "keep" || !norm.targetId) continue;
+            if (norm.action !== "convert") continue;
             targets.push([id, norm.targetId]);
         }
     }
@@ -221,7 +217,7 @@ function applyFineScrub(block: Block): void {
         ? normalizeBlock(typeId)
         : { action: "convert" as const, targetId: fineTarget };
 
-    if (blockNorm.action === "convert" && blockNorm.targetId) {
+    if (blockNorm.action === "convert") {
         applyReplacement(block, blockNorm.targetId);
     } else if (blockNorm.action === "remove") {
         block.setType("minecraft:air");

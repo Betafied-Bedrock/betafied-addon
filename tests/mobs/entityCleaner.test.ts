@@ -38,47 +38,23 @@ describe("EntityCleaner Batching & Lifetime Safety", () => {
         resetMocks();
     });
 
-    it("batches entity processing into 20-item chunks", () => {
+    it("yields part-way through the sweep, completes on the last entity, and skips a despawned handle", () => {
         const overworld = world.getDimension("minecraft:overworld") as any;
         const player = new Player("test_player");
         player.dimension = overworld;
         mockPlayers.push(player);
 
-        for (let i = 0; i < 45; i++) {
+        for (let i = 0; i < 25; i++) {
             overworld.spawnEntity("minecraft:sniffer", { x: 0, y: 64, z: 0 });
         }
+        overworld.spawnEntity("minecraft:sniffer", { x: 0, y: 64, z: 0 }).isValid = false;
 
         const job = cleanerJob();
+        assert.equal(job.next().done, false, "the sweep yields with entities still to clean");
 
-        // Batch 1 (20 entities)
-        const step1 = job.next();
-        assert.equal(step1.done, false, "yields after first batch of 20 entities");
-
-        // Batch 2 (next 20 entities -> 40 total)
-        const step2 = job.next();
-        assert.equal(step2.done, false, "yields after second batch of 20 entities");
-
-        // Remaining 5 entities + player loop yield
-        const step3 = job.next();
-        assert.equal(step3.done, false, "yields after player loop");
-
-        const step4 = job.next();
-        assert.equal(step4.done, true, "generator completes after all entities cleaned");
-    });
-
-    it("safely skips invalid entities without throwing", () => {
-        const overworld = world.getDimension("minecraft:overworld") as any;
-        const player = new Player("test_player");
-        player.dimension = overworld;
-        mockPlayers.push(player);
-
-        const ent = overworld.spawnEntity("minecraft:sniffer", { x: 0, y: 64, z: 0 });
-        ent.isValid = false;
-
-        const job = cleanerJob();
-        assert.doesNotThrow(() => {
-            while (!job.next().done) {}
-        });
+        let step = job.next();
+        while (!step.done) step = job.next();
+        assert.equal(step.done, true, "and finishes on the pass that cleans the last one");
     });
 
     it("aborts player sweep cleanly if player disconnects across yield boundary", () => {
@@ -175,24 +151,6 @@ describe("EntityCleaner Batching & Lifetime Safety", () => {
         // has no break of its own to attribute, so it retypes the apple instead of reading the marker.
         assert.equal(spawned.length, 1, "the sweep retypes an apple rather than deleting it");
         assert.equal(spawned[0].typeId, "bh:apple");
-    });
-
-    it("migrates uninitialized properties and effects on nearby Beta mobs", () => {
-        const overworld = world.getDimension("minecraft:overworld") as any;
-        const player = new Player("test_player");
-        player.dimension = overworld;
-        mockPlayers.push(player);
-
-        const cow = overworld.spawnEntity("minecraft:cow", { x: 0, y: 64, z: 0 });
-        cow.setComponent("minecraft:is_hidden_when_invisible", {});
-        assert.equal(cow.getProperty("betarock:shadow_span"), undefined);
-        assert.equal(cow.getEffect("invisibility"), undefined);
-
-        const job = cleanerJob();
-        while (!job.next().done) {}
-
-        assert.equal(cow.getProperty("betarock:shadow_span"), 1);
-        assert.ok(cow.getEffect("invisibility"));
     });
 });
 

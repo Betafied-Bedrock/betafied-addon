@@ -3,6 +3,7 @@ import { tickManager } from "../core/tickManager.js";
 import { teleportQuietly } from "../core/quietTeleport.js";
 import { reportError } from "../core/errorReporter.js";
 import { END_ID, END_KEY } from "../core/betaConstants.js";
+import { PLAYER_TAGS } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 10,
@@ -38,7 +39,7 @@ export function islandJob(): void {
     for (const player of world.getAllPlayers()) {
         if (!player.isValid) continue;
 
-        if (!player.hasTag("voided")) {
+        if (!player.hasTag(PLAYER_TAGS.VOIDED)) {
             try {
                 player.removeEffect("resistance");
             } catch (e) {

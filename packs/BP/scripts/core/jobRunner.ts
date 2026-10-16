@@ -19,13 +19,14 @@ export class JobRunner {
         this.activeJobs = new Set<number>();
     }
 
+    /** Starts the job and hands back its id, or `undefined` when the engine refused to start it. */
     public run(
         generator: Generator<void, void, void>,
         options?: JobOptions
-    ): number {
+    ): number | undefined {
         const box = { id: -1 };
         const wrapped = JobRunner.wrap(generator, options, () => {
-            if (box.id !== -1) {
+            if (box.id >= 0) {
                 this.activeJobs.delete(box.id);
             }
         });
@@ -36,12 +37,12 @@ export class JobRunner {
             (err) => {
                 options?.onError?.(err);
                 options?.onFinally?.();
-                return -1;
+                return undefined;
             }
         );
 
-        if (started < 0) {
-            return -1;
+        if (started === undefined) {
+            return undefined;
         }
 
         box.id = started;
@@ -53,9 +54,8 @@ export class JobRunner {
         items: Iterable<T>,
         handler: (item: T, index: number) => void,
         options?: BatchJobOptions
-    ): number {
-        const gen = JobRunner.batch(items, handler, options?.batchSize);
-        return this.run(gen, options);
+    ): number | undefined {
+        return this.run(JobRunner.batch(items, handler, options?.batchSize), options);
     }
 
     public has(jobId: number): boolean {
@@ -65,10 +65,6 @@ export class JobRunner {
     public clear(jobId: number): void {
         this.activeJobs.delete(jobId);
         JobRunner.clear(jobId);
-    }
-
-    public cancel(jobId: number): void {
-        this.clear(jobId);
     }
 
     public clearAll(): void {
@@ -82,34 +78,7 @@ export class JobRunner {
         return this.activeJobs.size;
     }
 
-    public static run(
-        generator: Generator<void, void, void>,
-        options?: JobOptions
-    ): number {
-        const wrapped = JobRunner.wrap(generator, options);
-        const started = runCatching(
-            { system: options?.system ?? "jobRunner", operation: "startJob" },
-            () => system.runJob(wrapped),
-            (err) => {
-                options?.onError?.(err);
-                options?.onFinally?.();
-                return -1;
-            }
-        );
-        return started;
-    }
-
-    public static forEach<T>(
-        items: Iterable<T>,
-        handler: (item: T, index: number) => void,
-        options?: BatchJobOptions
-    ): number {
-        const gen = JobRunner.batch(items, handler, options?.batchSize);
-        return JobRunner.run(gen, options);
-    }
-
-    public static clear(jobId: number): void {
-        if (jobId < 0) return;
+    private static clear(jobId: number): void {
         runCatching(
             { system: "jobRunner", operation: "clearJob" },
             () => {
@@ -118,7 +87,7 @@ export class JobRunner {
         );
     }
 
-    public static *batch<T>(
+    private static *batch<T>(
         items: Iterable<T>,
         handler: (item: T, index: number) => void,
         batchSize = 1
@@ -141,6 +110,8 @@ export class JobRunner {
         options?: JobOptions,
         onComplete?: () => void
     ): Generator<void, void, void> {
+        const systemName = options?.system ?? "jobRunner";
+
         try {
             while (true) {
                 const res = generator.next();
@@ -148,40 +119,18 @@ export class JobRunner {
                 yield;
             }
         } catch (err) {
-            if (options?.onError) {
-                try {
-                    options.onError(err);
-                } catch (reportErr) {
-                    reportError(
-                        {
-                            system: options?.system ?? "jobRunner",
-                            operation: "onError"
-                        },
-                        reportErr
-                    );
-                }
-            }
+            // The caller's own callbacks run through runCatching, the module's one way to contain a
+            // failure without aborting the job that is already unwinding.
+            runCatching({ system: systemName, operation: "onError" }, () => options?.onError?.(err));
             reportError(
                 {
-                    system: options?.system ?? "jobRunner",
+                    system: systemName,
                     operation: options?.operation ?? "execute"
                 },
                 err
             );
         } finally {
-            if (options?.onFinally) {
-                try {
-                    options.onFinally();
-                } catch (finallyErr) {
-                    reportError(
-                        {
-                            system: options?.system ?? "jobRunner",
-                            operation: "onFinally"
-                        },
-                        finallyErr
-                    );
-                }
-            }
+            runCatching({ system: systemName, operation: "onFinally" }, () => options?.onFinally?.());
             onComplete?.();
         }
     }

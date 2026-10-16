@@ -36,7 +36,7 @@ export const WOOL_DROP_MAX = 3;
 export const hurtCooldowns = new Map<string, number>();
 export const jumpCooldowns = new Map<string, number>();
 
-export function handleSheepPunch(sheep: Entity): void {
+export function shearPunchedSheep(sheep: Entity): void {
     if (!sheep.isValid) return;
 
     const health = sheep.getComponent(EntityComponentTypes.Health);
@@ -63,7 +63,7 @@ eventBus.onEntityHurt((ev) => {
         ev.damageSource.damagingEntity instanceof Player &&
         !hurtEntity.hasComponent("minecraft:is_sheared")
     ) {
-        handleSheepPunch(hurtEntity);
+        shearPunchedSheep(hurtEntity);
     }
 });
 

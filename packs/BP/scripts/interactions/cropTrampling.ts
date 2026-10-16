@@ -4,10 +4,7 @@ import { tickManager } from "../core/tickManager.js";
 import { eventBus } from "../core/eventBus.js";
 import { runCatching, reportError } from "../core/errorReporter.js";
 import { BH_FENCE_ID } from "../core/betaRegistry.js";
-
-function walkRuleApplies(mode: GameMode | undefined): boolean {
-    return mode !== GameMode.Creative && mode !== GameMode.Spectator;
-}
+import { eraRulesApply } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({
     MOB_INTERVAL: 2,
@@ -321,7 +318,7 @@ function sample(entity: Entity, nowTick: number, mode?: GameMode): void {
 }
 
 function walkRule(entity: Entity, nowTick: number, mode?: GameMode): void {
-    if (!walkRuleApplies(mode)) return;
+    if (!eraRulesApply(mode)) return;
 
     const id = entity.id;
     const location = entity.location;

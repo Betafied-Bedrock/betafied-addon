@@ -1,30 +1,5 @@
 import type { Entity } from "@minecraft/server";
-import { BH_CAKE_ID, isBetaEntity, isVanillaId, TERRAIN_PLANK_SPECIES } from "./betaRegistry.js";
-import { normalizeEntityDrop } from "./normalizer.js";
-
-export function isAllowedEntityType(typeId: string): boolean {
-    return !isVanillaId(typeId) || isBetaEntity(typeId);
-}
-
-export function isBannedItemDrop(itemId: string): boolean {
-    const res = normalizeEntityDrop(itemId);
-    return res.action === "remove";
-}
-
-export interface EntityCompatibilityAssessment {
-    allowed: boolean;
-    reason?: "disallowed_type" | "banned_item_drop";
-}
-
-export function assessEntityCompatibility(typeId: string, droppedItemTypeId?: string): EntityCompatibilityAssessment {
-    if (!isAllowedEntityType(typeId)) {
-        return { allowed: false, reason: "disallowed_type" };
-    }
-    if (typeId === "minecraft:item" && droppedItemTypeId !== undefined && isBannedItemDrop(droppedItemTypeId)) {
-        return { allowed: false, reason: "banned_item_drop" };
-    }
-    return { allowed: true };
-}
+import { BH_CAKE_ID, TERRAIN_PLANK_SPECIES } from "./betaRegistry.js";
 
 export const FOREIGN_OWNED_TAGS: readonly string[] = Object.freeze([
     "far:item_display",

@@ -86,7 +86,8 @@ export function tryTriggerNightmare(bedKey: string): void {
             }
             spawnNightmare(player, bedBlock);
         } catch {
-            // Block query safety
+            // The bed's chunk can be unloaded by the time this delayed read runs, which makes the
+            // block lookup throw.
         }
     }, CONFIG.SPAWN_DELAY);
 }
@@ -154,7 +155,7 @@ function getSpawnOffset(bedBlock: Block): Vector3 {
                 return { x: offset.x + 0.5, y: offset.y, z: offset.z + 0.5 };
             }
         } catch {
-            // Block query safety
+            // A candidate cell in an unloaded chunk makes getBlock throw; the next side is tried.
         }
     }
 
@@ -178,7 +179,7 @@ function spawnNightmare(player: Player, block: Block): void {
     }
 }
 
-export function handleBedInteraction(player: Player, block: Block): void {
+export function noteBedInteraction(player: Player, block: Block): void {
     if (!block || !block.typeId.includes("bed")) return;
 
     const bedKey = `${block.dimension.id}:${block.location.x},${block.location.y},${block.location.z}`;
@@ -209,7 +210,7 @@ export function handleBedInteraction(player: Player, block: Block): void {
     } else {
         current.count += 1;
         if (current.jobId !== undefined) {
-            nightmareJobRunner.cancel(current.jobId);
+            nightmareJobRunner.clear(current.jobId);
         }
         bedInteractions.delete(bedKey);
     }
@@ -219,7 +220,7 @@ export function handlePlayerLeave(event: { playerId: string }): void {
     for (const [key, record] of bedInteractions) {
         if (record.playerId === event.playerId) {
             if (record.jobId !== undefined) {
-                nightmareJobRunner.cancel(record.jobId);
+                nightmareJobRunner.clear(record.jobId);
             }
             bedInteractions.delete(key);
         }
@@ -227,7 +228,7 @@ export function handlePlayerLeave(event: { playerId: string }): void {
 }
 
 eventBus.onPlayerInteractWithBlock((event) => {
-    handleBedInteraction(event.player, event.block);
+    noteBedInteraction(event.player, event.block);
 });
 
 eventBus.onPlayerLeave((event) => {

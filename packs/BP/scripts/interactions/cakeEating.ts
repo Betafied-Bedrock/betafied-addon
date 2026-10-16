@@ -2,6 +2,7 @@ import { BlockPermutation, EntityComponentTypes, system, world } from "@minecraf
 import type { Block, Player, PlayerInteractWithBlockBeforeEvent } from "@minecraft/server";
 import { BH_CAKE_ID } from "../core/betaRegistry.js";
 import { eventBus } from "../core/eventBus.js";
+import type { Cell } from "./cell.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 
 const AIR_ID = "minecraft:air";
@@ -28,12 +29,6 @@ function isBursted(key: string, currentTick: number): boolean {
         }
     }
     return false;
-}
-
-export interface Cell {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
 }
 
 export interface CakeBite {

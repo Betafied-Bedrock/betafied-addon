@@ -36,8 +36,11 @@ function frameBytes(decoded: any, columns: number, rows: number, column: number,
 
 describe("Beta Sky Textures - Resource Pack Environment Contract", () => {
     it("overrides clouds and the sun at the paths the engine reads", () => {
-        assert.deepEqual([decode(resolve(environmentDir, "clouds.png")).width, decode(resolve(environmentDir, "clouds.png")).height], [256, 256]);
-        assert.deepEqual([decode(resolve(environmentDir, "sun.png")).width, decode(resolve(environmentDir, "sun.png")).height], [32, 32]);
+        const clouds = decode(resolve(environmentDir, "clouds.png"));
+        assert.deepEqual([clouds.width, clouds.height], [256, 256]);
+
+        const sun = decode(resolve(environmentDir, "sun.png"));
+        assert.deepEqual([sun.width, sun.height], [32, 32]);
     });
 
     it("ships a single moon, not the eight phases Beta did not have", () => {

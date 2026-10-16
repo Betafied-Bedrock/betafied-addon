@@ -1,3 +1,11 @@
+/**
+ * Which module owns which era table, so a rule has one home instead of three: this file owns the era's
+ * id sets (the blocks, items and entities 1.7.3 had, plus the pack's own ids); `normalizer.ts` owns the
+ * translations between eras (what a post-Beta id becomes at each boundary, and no id set of its own);
+ * `compatibilityPolicy.ts` owns policy across addons (foreign entities and blocks the pack leaves alone,
+ * and the bulk and fine terrain tables). A rule spanning two belongs to the table the boundary reads,
+ * with the other importing it; `BETA_POLICY_GAPS.md` records the decisions still open across the split.
+ */
 export const BH_FENCE_ID = "bh:fence";
 export const BH_CHEST_ID = "bh:chest";
 export const BH_BOW_ID = "bh:bow";
@@ -256,7 +264,13 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     // is a broken piston. Both heads belong to the era even though neither has an item form.
     "minecraft:piston_arm_collision", "minecraft:sticky_piston_arm_collision",
     "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door",
-    "minecraft:standing_sign", "minecraft:wall_sign"
+    "minecraft:standing_sign", "minecraft:wall_sign",
+    // Six era blocks whose engine id is the legacy Bedrock spelling of the id the era used, and both
+    // spellings resolve on this build. Listing the engine's spelling here is what keeps the two
+    // boundaries agreeing: the scrubber preserves the block, and the drop boundary keeps the item the
+    // block pays. A private list in either pass is how the block came to survive while its drop did not.
+    "minecraft:deadbush", "minecraft:web", "minecraft:mob_spawner",
+    "minecraft:unpowered_repeater", "minecraft:powered_repeater", "minecraft:stone_block_slab"
 ]));
 
 export function isBetaEntity(typeId: string): boolean {

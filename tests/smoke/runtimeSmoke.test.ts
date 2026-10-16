@@ -7,9 +7,8 @@ describe("Bedrock Runtime Smoke Suite - Manifest & Entrypoint Integrity", () => 
     const root = process.cwd();
     const bpManifestPath = resolve(root, "packs/BP/manifest.json");
     const rpManifestPath = resolve(root, "packs/RP/manifest.json");
-    const mainScriptPath = resolve(root, "packs/BP/scripts/main.ts");
 
-    it("verifies behavior pack manifest structure and script module entrypoint", () => {
+    it("verifies both pack manifests and the script module entrypoint", () => {
         assert.ok(existsSync(bpManifestPath), "BP manifest must exist");
         const raw = readFileSync(bpManifestPath, "utf-8");
         const manifest = JSON.parse(raw);
@@ -25,6 +24,15 @@ describe("Bedrock Runtime Smoke Suite - Manifest & Entrypoint Integrity", () => 
         const serverDep = manifest.dependencies.find((d: any) => d.module_name === "@minecraft/server");
         assert.ok(serverDep, "BP manifest must declare @minecraft/server dependency");
         assert.ok(serverDep.version, "@minecraft/server dependency must have a version");
+
+        assert.ok(existsSync(rpManifestPath), "RP manifest must exist");
+        const rpManifest = JSON.parse(readFileSync(rpManifestPath, "utf-8"));
+        assert.equal(rpManifest.format_version, 2, "RP format_version must be 2");
+        assert.ok(rpManifest.header.uuid, "RP header must contain a UUID");
+        assert.ok(
+            rpManifest.modules.some((m: any) => m.type === "resources"),
+            "RP must have a resources module"
+        );
     });
 
     it("pins @minecraft/server-ui to the engine line @minecraft/server is pinned to", () => {
@@ -49,20 +57,6 @@ describe("Bedrock Runtime Smoke Suite - Manifest & Entrypoint Integrity", () => 
             uiPin.startsWith(`${uiDep.version}.`),
             `manifest ${uiDep.version} and devDependency ${uiPin} must name the same module version`
         );
-    });
-
-    it("verifies resource pack manifest structure", () => {
-        assert.ok(existsSync(rpManifestPath), "RP manifest must exist");
-        const raw = readFileSync(rpManifestPath, "utf-8");
-        const manifest = JSON.parse(raw);
-
-        assert.equal(manifest.format_version, 2, "RP format_version must be 2");
-        assert.ok(manifest.header.uuid, "RP header must contain a UUID");
-        assert.ok(manifest.modules.some((m: any) => m.type === "resources"), "RP must have resources module");
-    });
-
-    it("verifies script entrypoint file exists on disk", () => {
-        assert.ok(existsSync(mainScriptPath), "packs/BP/scripts/main.ts must exist on disk");
     });
 
     it("looks dimensions up by the short keys the API documents", () => {

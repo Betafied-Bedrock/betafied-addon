@@ -72,85 +72,90 @@ function isValidPositionJson(raw: unknown): Vector3 | null {
     return null;
 }
 
+const FUEL_KEY = "fuelTime";
+const POSITION_KEY = "lastPosition";
+
+// The engine inlines this union on setDynamicProperty instead of exporting a type for it.
+type PropertyValue = string | number | boolean | Vector3;
+
+/**
+ * One cart property read: a value the key's own parser rejects is repaired to what the key expects and
+ * reported, because the engine hands back whatever the last build wrote.
+ */
+function readProperty<T>(
+    entity: Entity,
+    key: string,
+    parse: (raw: unknown) => T | undefined,
+    repair: () => PropertyValue
+): T | undefined {
+    try {
+        const raw = entity.getDynamicProperty(key);
+        if (raw === undefined) return undefined;
+
+        const parsed = parse(raw);
+        if (parsed !== undefined) return parsed;
+
+        reportError({
+            system: "furnaceMinecart",
+            operation: "readProperty",
+            target: entity.id,
+            details: { key, raw: typeof raw === "object" ? JSON.stringify(raw) : String(raw) }
+        }, "Malformed dynamic property");
+        entity.setDynamicProperty(key, repair());
+    } catch (e) {
+        reportError({
+            system: "furnaceMinecart",
+            operation: "readProperty",
+            target: entity.id,
+            details: { key }
+        }, e);
+    }
+    return undefined;
+}
+
+function writeProperty(entity: Entity, key: string, value: PropertyValue): void {
+    try {
+        entity.setDynamicProperty(key, value);
+    } catch (e) {
+        reportError({
+            system: "furnaceMinecart",
+            operation: "writeProperty",
+            target: entity.id,
+            details: { key }
+        }, e);
+    }
+}
+
 const FurnaceState = {
     getFuel(entity: Entity): number {
-        try {
-            const raw = entity.getDynamicProperty("fuelTime");
-            if (isValidFuelTime(raw)) {
-                return Math.floor(raw);
-            }
-            if (raw !== undefined) {
-                reportError({
-                    system: "furnaceMinecart",
-                    operation: "readFuelTimeInvalid",
-                    target: entity.id,
-                    details: { raw: typeof raw === "object" ? JSON.stringify(raw) : String(raw) }
-                }, "Invalid fuelTime property");
-                entity.setDynamicProperty("fuelTime", 0);
-            }
-        } catch (e) {
-            reportError({
-                system: "furnaceMinecart",
-                operation: "readFuelTime",
-                target: entity.id
-            }, e);
-        }
-        return 0;
+        const fuel = readProperty(
+            entity,
+            FUEL_KEY,
+            (raw) => (isValidFuelTime(raw) ? Math.floor(raw) : undefined),
+            () => 0
+        );
+        return fuel ?? 0;
     },
     setFuel(entity: Entity, ticks: number): void {
-        const validTicks = isValidFuelTime(ticks) ? Math.floor(ticks) : 0;
-        try {
-            entity.setDynamicProperty("fuelTime", validTicks);
-        } catch (e) {
-            reportError({
-                system: "furnaceMinecart",
-                operation: "setFuelTime",
-                target: entity.id
-            }, e);
-        }
+        writeProperty(entity, FUEL_KEY, isValidFuelTime(ticks) ? Math.floor(ticks) : 0);
     },
     decrementFuel(entity: Entity): number {
-        const current = FurnaceState.getFuel(entity);
-        const updated = Math.max(0, current - 1);
+        const updated = Math.max(0, FurnaceState.getFuel(entity) - 1);
         FurnaceState.setFuel(entity, updated);
         return updated;
     },
     getLastPosition(entity: Entity): Vector3 {
-        try {
-            const raw = entity.getDynamicProperty("lastPosition");
-            if (raw !== undefined) {
-                const parsed = isValidPositionJson(raw);
-                if (parsed) {
-                    return parsed;
-                }
-                reportError({
-                    system: "furnaceMinecart",
-                    operation: "parseLastPosition",
-                    target: entity.id
-                }, "Malformed lastPosition property");
-                entity.setDynamicProperty("lastPosition", JSON.stringify(entity.location));
-            }
-        } catch (e) {
-            reportError({
-                system: "furnaceMinecart",
-                operation: "readLastPosition",
-                target: entity.id
-            }, e);
-        }
-        return entity.location;
+        const lastPosition = readProperty(
+            entity,
+            POSITION_KEY,
+            (raw) => isValidPositionJson(raw) ?? undefined,
+            () => JSON.stringify(entity.location)
+        );
+        return lastPosition ?? entity.location;
     },
     updateLastPosition(entity: Entity, currentPos: Vector3, lastPos: Vector3): void {
-        if (currentPos.x !== lastPos.x || currentPos.y !== lastPos.y || currentPos.z !== lastPos.z) {
-            try {
-                entity.setDynamicProperty("lastPosition", JSON.stringify(currentPos));
-            } catch (e) {
-                reportError({
-                    system: "furnaceMinecart",
-                    operation: "updateLastPosition",
-                    target: entity.id
-                }, e);
-            }
-        }
+        const moved = currentPos.x !== lastPos.x || currentPos.y !== lastPos.y || currentPos.z !== lastPos.z;
+        if (moved) writeProperty(entity, POSITION_KEY, JSON.stringify(currentPos));
     }
 };
 
@@ -280,7 +285,7 @@ const FUEL_ITEM_IDS: ReadonlySet<string> = Object.freeze(new Set(["minecraft:coa
 
 function startFueledMinecart(entity: Entity): void {
     FurnaceState.setFuel(entity, CONFIG.FUEL_TICKS_PER_COAL);
-    entity.setDynamicProperty("lastPosition", JSON.stringify(entity.location));
+    writeProperty(entity, POSITION_KEY, JSON.stringify(entity.location));
     startMinecartMovement(entity);
 }
 

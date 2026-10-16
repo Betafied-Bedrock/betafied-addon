@@ -38,7 +38,14 @@ function buildFoodItems(): Record<string, FoodConfig> {
     for (const convertedId of Object.values(FOOD_CONVERSIONS)) {
         const config = FOOD_HEALTH[convertedId];
         if (!config) {
-            throw new Error(`foodAndHealth: no health configured for converted food ${convertedId}`);
+            // This runs at import, so a missing entry is reported rather than thrown: a throw would
+            // abort the script before any handler exists to report it. The food then simply keeps
+            // whatever the engine does with it natively.
+            reportError(
+                { system: "foodAndHealth", operation: "buildFoodItems", target: convertedId },
+                "converted food has no configured health"
+            );
+            continue;
         }
         items[convertedId] = config;
     }
@@ -69,10 +76,10 @@ class FoodAndHealth {
     }
 
     private registerEventHandlers(): void {
-        eventBus.onItemUse(this.handleFoodConsumption.bind(this));
+        eventBus.onItemUse(this.handleItemUse.bind(this));
     }
 
-    private handleFoodConsumption(event: ItemUseBeforeEvent): void {
+    private handleItemUse(event: ItemUseBeforeEvent): void {
         const player = event.source;
         const itemStack = event.itemStack;
 
@@ -81,6 +88,8 @@ class FoodAndHealth {
         }
 
         event.cancel = true;
+
+        const foodId = itemStack.typeId;
 
         system.run(() => {
             try {
@@ -95,9 +104,18 @@ class FoodAndHealth {
                 const selectedSlot = player.selectedSlotIndex;
                 const slotItem = inventory.getItem(selectedSlot);
 
-                if (!slotItem || slotItem.typeId !== itemStack.typeId) return;
+                // Writing to the inventory is not legal inside the before-event, so the use is
+                // cancelled one tick before the write. That is the whole revalidation window: if the
+                // slot moved on in it, the cancelled use is reported rather than dropped.
+                if (slotItem?.typeId !== foodId) {
+                    reportError(
+                        { system: "foodAndHealth", operation: "consumeFoodDeferred", target: player.name },
+                        `slot ${selectedSlot} no longer holds ${foodId}, so the cancelled use consumed nothing`
+                    );
+                    return;
+                }
 
-                this.consumeFoodItem(player, inventory, healthComponent, itemStack, selectedSlot);
+                this.consumeFoodItem(player, inventory, healthComponent, slotItem, selectedSlot);
             } catch (e) {
                 reportError({
                     system: "foodAndHealth",

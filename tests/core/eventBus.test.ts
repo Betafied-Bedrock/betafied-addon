@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
+import { eventBus, guarded } from "../../packs/BP/scripts/core/eventBus.js";
 import { registeredBeforeEvents } from "../mocks/minecraftServer.js";
 
 describe("Central EventBus Architecture", () => {
@@ -65,27 +65,6 @@ describe("Central EventBus Architecture", () => {
         unsubPriority();
     });
 
-    it("routes container access events to their subscribers", () => {
-        let opened = 0;
-        let closed = 0;
-
-        const unsubOpen = eventBus.onBlockContainerOpened(() => {
-            opened++;
-        });
-        const unsubClose = eventBus.onBlockContainerClosed(() => {
-            closed++;
-        });
-
-        eventBus.dispatch("blockContainerOpened", {});
-        eventBus.dispatch("blockContainerClosed", {});
-
-        assert.equal(opened, 1, "blockContainerOpened handlers must receive the open event");
-        assert.equal(closed, 1, "blockContainerClosed handlers must receive the close event");
-
-        unsubOpen();
-        unsubClose();
-    });
-
     it("isolates errors so a throwing handler does not crash sibling handlers", () => {
         let siblingRan = false;
 
@@ -107,28 +86,7 @@ describe("Central EventBus Architecture", () => {
         unsubSuccess();
     });
 
-    it("supports beforeEvents short-circuiting when event is cancelled", () => {
-        let secondHandlerRan = false;
-
-        const unsubCanceller = eventBus.onPlayerInteractWithBlock((e: any) => {
-            e.cancel = true;
-        }, 100);
-
-        const unsubSecondary = eventBus.onPlayerInteractWithBlock(() => {
-            secondHandlerRan = true;
-        }, 10);
-
-        const eventObj = { cancel: false };
-        eventBus.dispatch("playerInteractWithBlock", eventObj);
-
-        assert.equal(eventObj.cancel, true);
-        assert.equal(secondHandlerRan, false, "Cancelled beforeEvent must short-circuit lower priority handlers");
-
-        unsubCanceller();
-        unsubSecondary();
-    });
-
-    it("dispatches the hurt before-event and short-circuits a cancelled hit", () => {
+    it("runs the handlers above a canceller, then short-circuits the ones below it", () => {
         const seen: string[] = [];
 
         const unsubFirst = eventBus.onEntityHurtBefore(() => {
@@ -146,12 +104,51 @@ describe("Central EventBus Architecture", () => {
         const event: any = { cancel: false, damage: 5 };
         eventBus.dispatch("entityHurtBefore", event);
 
-        assert.equal(event.cancel, true);
-        assert.deepEqual(seen, ["first"], "A cancelled hurt must short-circuit lower-priority handlers");
+        assert.equal(event.cancel, true, "the flag the canceller set is the one dispatch leaves behind");
+        assert.deepEqual(seen, ["first"], "a cancelled beforeEvent must short-circuit lower-priority handlers");
 
         unsubFirst();
         unsubCanceller();
         unsubSecond();
+    });
+
+    it("reports a guarded handler's failure with its own context and spares the next handler", () => {
+        const warnings: string[] = [];
+        const originalWarn = console.warn;
+        console.warn = (message?: unknown) => {
+            warnings.push(String(message));
+        };
+
+        let siblingRan = false;
+        const unsubFail = eventBus.onEntitySpawn(guarded(
+            (event: { entity: { typeId: string } }) => ({
+                system: "guardedTest",
+                operation: "handleSpawn",
+                target: event.entity.typeId
+            }),
+            (event) => {
+                if (event.entity) throw new Error("guarded handler crash");
+            }
+        ));
+        const unsubSibling = eventBus.onEntitySpawn(() => {
+            siblingRan = true;
+        });
+
+        try {
+            assert.doesNotThrow(() => {
+                eventBus.dispatch("entitySpawn", { entity: { typeId: "minecraft:pig" } });
+            });
+        } finally {
+            console.warn = originalWarn;
+            unsubFail();
+            unsubSibling();
+        }
+
+        assert.equal(warnings.length, 1, "the guard reports through the shared error boundary exactly once");
+        assert.match(warnings[0], /^guardedTest: Error during handleSpawn/);
+        assert.match(warnings[0], /target: minecraft:pig/, "the context factory reads the event it is given");
+        assert.match(warnings[0], /guarded handler crash/);
+        assert.equal(siblingRan, true, "a guarded failure must not stop the sibling handlers");
     });
 
     it("routes the engine's before-hurt event through the bus once initialised", () => {

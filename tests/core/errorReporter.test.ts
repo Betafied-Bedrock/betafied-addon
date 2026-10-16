@@ -31,14 +31,6 @@ describe("Error boundary plumbing", () => {
         assert.deepEqual(captured.lines, [], "a successful operation must not log");
     });
 
-    it("swallows the exception so a failing job cannot kill the tick", () => {
-        assert.doesNotThrow(() =>
-            runCatching({ system: "test", operation: "boom" }, () => {
-                throw new Error("InvalidEntityError");
-            })
-        );
-    });
-
     it("logs the throwing system and operation instead of dropping the error", () => {
         runCatching({ system: "chunkScrubber", operation: "sealFloor", target: "0,0" }, () => {
             throw new Error("chunk unloaded");

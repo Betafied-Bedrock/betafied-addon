@@ -5,10 +5,15 @@ import {
 
 export type NormalizationAction = "keep" | "convert" | "remove";
 
-export interface NormalizationResult {
-    readonly action: NormalizationAction;
-    readonly targetId?: string;
-}
+/**
+ * One answer shape for every translation this module makes. A `convert` always carries its target,
+ * so no caller re-checks a field before it can act on the decision. The id-producing entry points
+ * answer `undefined` — never a fourth action — when their boundary has nothing to say about an id.
+ */
+export type NormalizationResult =
+    | { readonly action: "keep" }
+    | { readonly action: "convert"; readonly targetId: string }
+    | { readonly action: "remove" };
 
 const ORE_DROP_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:raw_iron": "minecraft:iron_ore",
@@ -64,17 +69,25 @@ export function isStoneCompound(bareId: string): boolean {
     return bareId.includes("stone") || bareId.includes("cobble") || bareId.includes("deepslate") || bareId.includes("brick");
 }
 
+// The suffix classes both boundaries classify. Only the classification is shared: a world block is
+// replaced with a vanilla id while a placed or held one becomes the pack's own item, so each
+// boundary keeps its own target for a class.
+const isPlanksSuffix = (bareId: string): boolean => bareId.endsWith("_planks");
+const isFenceSuffix = (bareId: string): boolean => bareId.endsWith("_fence") || bareId.endsWith("_fence_gate");
+const isStairsSuffix = (bareId: string): boolean => bareId.endsWith("_stairs");
+const isSlabSuffix = (bareId: string): boolean => bareId.endsWith("_slab");
+
 function matchWoodBuilding(bareId: string): NormalizationResult | null {
-    if (bareId.endsWith("_planks")) return { action: "convert", targetId: "minecraft:oak_planks" };
+    if (isPlanksSuffix(bareId)) return { action: "convert", targetId: "minecraft:oak_planks" };
     if (bareId.endsWith("_log") || bareId.endsWith("_stem") || bareId.endsWith("_wood") || bareId.includes("stripped_") || bareId === "wood" || bareId === "log" || bareId === "log2") {
         return { action: "convert", targetId: "minecraft:oak_log" };
     }
-    if (bareId.endsWith("_fence") || bareId.endsWith("_fence_gate")) return { action: "convert", targetId: BH_FENCE_ID };
+    if (isFenceSuffix(bareId)) return { action: "convert", targetId: BH_FENCE_ID };
 
-    if (bareId.endsWith("_stairs")) {
+    if (isStairsSuffix(bareId)) {
         return { action: "convert", targetId: isStoneCompound(bareId) ? "minecraft:cobblestone_stairs" : "minecraft:oak_stairs" };
     }
-    if (bareId.endsWith("_slab")) {
+    if (isSlabSuffix(bareId)) {
         return { action: "convert", targetId: isStoneCompound(bareId) ? "minecraft:cobblestone_slab" : "bh:wooden_slab" };
     }
     return null;
@@ -128,7 +141,11 @@ export function normalizeBlock(blockId: string): NormalizationResult {
     return normalizeItem(blockId);
 }
 
-export function resolvePlacerReplacement(id: string): string | undefined {
+/**
+ * The placement boundary: the pack id a block or item becomes when it is placed or held. Answers
+ * `undefined` for an id this boundary does not retype.
+ */
+export function resolvePlacerTarget(id: string): NormalizationResult | undefined {
     if (!id.startsWith("minecraft:")) {
         return undefined;
     }
@@ -136,39 +153,39 @@ export function resolvePlacerReplacement(id: string): string | undefined {
     const bareId = id.slice(10);
 
     if (bareId === "wood" || bareId === "log" || bareId === "log2") {
-        return "bh:oak_log";
+        return { action: "convert", targetId: "bh:oak_log" };
     }
     if (bareId.endsWith("_log") || bareId.endsWith("_wood") || bareId.endsWith("_stem") || bareId.endsWith("_hyphae") || bareId.startsWith("stripped_")) {
-        if (bareId.includes("spruce")) return "bh:spruce_log";
-        if (bareId.includes("birch")) return "bh:birch_log";
-        return "bh:oak_log";
+        if (bareId.includes("spruce")) return { action: "convert", targetId: "bh:spruce_log" };
+        if (bareId.includes("birch")) return { action: "convert", targetId: "bh:birch_log" };
+        return { action: "convert", targetId: "bh:oak_log" };
     }
 
     if (bareId === "chest") {
-        return BH_CHEST_ID;
+        return { action: "convert", targetId: BH_CHEST_ID };
     }
 
     if (bareId.endsWith("_door")) {
-        return BETA_CAPPED_ITEM_OF[id] ?? BH_WOODEN_DOOR_ID;
+        return { action: "convert", targetId: BETA_CAPPED_ITEM_OF[id] ?? BH_WOODEN_DOOR_ID };
     }
 
     if (bareId === "cake") {
-        return BH_CAKE_ID;
+        return { action: "convert", targetId: BH_CAKE_ID };
     }
 
-    if (bareId.endsWith("_fence") || bareId.endsWith("_fence_gate")) {
-        return BH_FENCE_ID;
+    if (isFenceSuffix(bareId)) {
+        return { action: "convert", targetId: BH_FENCE_ID };
     }
 
-    if (bareId.endsWith("_stairs")) {
+    if (isStairsSuffix(bareId)) {
         const prefix = bareId.replace(/_mosaic_stairs|_stairs/, "");
-        return WOOD_SPECIES.has(prefix) ? "bh:oak_stairs" : "bh:cobblestone_stairs";
+        return { action: "convert", targetId: WOOD_SPECIES.has(prefix) ? "bh:oak_stairs" : "bh:cobblestone_stairs" };
     }
 
-    if (bareId.endsWith("_slab")) {
-        if (bareId.includes("cobble")) return "bh:cobblestone_slab";
-        if (bareId.includes("sandstone")) return "bh:sandstone_slab";
-        return isStoneCompound(bareId) ? "bh:stone_slab" : "bh:wooden_slab";
+    if (isSlabSuffix(bareId)) {
+        if (bareId.includes("cobble")) return { action: "convert", targetId: "bh:cobblestone_slab" };
+        if (bareId.includes("sandstone")) return { action: "convert", targetId: "bh:sandstone_slab" };
+        return { action: "convert", targetId: isStoneCompound(bareId) ? "bh:stone_slab" : "bh:wooden_slab" };
     }
 
     return undefined;
@@ -189,17 +206,34 @@ export const FOOD_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze(
     "minecraft:cooked_fish": "bh:cooked_cod"
 });
 
-export function resolveHeldItemReplacement(id: string): string | undefined {
+/**
+ * The held-item boundary: what a player's own inventory item is retyped to, or `undefined` when no
+ * table here has an opinion and the item keeps its id.
+ */
+export function resolveHeldItem(id: string): NormalizationResult | undefined {
     if (id === "minecraft:bow") {
-        return BH_BOW_ID;
+        return { action: "convert", targetId: BH_BOW_ID };
     }
-    return resolvePlacerReplacement(id) ?? FOOD_CONVERSIONS[id] ?? BETA_CAPPED_ITEM_OF[id];
+
+    const placer = resolvePlacerTarget(id);
+    if (placer) return placer;
+
+    const food = FOOD_CONVERSIONS[id];
+    if (food !== undefined) return { action: "convert", targetId: food };
+
+    const capped = BETA_CAPPED_ITEM_OF[id];
+    return capped === undefined ? undefined : { action: "convert", targetId: capped };
 }
 
-export function planDropResolution(itemId: string): NormalizationResult {
-    const retyped = resolveHeldItemReplacement(itemId);
-    if (retyped !== undefined) {
-        return retyped === itemId ? { action: "keep" } : { action: "convert", targetId: retyped };
-    }
-    return normalizeEntityDrop(itemId);
+/**
+ * The drop boundary: an entity's drop is retyped to the pack item the player holds first, and only
+ * then handed to the vanilla drop normalizer. Both answers are the module's one result shape, which
+ * is what lets the caller act on the decision without decoding it first.
+ */
+export function resolveDropTarget(itemId: string): NormalizationResult {
+    const retyped = resolveHeldItem(itemId);
+    if (!retyped) return normalizeEntityDrop(itemId);
+    if (retyped.action !== "convert") return retyped;
+
+    return retyped.targetId === itemId ? { action: "keep" } : retyped;
 }

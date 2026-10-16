@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DOUBLE_SLAB_OF } from "../../packs/BP/scripts/interactions/slabStacking.js";
 import { BETA_BLOCK_IDS } from "../../packs/BP/scripts/core/betaRegistry.js";
-import { compareText } from "../support/text.js";
 
 const root = process.cwd();
 
@@ -24,13 +23,6 @@ function blockOf(name: string): any {
 const fileOf = (id: string): string => id.replace("bh:", "");
 
 describe("Beta Double Slab Contract - two slabs become one full block", () => {
-    it("covers every single slab the pack defines", () => {
-        assert.deepEqual(
-            PAIRS.map(([single]) => single).sort(compareText),
-            ["bh:cobblestone_slab", "bh:sandstone_slab", "bh:stone_slab", "bh:wooden_slab"]
-        );
-    });
-
     it("renders the merged block as an untransformed cube wearing the single's faces", () => {
         for (const [single, double] of PAIRS) {
             const block = blockOf(fileOf(double));

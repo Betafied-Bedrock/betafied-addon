@@ -8,22 +8,24 @@ import { extractChangelogSection, releaseVersionFrom } from "../../scripts/lib/c
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("Release version derivation", () => {
-  it("collapses a semver triple to the major.minor tag the packs use", () => {
-    assert.equal(releaseVersionFrom("5.2.0"), "5.2");
-    assert.equal(releaseVersionFrom("4.3.0"), "4.3");
-    assert.equal(releaseVersionFrom(" 5.0.0 "), "5.0");
-    assert.equal(releaseVersionFrom("5.2.0-beta.1"), "5.2");
-  });
+  it("derives the tag the packs use, and reads nothing it cannot parse", () => {
+    const derivations: Array<[string | undefined, string | null]> = [
+      // A .0 triple collapses to the major.minor tag; a real patch digit survives, so a fix-up
+      // release can tag itself. Anything unparseable is a null rather than a guessed tag.
+      ["5.2.0", "5.2"],
+      ["4.3.0", "4.3"],
+      [" 5.0.0 ", "5.0"],
+      ["5.2.0-beta.1", "5.2"],
+      ["5.3.1", "5.3.1"],
+      ["5.3.2-beta.1", "5.3.2"],
+      ["5", null],
+      ["stable", null],
+      [undefined, null]
+    ];
 
-  it("keeps a real patch digit so a fix-up release can tag itself", () => {
-    assert.equal(releaseVersionFrom("5.3.1"), "5.3.1");
-    assert.equal(releaseVersionFrom("5.3.2-beta.1"), "5.3.2");
-  });
-
-  it("returns null for a version it cannot read, rather than guessing a tag", () => {
-    assert.equal(releaseVersionFrom("5"), null);
-    assert.equal(releaseVersionFrom("stable"), null);
-    assert.equal(releaseVersionFrom(undefined), null);
+    for (const [version, expected] of derivations) {
+      assert.equal(releaseVersionFrom(version), expected, `releaseVersionFrom(${JSON.stringify(version)})`);
+    }
   });
 });
 
@@ -54,12 +56,6 @@ describe("Changelog section extraction", () => {
     assert.ok(earlier.includes("The 5.2 body."));
     assert.ok(earlier.includes("### A subsection"));
     assert.ok(!earlier.includes("The 5.1 body."), "must not bleed into the next version's notes");
-  });
-
-  it("does not confuse a longer version with a shorter prefix", () => {
-    const withTwenty = "# Changelog\n\n## 5.20 — someday\n\nTwenty.\n";
-    assert.equal(extractChangelogSection(withTwenty, "5.2"), null);
-    assert.equal(extractChangelogSection(withTwenty, "5.20"), "Twenty.");
   });
 
   it("returns null when the changelog has no such version", () => {

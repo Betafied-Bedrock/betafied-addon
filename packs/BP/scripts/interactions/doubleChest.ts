@@ -7,87 +7,28 @@ import type {
     PlayerPlaceBlockAfterEvent,
     PlayerPlaceBlockBeforeEvent
 } from "@minecraft/server";
-import { eventBus } from "../core/eventBus.js";
+import { eventBus, guarded } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
-import { tickManager } from "../core/tickManager.js";
 import type { ChestLocation } from "./chestPairing.js";
-import {
-    DOUBLE_CHEST_ID,
-    SINGLE_CHEST_ID,
-    chestOpenBlocked,
-    planChestPlacement,
-    planClose,
-    planOpen,
-    planOpenBlock
-} from "./chestPairing.js";
-import { containerHasItems, neighbourTypeIds, solidAbove } from "./chestCells.js";
-import {
-    applyMove,
-    dropIfIdle,
-    releaseIdleShadow,
-    resolveEventBlock,
-    resolvePairRef,
-    sessions,
-    sweepPairsJob,
-    viewerIdOf,
-    SWEEP_INTERVAL_TICKS
-} from "./chestMirror.js";
+import { DOUBLE_CHEST_ID, SINGLE_CHEST_ID, planChestPlacement, planPlacementBlocked } from "./chestPairing.js";
+import { neighbourTypeIds, solidAbove } from "./chestCells.js";
+import { closePair, openPair, pairInUse, releaseViewer, viewerIdOf } from "./chestMirror.js";
 import { mergeChestAt } from "./chestMerge.js";
 
 const MERGE_DELAY_TICKS = 1;
 
+// Every handler below is event wiring only: the pair's session state, viewer counts and mirror
+// decisions belong to chestMirror, and the structural conversion belongs to chestMerge.
 function handleContainerOpened(event: BlockContainerOpenedAfterEvent): void {
-    const resolved = resolveEventBlock(event.block);
-    if (!resolved) return;
-
-    const { session, half } = resolved;
-    const masterViewers = session.masterViewers.size;
-    const shadowViewers = session.shadowViewers.size;
-    const firstViewer = half === "master" ? masterViewers === 0 : shadowViewers === 0;
-
-    const viewerId = viewerIdOf(event.openSource);
-    if (viewerId) (half === "master" ? session.masterViewers : session.shadowViewers).add(viewerId);
-
-    const move = planOpen({
-        half,
-        firstViewer,
-        masterHasItems: containerHasItems(session.dimensionId, session.master) ?? false,
-        shadowHasItems: containerHasItems(session.dimensionId, session.shadow) ?? false,
-        masterViewers,
-        shadowViewers
-    });
-
-    const drained = applyMove(move, session);
-    if (move !== "none") dropIfIdle(session, resolved.key, drained);
+    openPair(event.block, viewerIdOf(event.openSource));
 }
 
 function handleContainerClosed(event: BlockContainerClosedAfterEvent): void {
-    const resolved = resolveEventBlock(event.block);
-    if (!resolved) return;
-
-    const { key, session, half } = resolved;
-    const viewerId = viewerIdOf(event.closeSource);
-    if (viewerId) (half === "master" ? session.masterViewers : session.shadowViewers).delete(viewerId);
-
-    if (half !== "shadow") return;
-
-    const remainingViewers = session.shadowViewers.size;
-    const shadowHasItems = containerHasItems(session.dimensionId, session.shadow);
-    // An unreadable half stays tracked so the sweep retries the drain instead of parking items.
-    if (shadowHasItems === undefined) return;
-
-    const drained = applyMove(planClose({ half, remainingViewers, shadowHasItems }), session);
-    dropIfIdle(session, key, drained);
+    closePair(event.block, viewerIdOf(event.closeSource));
 }
 
 function handlePlayerLeave(event: PlayerLeaveAfterEvent): void {
-    for (const [key, session] of sessions) {
-        const leftMaster = session.masterViewers.delete(event.playerId);
-        const leftShadow = session.shadowViewers.delete(event.playerId);
-        if (!leftMaster && !leftShadow) continue;
-
-        releaseIdleShadow(session, key);
-    }
+    releaseViewer(event.playerId);
 }
 
 function handleChestPlacement(event: PlayerPlaceBlockBeforeEvent): void {
@@ -125,77 +66,26 @@ function handleInteractWithBlock(event: PlayerInteractWithBlockBeforeEvent): voi
     if (block.typeId === SINGLE_CHEST_ID || block.typeId === DOUBLE_CHEST_ID) {
         const placing = event.player.isSneaking && event.itemStack !== undefined;
 
-        if (chestOpenBlocked({ placing, aboveSolid: solidAbove(block) })) {
+        if (planPlacementBlocked({ placing, aboveSolid: solidAbove(block) })) {
             event.cancel = true;
             return;
         }
     }
 
-    if (block.typeId !== DOUBLE_CHEST_ID) return;
-
-    const ref = resolvePairRef(block);
-    if (!ref) return;
-
-    const session = sessions.get(ref.key);
-    if (!session) return;
-
-    const busy = planOpenBlock({
-        half: ref.resolution.half,
-        masterViewers: session.masterViewers.size,
-        shadowViewers: session.shadowViewers.size
-    });
-    if (!busy) return;
+    if (!pairInUse(block)) return;
 
     event.cancel = true;
     event.player.sendMessage("§cThis chest is in use");
 }
 
-eventBus.onPlayerPlaceBlockBefore(event => {
-    try {
-        handleChestPlacement(event);
-    } catch (e) {
-        reportError({ system: "doubleChest", operation: "placementRule", target: SINGLE_CHEST_ID }, e);
-    }
-});
+eventBus.onPlayerPlaceBlockBefore(guarded({ system: "doubleChest", operation: "placementRule", target: SINGLE_CHEST_ID }, handleChestPlacement));
 
-eventBus.onPlayerPlaceBlock(event => {
-    try {
-        handleChestPlaced(event);
-    } catch (e) {
-        reportError({ system: "doubleChest", operation: "mergeOnPlace", target: SINGLE_CHEST_ID }, e);
-    }
-});
+eventBus.onPlayerPlaceBlock(guarded({ system: "doubleChest", operation: "mergeOnPlace", target: SINGLE_CHEST_ID }, handleChestPlaced));
 
-eventBus.onBlockContainerOpened(event => {
-    try {
-        handleContainerOpened(event);
-    } catch (e) {
-        reportError({ system: "doubleChest", operation: "containerOpened" }, e);
-    }
-});
+eventBus.onBlockContainerOpened(guarded({ system: "doubleChest", operation: "containerOpened" }, handleContainerOpened));
 
-eventBus.onBlockContainerClosed(event => {
-    try {
-        handleContainerClosed(event);
-    } catch (e) {
-        reportError({ system: "doubleChest", operation: "containerClosed" }, e);
-    }
-});
+eventBus.onBlockContainerClosed(guarded({ system: "doubleChest", operation: "containerClosed" }, handleContainerClosed));
 
-eventBus.onPlayerLeave(event => {
-    try {
-        handlePlayerLeave(event);
-    } catch (e) {
-        reportError({ system: "doubleChest", operation: "playerLeave" }, e);
-    }
-});
+eventBus.onPlayerLeave(guarded({ system: "doubleChest", operation: "playerLeave" }, handlePlayerLeave));
 
-eventBus.onPlayerInteractWithBlock(event => {
-    try {
-        handleInteractWithBlock(event);
-    } catch (e) {
-        reportError({ system: "doubleChest", operation: "interactWithBlock" }, e);
-    }
-});
-
-tickManager.register("doubleChest:sweep", SWEEP_INTERVAL_TICKS, sweepPairsJob);
+eventBus.onPlayerInteractWithBlock(guarded({ system: "doubleChest", operation: "interactWithBlock" }, handleInteractWithBlock));

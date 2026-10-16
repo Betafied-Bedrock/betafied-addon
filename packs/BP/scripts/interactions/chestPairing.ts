@@ -94,10 +94,7 @@ export function latchOf(direction: CardinalDirection | undefined): CardinalDirec
 }
 
 function layoutStep(direction: ChestLocation): CardinalDirection | undefined {
-    return CARDINAL_DIRECTIONS.find(state => {
-        const step = PAIR_LAYOUTS[state].step;
-        return step.x === direction.x && step.y === direction.y && step.z === direction.z;
-    });
+    return CARDINAL_DIRECTIONS.find(state => stepReaches(PAIR_LAYOUTS[state].step, direction));
 }
 
 function stepReaches(step: ChestLocation, offset: ChestLocation): boolean {
@@ -215,7 +212,7 @@ export function planPlacement<T>(
     return { destination: destinationAfter, source: sourceAfter, moves };
 }
 
-interface OpenDecisionInput {
+export interface OpenDecisionInput {
     half: ChestHalf;
     firstViewer: boolean;
     masterHasItems: boolean;
@@ -224,24 +221,24 @@ interface OpenDecisionInput {
     shadowViewers: number;
 }
 
-interface CloseDecisionInput {
+export interface CloseDecisionInput {
     half: ChestHalf;
     remainingViewers: number;
     shadowHasItems: boolean;
 }
 
-interface SweepInput {
+export interface SweepInput {
     shadowViewers: number;
     shadowHasItems: boolean;
 }
 
-interface OpenBlockInput {
+export interface OpenBlockInput {
     half: ChestHalf;
     masterViewers: number;
     shadowViewers: number;
 }
 
-interface PlacementBlockInput {
+export interface PlacementBlockInput {
     placing: boolean;
     aboveSolid: boolean;
 }
@@ -271,7 +268,7 @@ export function planOpenBlock(input: OpenBlockInput): boolean {
     return input.half === "master" ? input.shadowViewers > 0 : input.masterViewers > 0;
 }
 
-export function chestOpenBlocked(input: PlacementBlockInput): boolean {
+export function planPlacementBlocked(input: PlacementBlockInput): boolean {
     return input.aboveSolid && !input.placing;
 }
 

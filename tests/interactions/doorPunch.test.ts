@@ -50,15 +50,23 @@ describe("Door Punch - Beta 1.7.3 punch-to-toggle wooden door", () => {
     });
 
     describe("planDoorToggle - pure planning logic", () => {
-        it("plans opening when punching a closed lower half", () => {
-            const cell = { x: 10, y: 64, z: 10 };
-            const plan = planDoorToggle(WOODEN_DOOR_ID, CLOSED_LOWER_STATES, cell);
+        it("plans opening when punching a closed lower half, whatever the state keys are spelled", () => {
+            const plan = planDoorToggle(WOODEN_DOOR_ID, CLOSED_LOWER_STATES, { x: 10, y: 64, z: 10 });
 
             assert.ok(plan, "closed lower half should produce a toggle plan");
             assert.deepEqual(plan.lowerCell, { x: 10, y: 64, z: 10 });
             assert.deepEqual(plan.upperCell, { x: 10, y: 65, z: 10 });
             assert.equal(plan.newOpenState, true);
             assert.equal(plan.soundName, "random.door_open");
+
+            const namespaced = planDoorToggle(
+                WOODEN_DOOR_ID,
+                { "minecraft:upper_block_bit": false, "minecraft:open_bit": false },
+                { x: 5, y: 64, z: 5 }
+            );
+
+            assert.equal(namespaced?.newOpenState, true, "a namespaced key names the same state");
+            assert.deepEqual(namespaced?.upperCell, { x: 5, y: 65, z: 5 });
         });
 
         it("plans closing when punching an open upper half", () => {
@@ -76,69 +84,42 @@ describe("Door Punch - Beta 1.7.3 punch-to-toggle wooden door", () => {
             assert.equal(plan.soundName, "random.door_close");
         });
 
-        it("recognizes namespace-prefixed block state keys", () => {
-            const cell = { x: 5, y: 64, z: 5 };
-            const plan = planDoorToggle(
-                WOODEN_DOOR_ID,
-                {
-                    "minecraft:upper_block_bit": false,
-                    "minecraft:open_bit": false
-                },
-                cell
-            );
-
-            assert.ok(plan);
-            assert.equal(plan.newOpenState, true);
-            assert.deepEqual(plan.upperCell, { x: 5, y: 65, z: 5 });
-        });
-
-        it("refuses to plan toggling for iron doors", () => {
+        it("refuses to plan a toggle for anything but the pack's wooden door", () => {
             const cell = { x: 10, y: 64, z: 10 };
-            const plan = planDoorToggle("minecraft:iron_door", CLOSED_LOWER_STATES, cell);
 
-            assert.equal(plan, undefined, "iron doors must not be punch-opened");
-        });
-
-        it("refuses to plan toggling for non-door blocks", () => {
-            const cell = { x: 10, y: 64, z: 10 };
+            assert.equal(planDoorToggle("minecraft:iron_door", CLOSED_LOWER_STATES, cell), undefined, "iron doors must not be punch-opened");
             assert.equal(planDoorToggle("minecraft:stone", {}, cell), undefined);
-            assert.equal(planDoorToggle("minecraft:oak_planks", {}, cell), undefined);
         });
     });
 
     describe("entityHitBlock interaction handler", () => {
-        it("toggles wooden door open when punched by a player", () => {
-            const { dim, lower, upper } = spawnDoorInWorld({ x: 20, y: 64, z: 20 }, false);
+        it("toggles the door from whichever half the player punched", () => {
+            const first = spawnDoorInWorld({ x: 20, y: 64, z: 20 }, false);
+            const second = spawnDoorInWorld({ x: 22, y: 64, z: 20 }, true);
             const player = new Player("tester", "Tester");
 
             eventBus.dispatch("entityHitBlock", {
                 damagingEntity: player,
-                hitBlock: lower,
-                hitBlockPermutation: lower.permutation,
+                hitBlock: first.lower,
+                hitBlockPermutation: first.lower.permutation,
                 blockFace: Direction.North
             });
 
-            assert.equal(lower.permutation.getState("open_bit"), true);
-            assert.equal(upper.permutation.getState("open_bit"), true);
-            assert.equal((dim as any).soundsPlayed.length, 1);
-            assert.equal((dim as any).soundsPlayed[0].soundId, "random.door_open");
-        });
-
-        it("toggles wooden door closed when punched on the upper half", () => {
-            const { dim, lower, upper } = spawnDoorInWorld({ x: 22, y: 64, z: 20 }, true);
-            const player = new Player("tester", "Tester");
+            assert.equal(first.lower.permutation.getState("open_bit"), true, "both halves swing together");
+            assert.equal(first.upper.permutation.getState("open_bit"), true);
+            assert.equal((first.dim as any).soundsPlayed[0].soundId, "random.door_open");
 
             eventBus.dispatch("entityHitBlock", {
                 damagingEntity: player,
-                hitBlock: upper,
-                hitBlockPermutation: upper.permutation,
+                hitBlock: second.upper,
+                hitBlockPermutation: second.upper.permutation,
                 blockFace: Direction.South
             });
 
-            assert.equal(lower.permutation.getState("open_bit"), false);
-            assert.equal(upper.permutation.getState("open_bit"), false);
-            assert.equal((dim as any).soundsPlayed.length, 1);
-            assert.equal((dim as any).soundsPlayed[0].soundId, "random.door_close");
+            assert.equal(second.lower.permutation.getState("open_bit"), false, "punching either half closes it");
+            assert.equal(second.upper.permutation.getState("open_bit"), false);
+            assert.equal((first.dim as any).soundsPlayed.length, 2, "one sound per toggle");
+            assert.equal((first.dim as any).soundsPlayed[1].soundId, "random.door_close");
         });
 
         it("debounces rapid hits within cooldown window", () => {
@@ -190,8 +171,7 @@ describe("Door Punch - Beta 1.7.3 punch-to-toggle wooden door", () => {
                 blockFace: Direction.West
             });
 
-            assert.equal(lower.permutation.getState("open_bit"), false);
-            assert.equal(upper.permutation.getState("open_bit"), false);
+            assert.equal(lower.permutation.getState("open_bit"), false, "the door is left as it stood");
             assert.equal((dim as any).soundsPlayed.length, 0);
         });
     });

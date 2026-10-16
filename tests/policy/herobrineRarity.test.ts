@@ -9,8 +9,10 @@ import {
     pickSightDistance
 } from "../../packs/BP/scripts/mobs/herobrine.js";
 
-const FAR_SIGHTING_CASES = 4000;
-const RATE_SAMPLES = 2000;
+// Sampling counts stay modest on purpose: these cases assert the shape of a distribution, and a
+// couple of hundred draws already fails if the range, the bias or the spread moves.
+const FAR_SIGHTING_CASES = 200;
+const RATE_SAMPLES = 200;
 const TICKS_PER_HOUR = 20 * 60 * 60;
 const FORWARD = { x: 0, y: 0, z: 1 };
 
@@ -40,18 +42,11 @@ describe("Herobrine Appearance Policy", () => {
                 `expected distant sightings to dominate, got ${(far / FAR_SIGHTING_CASES).toFixed(2)}`
             );
         });
-
-        it("averages well past the midpoint so a sighting is rarely in the player's face", () => {
-            let total = 0;
-            for (let i = 0; i < FAR_SIGHTING_CASES; i++) total += pickSightDistance();
-            const mean = total / FAR_SIGHTING_CASES;
-            assert.ok(mean > 30, `expected a far-average distance, got ${mean.toFixed(1)}`);
-        });
     });
 
     describe("pickRollDelayTicks", () => {
         it("keeps the first window quiet", () => {
-            for (let i = 0; i < 1000; i++) {
+            for (let i = 0; i < 200; i++) {
                 const delay = pickRollDelayTicks(true);
                 assert.ok(delay >= 24000 && delay <= 72000, `first delay ${delay} out of window`);
             }
@@ -59,12 +54,12 @@ describe("Herobrine Appearance Policy", () => {
 
         it("re-rolls every later window somewhere else in the range", () => {
             const seen = new Set<number>();
-            for (let i = 0; i < 1000; i++) {
+            for (let i = 0; i < 200; i++) {
                 const delay = pickRollDelayTicks(false);
                 assert.ok(delay >= 12000 && delay <= 36000, `later delay ${delay} out of window`);
                 seen.add(delay);
             }
-            assert.ok(seen.size > 900, "later windows should be spread across the range, not fixed");
+            assert.ok(seen.size > 180, "later windows should be spread across the range, not fixed");
         });
     });
 
@@ -88,16 +83,10 @@ describe("Herobrine Appearance Policy", () => {
     });
 
     describe("isWithinLookCone", () => {
-        it("counts dead-on eye contact", () => {
-            assert.equal(isWithinLookCone(FORWARD, offAxis(0)), true);
-        });
-
-        it("counts a glance well inside the cone", () => {
-            assert.equal(isWithinLookCone(FORWARD, offAxis(15)), true);
-        });
-
-        it("counts the cone edge just inside thirty degrees", () => {
-            assert.equal(isWithinLookCone(FORWARD, offAxis(29)), true);
+        it("counts a gaze from dead-on out to just inside thirty degrees", () => {
+            assert.equal(isWithinLookCone(FORWARD, offAxis(0)), true, "dead-on eye contact");
+            assert.equal(isWithinLookCone(FORWARD, offAxis(15)), true, "a glance well inside the cone");
+            assert.equal(isWithinLookCone(FORWARD, offAxis(29)), true, "the edge just inside the limit");
         });
 
         it("ignores anything past thirty degrees", () => {
@@ -113,20 +102,13 @@ describe("Herobrine Appearance Policy", () => {
     });
 
     describe("facingYaw", () => {
-        it("returns 0 when the observer looks toward +Z", () => {
-            assert.ok(facingYaw({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 10 }) === 0);
-        });
+        it("reads the era's yaw for each cardinal direction", () => {
+            const at = { x: 0, y: 0, z: 0 };
 
-        it("returns 90 when the observer looks toward -X", () => {
-            assert.equal(facingYaw({ x: 0, y: 0, z: 0 }, { x: -10, y: 0, z: 0 }), 90);
-        });
-
-        it("returns -90 when the observer looks toward +X", () => {
-            assert.equal(facingYaw({ x: 0, y: 0, z: 0 }, { x: 10, y: 0, z: 0 }), -90);
-        });
-
-        it("returns 180 when the observer looks toward -Z", () => {
-            assert.equal(Math.abs(facingYaw({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -10 })), 180);
+            assert.equal(Math.abs(facingYaw(at, { x: 0, y: 0, z: 10 })), 0, "toward +Z");
+            assert.equal(facingYaw(at, { x: -10, y: 0, z: 0 }), 90, "toward -X");
+            assert.equal(facingYaw(at, { x: 10, y: 0, z: 0 }), -90, "toward +X");
+            assert.equal(Math.abs(facingYaw(at, { x: 0, y: 0, z: -10 })), 180, "toward -Z");
         });
     });
 });

@@ -3,7 +3,6 @@ import {
     Player,
     ItemComponentTypes,
     EntityComponentTypes,
-    GameMode,
     world
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
@@ -11,6 +10,7 @@ import { tickManager } from "../core/tickManager.js";
 import { runCatching } from "../core/errorReporter.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
 import { isBetaItem, isVanillaId } from "../core/betaRegistry.js";
+import { getPrivilegeReason } from "../core/permissions.js";
 
 // Beta 1.7.3 base armor points are slot-indexed rather than material-indexed.
 const ARMOR_POINTS_BY_SLOT: Readonly<Record<string, number>> = Object.freeze({
@@ -160,9 +160,9 @@ export function clearPlayerDamageCarryover(playerId: string): void {
 export function updatePlayerArmorDisplay(player: Player, force = false): void {
     if (!player.isValid) return;
 
-    const isCreative = typeof player.getGameMode === "function" &&
-        (player.getGameMode() === GameMode.Creative || player.getGameMode() === GameMode.Spectator);
-    const current = isCreative ? 0 : Math.min(20, Math.max(0, Math.round(getEffectiveArmorPoints(player))));
+    const reason = getPrivilegeReason(player);
+    const hiddenDisplay = reason === "creative" || reason === "spectator";
+    const current = hiddenDisplay ? 0 : Math.min(20, Math.max(0, Math.round(getEffectiveArmorPoints(player))));
     const last = lastSentArmorPoints.get(player.id);
 
     if (force || last === undefined || last !== current) {
@@ -181,7 +181,7 @@ eventBus.onEntityHurt((ev) => {
     if (!(player instanceof Player)) return;
     if (!player.isValid) return;
     if (damage <= 0) return;
-    if (typeof player.getGameMode === "function" && player.getGameMode() === GameMode.Creative) return;
+    if (getPrivilegeReason(player) === "creative") return;
     if (BYPASS_SOURCES.has(damageSource.cause)) return;
 
     const points = getEffectiveArmorPoints(player);

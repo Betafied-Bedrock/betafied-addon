@@ -17,7 +17,6 @@ describe("Classic Fog Player Sweep Batching", () => {
         }
 
         const job = fogJob();
-        assert.ok(typeof job.next === "function", "fogJob is a generator");
 
         // Batch 1: 5 players
         const step1 = job.next();

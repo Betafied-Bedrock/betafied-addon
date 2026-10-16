@@ -26,24 +26,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 describe("Release version stepping", () => {
   it("reads a tag as a triple, treating a missing patch as zero", () => {
     assert.deepEqual(versionTriple("5.4"), [5, 4, 0]);
-    assert.deepEqual(versionTriple("5.4.1"), [5, 4, 1]);
     assert.deepEqual(versionTriple(" 5.5.0-beta.1 "), [5, 5, 0]);
-    assert.equal(versionTriple("stable"), null);
+    assert.equal(versionTriple("stable"), null, "a tag that is not a release has nothing to step from");
   });
 
-  it("steps minor and patch from the last released tag, not from package.json", () => {
+  it("steps minor and patch from the last released tag, and refuses to prepare over a higher release", () => {
     assert.equal(nextReleaseVersion("5.4", "minor"), "5.5.0");
     assert.equal(nextReleaseVersion("5.4", "patch"), "5.4.1");
-    assert.equal(nextReleaseVersion("5.4.1", "minor"), "5.5.0");
     // A patch line that never shipped a patch is the `.0` of its minor, so its first
     // patch is `.1` — `.0` is already the release that shipped as the bare tag.
     assert.equal(nextReleaseVersion("5.4.0", "patch"), "5.4.1");
     assert.equal(nextReleaseVersion("nonsense", "minor"), null);
-  });
 
-  it("orders triples so a lower version cannot be prepared over a higher release", () => {
     assert.ok(compareTriples([5, 5, 0], [5, 4, 9]) > 0);
-    assert.ok(compareTriples([5, 4, 0], [5, 4, 0]) === 0);
     assert.ok(compareTriples([4, 9, 0], [5, 0, 0]) < 0);
   });
 
@@ -67,7 +62,7 @@ describe("Version carriers", () => {
     ]
   };
 
-  it("moves every pack version, including the resource-pack dependency", () => {
+  it("moves every pack version, including the resource-pack dependency, without mutating the manifest it was given", () => {
     const updated = applyManifestVersion(behavior, [5, 5, 0], { name: "Betafied 5.5" });
 
     assert.deepEqual(updated.header.version, [5, 5, 0]);
@@ -81,11 +76,8 @@ describe("Version carriers", () => {
     );
     assert.deepEqual(updated.dependencies[1].version, [5, 5, 0], "the resource pack entry drives whether it loads");
     assert.equal(updated.dependencies[0].version, "2.11.0-beta", "an engine module keeps its own version");
-  });
 
-  it("leaves the manifest it was given alone", () => {
-    applyManifestVersion(behavior, [6, 0, 0]);
-    assert.deepEqual(behavior.header.version, [5, 4, 0]);
+    assert.deepEqual(behavior.header.version, [5, 4, 0], "the input manifest is left alone");
     assert.deepEqual(behavior.modules[0].version, [5, 4, 0]);
   });
 
@@ -120,7 +112,7 @@ describe("World template manifest", () => {
   };
   const baseGameVersion = [1, 26, 51];
 
-  it("carries both header fields the game requires of a template, lock_template_options and base_game_version", () => {
+  it("carries the header fields the game requires of a template, and never overrides an explicit lock", () => {
     const updated = applyWorldTemplateManifest(template, [5, 5, 0], { name: "Betafied 5.5", baseGameVersion });
 
     assert.equal(updated.header.lock_template_options, false, "the template is never listed without this field");
@@ -130,21 +122,11 @@ describe("World template manifest", () => {
       [1, 26, 51],
       "the import is refused without this field, not just the listing"
     );
-    assert.deepEqual(worldTemplateManifestProblems(updated), []);
-  });
 
-  it("refuses to package a template that names no base game version", () => {
-    const problems = worldTemplateManifestProblems(applyWorldTemplateManifest(template, [5, 5, 0]));
-
-    assert.ok(problems.some((problem) => problem.includes("header.base_game_version")));
-  });
-
-  it("keeps an explicit lock_template_options rather than forcing one", () => {
     const locked = applyWorldTemplateManifest(
       { ...template, header: { ...template.header, lock_template_options: true } },
       [5, 5, 0]
     );
-
     assert.equal(locked.header.lock_template_options, true);
   });
 
@@ -155,6 +137,10 @@ describe("World template manifest", () => {
     assert.ok(problems.some((problem) => problem.includes("header.lock_template_options")));
     assert.ok(problems.some((problem) => problem.includes("header.base_game_version")));
     assert.ok(problems.some((problem) => problem.includes("world_template module")));
+
+    const unversioned = worldTemplateManifestProblems(applyWorldTemplateManifest(template, [5, 5, 0]));
+    assert.ok(unversioned.some((problem) => problem.includes("header.base_game_version")));
+
     assert.deepEqual(
       worldTemplateManifestProblems({
         ...applyWorldTemplateManifest(template, [5, 4, 0], { baseGameVersion }),
@@ -169,17 +155,21 @@ describe("World template manifest", () => {
 describe("Changelog preparation", () => {
   const markdown = "# Changelog\n\nIntro that belongs to no release.\n\n## 5.4 — 2026-10-10\n\nNotes.\n";
 
-  it("inserts the new heading above the newest release, under the intro", () => {
+  it("inserts the new heading above the newest release, under the intro, as an unwritten placeholder", () => {
     const updated = ensureChangelogEntry(markdown, "5.5", "2026-10-11");
-    const lines = updated.split("\n");
 
-    assert.ok(lines.includes("## 5.5 — 2026-10-11"));
+    assert.ok(updated.includes("## 5.5 — 2026-10-11"));
     assert.ok(updated.includes("Intro that belongs to no release."), "the intro stays above every release");
     assert.ok(
       updated.indexOf("## 5.5") < updated.indexOf("## 5.4"),
       "the newest release must come first, or release.mjs reads the wrong section"
     );
-    assert.ok(updated.endsWith("\n"));
+    assert.ok(
+      notesArePlaceholder(extractChangelogSection(updated, "5.5")),
+      "a prepared section must not pass as finished notes"
+    );
+    assert.equal(notesArePlaceholder("The real notes."), false);
+    assert.equal(notesArePlaceholder(null), false);
   });
 
   it("is a no-op when the version already has a section, so re-running never eats notes", () => {
@@ -189,15 +179,6 @@ describe("Changelog preparation", () => {
     );
     assert.equal(ensureChangelogEntry(written, "5.5", "2026-10-12"), written);
     assert.equal(extractChangelogSection(ensureChangelogEntry(written, "5.5", "2026-10-12"), "5.5"), "The real notes.");
-  });
-
-  it("reports a placeholder section as unwritten, so release.mjs can refuse to publish it", () => {
-    const updated = ensureChangelogEntry(markdown, "5.5", "2026-10-11");
-    const section = extractChangelogSection(updated, "5.5");
-
-    assert.ok(notesArePlaceholder(section), "a prepared section must not pass as finished notes");
-    assert.equal(notesArePlaceholder("The real notes."), false);
-    assert.equal(notesArePlaceholder(null), false);
   });
 
   it("does not mistake a longer version for the one being prepared", () => {

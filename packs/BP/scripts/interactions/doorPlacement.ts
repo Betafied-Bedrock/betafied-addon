@@ -2,16 +2,11 @@ import { Block, BlockPermutation, Direction, EntityComponentTypes, EquipmentSlot
 import type { Player, PlayerPlaceBlockBeforeEvent } from "@minecraft/server";
 import { BETA_DOOR_BLOCK_IDS, BETA_DOOR_BLOCK_OF } from "../core/betaRegistry.js";
 import { eventBus } from "../core/eventBus.js";
+import type { Cell } from "./cell.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 
 const AIR_ID = "minecraft:air";
 const UPPER_BIT = "upper_block_bit";
-
-export interface Cell {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
-}
 
 export interface DoorCompletion {
     readonly upperStates: Record<string, boolean | number | string>;

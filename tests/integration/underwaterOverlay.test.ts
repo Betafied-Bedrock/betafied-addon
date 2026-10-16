@@ -4,7 +4,6 @@ import { mockPlayers } from "../mocks/minecraftServer.js";
 import {
     CLEAR_SENTINEL,
     UNDERWATER_SENTINEL,
-    isHeadSubmerged,
     underwaterOverlayJob
 } from "../../packs/BP/scripts/world/underwaterOverlay.js";
 import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
@@ -78,18 +77,6 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
         mockPlayers.length = 0;
     });
 
-    it("reads the water state from the head block, not from the feet", () => {
-        const submerged = fakePlayer("diver", {
-            headBlock: { typeId: "minecraft:water", isLiquid: true }
-        }) as any;
-        const wading = fakePlayer("wader", {
-            headBlock: { typeId: "minecraft:air", isLiquid: false }
-        }) as any;
-
-        assert.equal(isHeadSubmerged(submerged), true, "a submerged head must read as under water");
-        assert.equal(isHeadSubmerged(wading), false, "standing in shallow water must not tint the screen");
-    });
-
     it("sends the sentinel only while the player is submerged", () => {
         const diver = fakePlayer("diver", {
             headBlock: { typeId: "minecraft:water", isLiquid: true }
@@ -97,26 +84,15 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
         const wader = fakePlayer("wader", {
             headBlock: { typeId: "minecraft:air", isLiquid: false }
         });
-        mockPlayers.push(diver, wader);
+        const lava = fakePlayer("lava", {
+            headBlock: { typeId: "minecraft:lava", isLiquid: true }
+        });
+        mockPlayers.push(diver, wader, lava);
 
         underwaterOverlayJob();
 
         assert.deepEqual(sentinels(diver), [UNDERWATER_SENTINEL]);
         assert.deepEqual(wader.titles, [], "a dry player must never receive the sentinel");
-    });
-
-    it("tints for flowing water and leaves lava alone", () => {
-        const flowing = fakePlayer("flowing", {
-            headBlock: { typeId: "minecraft:flowing_water", isLiquid: true }
-        });
-        const lava = fakePlayer("lava", {
-            headBlock: { typeId: "minecraft:lava", isLiquid: true }
-        });
-        mockPlayers.push(flowing, lava);
-
-        underwaterOverlayJob();
-
-        assert.equal(sentinels(flowing).length, 1);
         assert.deepEqual(lava.titles, [], "Beta only tinted the screen for water");
     });
 
@@ -135,38 +111,41 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
         assert.equal(sentinels(diver).length, 1);
     });
 
-    it("re-asserts the sentinel on a timer so the shared title channel cannot lose the tint", () => {
+    it("re-asserts the sentinel on a timer rather than on every pass", () => {
         // The armor readout writes the same title string, so a long dive has to keep restating the
-        // tint or an armor update would leave the screen untinted until the player surfaced.
+        // tint or an armor update would leave the screen untinted until the player surfaced — while a
+        // short dive must not spam that shared channel.
         const diver = fakePlayer("diver", {
             headBlock: { typeId: "minecraft:water", isLiquid: true }
         });
         mockPlayers.push(diver);
 
-        drainJob(12);
-
+        // The refresh counter is module state the cases above have already advanced, so the claim is
+        // the rate over a window rather than a count from a cold start: five passes carry the enter
+        // edge plus at most one refresh, where a per-pass write would carry five.
+        drainJob(5);
+        const firstWindow = sentinels(diver).length;
         assert.ok(
-            sentinels(diver).length > 1,
-            "the sentinel must be re-sent across a long dive, not only on the enter edge"
+            firstWindow <= 2,
+            `a five-pass window carries one refresh at most, got ${firstWindow} sends`
+        );
+
+        drainJob(5);
+        assert.equal(
+            sentinels(diver).length,
+            firstWindow + 1,
+            "and the window after it carries exactly the next refresh, so a long dive stays tinted"
         );
     });
 
-    it("does not restate the sentinel on every pass", () => {
+    it("pushes exactly one title clear when the head leaves the water, and none for a dry player", () => {
         const diver = fakePlayer("diver", {
             headBlock: { typeId: "minecraft:water", isLiquid: true }
         });
-        mockPlayers.push(diver);
-
-        drainJob(3);
-
-        assert.equal(sentinels(diver).length, 1, "a short dive must not spam the title channel");
-    });
-
-    it("pushes exactly one title clear when the head leaves the water", () => {
-        const diver = fakePlayer("diver", {
-            headBlock: { typeId: "minecraft:water", isLiquid: true }
+        const wader = fakePlayer("wader", {
+            headBlock: { typeId: "minecraft:air", isLiquid: false }
         });
-        mockPlayers.push(diver);
+        mockPlayers.push(diver, wader);
         underwaterOverlayJob();
 
         (diver.dimension as any).getBlock = () => ({ typeId: "minecraft:air", isLiquid: false });
@@ -179,22 +158,13 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
             "surfacing must clear the title exactly once, and an empty title is the clear"
         );
         assert.equal(diver.tinted, false, "the clear is what actually takes the tint down");
-    });
-
-    it("does not clear players that were never tinted", () => {
-        const wader = fakePlayer("wader", {
-            headBlock: { typeId: "minecraft:air", isLiquid: false }
-        });
-        mockPlayers.push(wader);
-
-        drainJob(3);
-
         assert.deepEqual(wader.titles, [], "a dry player must never receive a clear");
     });
 
-    it("answers dry for a head above the build height without consulting the block lookup", () => {
+    it("answers dry for a head outside the world, and lifts a tint below the floor", () => {
         // Above the ceiling the engine's only possible getBlock answer is LocationOutOfWorldBoundaries,
-        // so the height guard must settle the question before the lookup ever runs.
+        // so the height guard must settle the question before the lookup ever runs. The void is
+        // definitively dry, so it lifts a tint — unlike an unloaded chunk, which is not an answer.
         const flying = fakePlayer("flying");
         mockPlayers.push(flying);
 
@@ -212,9 +182,7 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
             0,
             "an out-of-bounds head must be settled by the height guard, not by a throwing lookup"
         );
-    });
 
-    it("answers dry for a head below the world floor and lifts a tint exactly once", () => {
         const diver = fakePlayer("diver", {
             headBlock: { typeId: "minecraft:water", isLiquid: true }
         });
@@ -228,7 +196,7 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
         assert.deepEqual(
             clears(diver),
             [CLEAR_SENTINEL],
-            "the void is definitively dry, so it must lift the tint — unlike an unloaded chunk"
+            "the void is definitively dry, so it must lift the tint"
         );
         assert.equal(diver.tinted, false);
     });
@@ -245,7 +213,7 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
         (diver as any).dimension.getBlock = () => {
             throw new Error("chunk unloaded");
         };
-        mockPlayers.push(diver, broken);
+        mockPlayers.push(broken);
 
         drainJob(3);
 

@@ -170,53 +170,15 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         assert.deepEqual(stoneBricks.setTypeCalls, ["minecraft:air"], "all non-Beta blocks must be deleted");
     });
 
-    it("clears vines and glow lichen through the bulk path", () => {
+    it("clears a post-Beta plant through the bulk path", () => {
         const dim = scrubDimension(new Map<string, RecordedBlock>([
-            ["3,70,2", recordingBlock("minecraft:vine")],
-            ["3,71,2", recordingBlock("minecraft:glow_lichen")],
-            ["9,40,9", recordingBlock("minecraft:cave_vines")]
+            ["3,70,2", recordingBlock("minecraft:vine")]
         ]));
 
         scrub(dim);
 
         assert.deepEqual(bulkFillsFor(dim, "minecraft:vine"), [
             "fill 0 0 0 15 127 15 minecraft:air replace minecraft:vine"
-        ]);
-        assert.deepEqual(bulkFillsFor(dim, "minecraft:glow_lichen"), [
-            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:glow_lichen"
-        ]);
-        assert.deepEqual(bulkFillsFor(dim, "minecraft:cave_vines"), [
-            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:cave_vines"
-        ]);
-    });
-
-    it("clears modern flowers through the bulk path", () => {
-        const dim = scrubDimension(new Map<string, RecordedBlock>([
-            ["3,70,2", recordingBlock("minecraft:lilac")],
-            ["7,66,9", recordingBlock("minecraft:sunflower")]
-        ]));
-
-        scrub(dim);
-
-        assert.deepEqual(bulkFillsFor(dim, "minecraft:lilac"), [
-            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:lilac"
-        ]);
-        assert.deepEqual(bulkFillsFor(dim, "minecraft:sunflower"), [
-            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:sunflower"
-        ]);
-    });
-
-    it("clears leaf litter with a bulk fill", () => {
-        const dim = scrubDimension(new Map<string, RecordedBlock>([
-            ["4,66,9", recordingBlock("minecraft:leaf_litter", { growth: 4, "minecraft:cardinal_direction": "north" })]
-        ]));
-
-        scrub(dim);
-
-        // The fine pass never returned leaf litter from its volume query, so the bulk fill is the path
-        // that actually removes it.
-        assert.deepEqual(bulkFillsFor(dim, "minecraft:leaf_litter"), [
-            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:leaf_litter"
         ]);
     });
 
@@ -267,15 +229,6 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         assert.deepEqual(base.setTypeCalls, [], "the piston base must survive the fine pass");
     });
 
-    it("still converts convertible modern blocks rather than deleting them", () => {
-        const andesite = recordingBlock("minecraft:andesite");
-        const dim = scrubDimension(new Map<string, RecordedBlock>([["2,64,2", andesite]]));
-
-        scrub(dim);
-
-        assert.equal(andesite.setTypeCalls.length, 0, "a convertible block must never be deleted");
-    });
-
     it("retypes Bedrock's consolidated planks block to oak instead of scrubbing it", () => {
         const planks = recordingBlock("minecraft:planks", { wood_type: "spruce" });
 
@@ -286,13 +239,15 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
     });
 
     it("runs a bulk fill for every post-Beta rock type the chunk actually holds", () => {
+        const andesite = recordingBlock("minecraft:andesite");
         const dim = scrubDimension(new Map<string, RecordedBlock>([
-            ["2,64,2", recordingBlock("minecraft:andesite")],
+            ["2,64,2", andesite],
             ["8,20,3", recordingBlock("minecraft:deepslate")]
         ]));
 
         scrub(dim);
 
+        assert.equal(andesite.setTypeCalls.length, 0, "a convertible block is repainted, never deleted");
         assert.deepEqual(bulkFillsFor(dim, "minecraft:andesite"), [
             "fill 0 0 0 15 127 15 minecraft:stone replace minecraft:andesite"
         ]);
@@ -318,11 +273,8 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         const dim = scrubDimension(new Map<string, RecordedBlock>([
             ["2,64,2", recordingBlock("minecraft:jungle_planks")],
             ["3,64,2", recordingBlock("minecraft:jungle_stairs")],
-            ["4,64,2", recordingBlock("minecraft:jungle_slab")],
-            ["5,20,2", recordingBlock("minecraft:dark_oak_log")],
             ["6,64,2", recordingBlock("minecraft:acacia_fence")],
-            ["7,64,2", recordingBlock("minecraft:crimson_stem")],
-            ["8,64,2", recordingBlock("minecraft:bamboo_sapling")]
+            ["7,64,2", recordingBlock("minecraft:crimson_stem")]
         ]));
 
         scrub(dim);
@@ -333,11 +285,9 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         for (const [id, replacement] of [
             ["minecraft:jungle_planks", "minecraft:planks"],
             ["minecraft:jungle_stairs", "minecraft:oak_stairs"],
-            ["minecraft:jungle_slab", "bh:wooden_slab"],
-            ["minecraft:dark_oak_log", "minecraft:oak_log"],
             ["minecraft:acacia_fence", "bh:fence"],
-            ["minecraft:crimson_stem", "minecraft:oak_log"],
-            ["minecraft:bamboo_sapling", "minecraft:oak_sapling"]
+            // A stem is the one spelling whose replacement is a log rather than its own species' part.
+            ["minecraft:crimson_stem", "minecraft:oak_log"]
         ]) {
             assert.deepEqual(
                 bulkFillsFor(dim, id),

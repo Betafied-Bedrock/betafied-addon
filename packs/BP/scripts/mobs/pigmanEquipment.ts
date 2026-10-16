@@ -15,6 +15,7 @@ eventBus.onEntitySpawn((event) => {
             equippable.setEquipment(EquipmentSlot.Mainhand, new ItemStack("minecraft:golden_sword"));
         }
     } catch {
-        // Entity despawn race condition safety
+        // A pigman can despawn between the spawn event and this read, so the component lookup and the
+        // equipment write throw on a dead handle.
     }
 });

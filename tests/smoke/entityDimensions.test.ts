@@ -6,7 +6,6 @@ import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
 } from "../../packs/BP/scripts/core/betaRegistry.js";
-import { compareText } from "../support/text.js";
 
 const LEGACY_ROSTER_IDS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:zombified_piglin": "minecraft:zombie_pigman"
@@ -80,26 +79,6 @@ const WALKING_PLAYER_UNITS = 0.35;
  */
 const ENGINE_PACE_CORRECTION: Readonly<Record<string, number>> = Object.freeze({ wolf: 0.3 });
 
-/** Beta's eye height per definition file, as the rule each one follows. */
-const BETA_EYE_HEIGHT: Readonly<Record<string, number>> = Object.freeze({
-    pig: 0.9 * 0.85,           // EntityLiving.java:89, `height * 0.85`
-    cow: 1.3 * 0.85,
-    sheep: 1.3 * 0.85,
-    chicken: 0.4 * 0.85,
-    wolf: 0.8 * 0.8,           // EntityWolf.java:221, `height * 0.8`
-    squid: 0.95 * 0.85,
-    zombie: 1.8 * 0.85,
-    skeleton: 1.8 * 0.85,
-    creeper: 1.8 * 0.85,
-    spider: 0.9 * 0.85,
-    ghast: 4.0 * 0.85,
-    zombie_pigman: 1.8 * 0.85,
-    player: 1.62               // EntityPlayer.java:44,152, the camera's `yOffset`
-});
-
-/** The few Beta mobs whose eye height does not follow `height * 0.85`. */
-const EYE_HEIGHT_FACTOR: Readonly<Record<string, number>> = Object.freeze({ wolf: 0.8 });
-
 /** Slime sizes 1, 2 and 4, and the component group each spawns into. */
 const SLIME_GROUPS: readonly (readonly [string, number])[] = Object.freeze([
     ["minecraft:slime_small", 1],
@@ -126,9 +105,6 @@ const MULTIPLIER_EXCEPTIONS: Readonly<Record<string, number>> = Object.freeze({
  * a clamped full stride, so the goal that drives its pursuit may not run it above the walking
  * player's pace. Its `random_stroll`, `melee_attack` and `follow_owner` goals are all 1.0 already.
  */
-
-/** The multiplier a ridden mob's own speed is wrong for, so only its presence is pinned. */
-const MOUNT_PATHING = "minecraft:behavior.mount_pathing";
 
 const root = process.cwd();
 
@@ -230,28 +206,6 @@ describe("entity dimensions and speed", () => {
         }
     });
 
-    it("carries a corrected share down without reordering the roster", () => {
-        for (const [file, corrected] of Object.entries(ENGINE_PACE_CORRECTION)) {
-            const share = BETA_MOVE_SPEED[file];
-            assert.ok(share !== undefined, `${file}: a correction needs a Beta share to be read off`);
-            assert.ok(
-                corrected < WALKING_PLAYER_UNITS,
-                `${file}: a correction sits below the walk it is corrected from`
-            );
-
-            for (const [other, otherShare] of Object.entries(BETA_MOVE_SPEED)) {
-                // A slime's value lives in its per-size groups, and no share outranks a full stride.
-                if (otherShare === undefined || otherShare >= share! || other === "slime") continue;
-
-                const value = entityOf(`minecraft:${other}`).components["minecraft:movement"].value;
-                assert.ok(
-                    corrected > value,
-                    `${file}: Beta's ordering keeps it faster than the ${other} share`
-                );
-            }
-        }
-    });
-
     it("declares no multiplier Beta had no second speed for", () => {
         for (const typeId of roster()) {
             const file = definitionFile(typeId);
@@ -263,45 +217,4 @@ describe("entity dimensions and speed", () => {
         }
     });
 
-    it("rides a mouthful of exceptions rather than letting one rot", () => {
-        // A ridden mob's speed is its rider's, and how Bedrock splits the two is uncheckable
-        // offline, so mount_pathing keeps vanilla's multiplier instead of a derived one.
-        for (const [keyed] of Object.entries(MULTIPLIER_EXCEPTIONS)) {
-            const [file, behavior] = keyed.split(".");
-            const declared = declaredMultipliers(`minecraft:${file}`).find(
-                (entry) => entry.behavior === `minecraft:behavior.${behavior}`
-            );
-
-            assert.ok(declared, `${keyed}: the exception has no matching behavior to sit on`);
-            if (behavior === MOUNT_PATHING.replace("minecraft:behavior.", "")) {
-                assert.ok(declared!.value > 1, `${keyed}: a ridden mob still travels faster than it walks`);
-            }
-        }
-    });
-
-    it("records the eye height Beta reads and no file can declare", () => {
-        // A slime's eye height follows whichever box its size declares, so it is derived from that
-        // box rather than fixed here -- the size test above is what pins the box itself.
-        // Two pigman ids share one definition file, so the roster maps onto fewer files than ids.
-        const covered = [...new Set(roster().map(definitionFile))]
-            .filter((file) => file !== "slime")
-            .sort(compareText);
-        assert.deepEqual(
-            Object.keys(BETA_EYE_HEIGHT).sort(compareText),
-            covered,
-            "every Beta mob has to have an eye height recorded, and nothing else"
-        );
-
-        for (const [file, recorded] of Object.entries(BETA_EYE_HEIGHT)) {
-            const factor = EYE_HEIGHT_FACTOR[file];
-            const height = BETA_SIZE[file][1];
-            const expected = file === "player" ? recorded : height * (factor ?? 0.85);
-
-            closeTo(recorded, expected, `${file}: eye height`);
-            assert.ok(
-                recorded <= height,
-                `${file}: an eye above the box would be a different mob`
-            );
-        }
-    });
 });

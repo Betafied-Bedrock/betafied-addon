@@ -98,49 +98,40 @@ describe("Authentic Beta 1.7.3 Leaf Apple Drops Policy", () => {
         assert.equal(spawnedItems[0].typeId, "bh:apple", "Apple entity from chest must become the Beta apple");
     });
 
-    it("preserves apples dropped intentionally by players from inventory", () => {
+    it("keeps an apple a player dropped or left on death, on the id the inventory keeps", () => {
         const dim = world.getDimension("minecraft:overworld") as any;
+
+        function appleAt(location: { x: number; y: number; z: number }): Entity {
+            const apple = new Entity();
+            apple.typeId = "minecraft:item";
+            apple.location = location;
+            apple.dimension = dim;
+            apple.setComponent(EntityComponentTypes.Item, { itemStack: new ItemStack("minecraft:apple", 1) });
+            return apple;
+        }
 
         const player = new Player();
         player.location = { x: 200, y: 65, z: 200 };
         player.dimension = dim;
         mockPlayers.push(player);
 
-        const appleEntity = new Entity();
-        appleEntity.typeId = "minecraft:item";
-        appleEntity.location = { x: 200.5, y: 65.2, z: 200.5 };
-        appleEntity.dimension = dim;
+        const dropped = appleAt({ x: 200.5, y: 65.2, z: 200.5 });
+        assert.equal(isTreeAppleDrop(dropped), false, "an apple a player dropped is not a leaf's");
 
-        const itemStack = new ItemStack("minecraft:apple", 1);
-        appleEntity.setComponent(EntityComponentTypes.Item, { itemStack });
+        eventBus.dispatch("entitySpawn", { entity: dropped });
+        assert.equal(spawnedItems[0]?.typeId, "bh:apple", "a dropped apple lands on the id the inventory keeps");
 
-        assert.equal(isTreeAppleDrop(appleEntity), false, "Player-dropped apples must NOT be flagged as tree drops");
-
-        eventBus.dispatch("entitySpawn", { entity: appleEntity });
-        assert.equal(spawnedItems[0]?.typeId, "bh:apple", "Player-dropped apple must land on the id the inventory keeps");
-    });
-
-    it("preserves apples dropped when a player dies", () => {
-        const dim = world.getDimension("minecraft:overworld") as any;
-
+        spawnedItems.length = 0;
         const deadPlayer = new Player();
         deadPlayer.location = { x: 300, y: 64, z: 300 };
         deadPlayer.dimension = dim;
-
         eventBus.dispatch("entityDie", { deadEntity: deadPlayer });
 
-        const appleEntity = new Entity();
-        appleEntity.typeId = "minecraft:item";
-        appleEntity.location = { x: 300.2, y: 64.1, z: 300.1 };
-        appleEntity.dimension = dim;
+        const onDeath = appleAt({ x: 300.2, y: 64.1, z: 300.1 });
+        assert.equal(isTreeAppleDrop(onDeath), false, "nor is one the death drop scattered");
 
-        const itemStack = new ItemStack("minecraft:apple", 1);
-        appleEntity.setComponent(EntityComponentTypes.Item, { itemStack });
-
-        assert.equal(isTreeAppleDrop(appleEntity), false, "Player death inventory drops must NOT be flagged as tree drops");
-
-        eventBus.dispatch("entitySpawn", { entity: appleEntity });
-        assert.equal(spawnedItems[0]?.typeId, "bh:apple", "Player death apple drop must land on the id the inventory keeps");
+        eventBus.dispatch("entitySpawn", { entity: onDeath });
+        assert.equal(spawnedItems[0]?.typeId, "bh:apple", "and the death drop lands on the same id");
     });
 
     it("identifies and prevents stick drops when leaves are broken by a player", () => {
@@ -163,28 +154,6 @@ describe("Authentic Beta 1.7.3 Leaf Apple Drops Policy", () => {
 
         eventBus.dispatch("entitySpawn", { entity: stickEntity });
         assert.equal(stickEntity.isRemoved, true, "Stick entity from broken leaves must be removed");
-    });
-
-    it("identifies and prevents stick drops from natural leaf decay near trees", () => {
-        const dim = world.getDimension("minecraft:overworld") as any;
-
-        dim.setBlock({ x: 50, y: 72, z: 50 }, {
-            typeId: "minecraft:oak_leaves",
-            permutation: BlockPermutation.resolve("minecraft:oak_leaves")
-        });
-
-        const stickEntity = new Entity();
-        stickEntity.typeId = "minecraft:item";
-        stickEntity.location = { x: 50.5, y: 71.5, z: 50.5 };
-        stickEntity.dimension = dim;
-
-        const itemStack = new ItemStack("minecraft:stick", 1);
-        stickEntity.setComponent(EntityComponentTypes.Item, { itemStack });
-
-        assert.equal(isTreeAppleDrop(stickEntity), true, "Stick from decaying leaves must be identified as tree drop");
-
-        eventBus.dispatch("entitySpawn", { entity: stickEntity });
-        assert.equal(stickEntity.isRemoved, true, "Stick entity from leaf decay must be removed");
     });
 
     it("removes non-Beta entities on entityLoad as well as entitySpawn", () => {

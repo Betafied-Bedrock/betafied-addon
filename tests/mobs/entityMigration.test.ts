@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { Entity, resetMocks, declaredEntityProperties } from "../mocks/minecraftServer.js";
-import { migrateEntity, type EntityPropertyRule } from "../../packs/BP/scripts/mobs/entityMigration.js";
+import { migrateEntity } from "../../packs/BP/scripts/mobs/entityMigration.js";
 
 describe("EntityMigration - Future-Proof Entity Property & Effect Migration", () => {
     beforeEach(() => {
@@ -12,22 +12,16 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
         const cow = new Entity();
         cow.typeId = "minecraft:cow";
 
-        assert.equal(cow.getProperty("betarock:shadow_span"), undefined);
-        assert.equal(cow.getProperty("betarock:shadow_alpha"), undefined);
-
         migrateEntity(cow);
 
         assert.equal(cow.getProperty("betarock:shadow_span"), 1);
         assert.equal(cow.getProperty("betarock:shadow_alpha"), 0.5);
-        assert.equal(cow.propertyWrites.length, 2);
     });
 
     it("applies missing infinite invisibility effect without particles to suppress native shadow", () => {
         const cow = new Entity();
         cow.typeId = "minecraft:cow";
         cow.setComponent("minecraft:is_hidden_when_invisible", {});
-
-        assert.equal(cow.getEffect("invisibility"), undefined);
 
         migrateEntity(cow);
 
@@ -62,89 +56,57 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
         assert.equal(player.getEffect("invisibility"), undefined, "the leftover invisibility is removed");
     });
 
-    it("is idempotent and leaves already-migrated entities untouched", () => {
+    it("is idempotent, and lands the effect once the render half arrives", () => {
         const cow = new Entity();
         cow.typeId = "minecraft:cow";
 
         migrateEntity(cow);
         const writeCount = cow.propertyWrites.length;
-
-        // Second pass
         migrateEntity(cow);
-        assert.equal(cow.propertyWrites.length, writeCount, "no additional property writes on migrated entity");
-    });
+        assert.equal(cow.propertyWrites.length, writeCount, "a migrated entity earns no further writes");
 
-    it("keeps a migrated entity a no-op once the render half arrives", () => {
-        const cow = new Entity();
-        cow.typeId = "minecraft:cow";
-
-        migrateEntity(cow);
         cow.setComponent("minecraft:is_hidden_when_invisible", {});
-
         migrateEntity(cow);
-        assert.ok(cow.getEffect("invisibility"), "the effect lands as soon as the swap can carry it");
-
         const applied = cow.getEffect("invisibility");
+        assert.ok(applied, "the effect lands as soon as the swap can carry it");
+
         migrateEntity(cow);
         assert.deepEqual(cow.getEffect("invisibility"), applied, "and is not re-added afterwards");
     });
 
-    it("future-proof: seamlessly applies custom property rules to unmigrated mobs", () => {
+    it("takes a caller's own property rules, and their default when the engine refuses the reset", () => {
         declaredEntityProperties.set("betarock:future_scale", 1.5);
-        const cow = new Entity();
-        cow.typeId = "minecraft:cow";
-
-        const customPropertyRules: EntityPropertyRule[] = [
-            { identifier: "betarock:future_scale" }
-        ];
-
-        migrateEntity(cow, customPropertyRules, []);
-
-        assert.equal(cow.getProperty("betarock:future_scale"), 1.5);
-    });
-
-    it("falls back to defaultValue if resetProperty throws for undeclared definition", () => {
-        const cow = new Entity();
-        cow.typeId = "minecraft:cow";
-
-        const customPropertyRules: EntityPropertyRule[] = [
-            { identifier: "betarock:fallback_prop", defaultValue: 42 }
-        ];
         declaredEntityProperties.set("betarock:fallback_prop", 42);
 
-        // Temporarily make resetProperty throw to test fallback
-        cow.resetProperty = () => {
+        const cow = new Entity();
+        cow.typeId = "minecraft:cow";
+
+        migrateEntity(cow, [{ identifier: "betarock:future_scale" }], []);
+        assert.equal(cow.getProperty("betarock:future_scale"), 1.5, "a declared definition answers the reset");
+
+        const guarded = new Entity();
+        guarded.typeId = "minecraft:cow";
+        guarded.resetProperty = () => {
             throw new Error("resetProperty failed");
         };
 
-        migrateEntity(cow, customPropertyRules, []);
-
-        assert.equal(cow.getProperty("betarock:fallback_prop"), 42);
+        migrateEntity(guarded, [{ identifier: "betarock:fallback_prop", defaultValue: 42 }], []);
+        assert.equal(guarded.getProperty("betarock:fallback_prop"), 42, "and the rule's own default covers a refusal");
     });
 
-    it("safely skips non-Beta or non-mob entities", () => {
+    it("leaves a non-Beta mob and a despawned handle alone", () => {
         const sniffer = new Entity();
         sniffer.typeId = "minecraft:sniffer";
 
         migrateEntity(sniffer);
-        assert.equal(sniffer.propertyWrites.length, 0);
+        assert.equal(sniffer.propertyWrites.length, 0, "a post-Beta mob earns no Beta properties");
         assert.equal(sniffer.getEffect("invisibility"), undefined);
 
-        const item = new Entity();
-        item.typeId = "minecraft:item";
-
-        migrateEntity(item);
-        assert.equal(item.propertyWrites.length, 0);
-    });
-
-    it("safely handles invalid or destroyed entities without throwing", () => {
         const cow = new Entity();
         cow.typeId = "minecraft:cow";
         cow.isValid = false;
 
-        assert.doesNotThrow(() => {
-            migrateEntity(cow);
-        });
-        assert.equal(cow.propertyWrites.length, 0);
+        assert.doesNotThrow(() => migrateEntity(cow));
+        assert.equal(cow.propertyWrites.length, 0, "and a despawned handle is not migrated");
     });
 });

@@ -8,12 +8,7 @@ import {
 import { eventBus } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 import { consumeHeldItem } from "../core/heldItem.js";
-
-interface Cell {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
-}
+import type { Cell } from "./cell.js";
 
 export const DOUBLE_SLAB_OF: Readonly<Record<string, string>> = Object.freeze({
     "bh:wooden_slab": "bh:double_wooden_slab",

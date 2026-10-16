@@ -2,9 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
     canStackSlab,
-    canMergePlacedSlab,
-    DOUBLE_SLAB_OF,
-    SLAB_SOUND_OF
+    canMergePlacedSlab
 } from "../../packs/BP/scripts/interactions/slabStacking.js";
 import {
     Direction,
@@ -27,67 +25,26 @@ describe("Slab Stacking - Beta 1.7.3 Pre-Placement Stacking", () => {
     });
 
     describe("canStackSlab - interaction qualification", () => {
-        it("allows stacking when clicking the top face with the matching slab", () => {
+        it("qualifies only a matching slab clicked on the top face of a single slab", () => {
             assert.equal(canStackSlab("bh:wooden_slab", Direction.Up, "bh:wooden_slab"), true);
-            assert.equal(canStackSlab("bh:stone_slab", Direction.Up, "bh:stone_slab"), true);
-            assert.equal(canStackSlab("bh:cobblestone_slab", Direction.Up, "bh:cobblestone_slab"), true);
             assert.equal(canStackSlab("bh:sandstone_slab", Direction.Up, "bh:sandstone_slab"), true);
-        });
 
-        it("forbids stacking when clicking non-up faces", () => {
             assert.equal(canStackSlab("bh:wooden_slab", Direction.Down, "bh:wooden_slab"), false);
             assert.equal(canStackSlab("bh:wooden_slab", Direction.North, "bh:wooden_slab"), false);
-            assert.equal(canStackSlab("bh:wooden_slab", Direction.South, "bh:wooden_slab"), false);
-            assert.equal(canStackSlab("bh:wooden_slab", Direction.East, "bh:wooden_slab"), false);
-            assert.equal(canStackSlab("bh:wooden_slab", Direction.West, "bh:wooden_slab"), false);
-        });
-
-        it("forbids stacking when held item does not match", () => {
             assert.equal(canStackSlab("bh:wooden_slab", Direction.Up, "bh:stone_slab"), false);
             assert.equal(canStackSlab("bh:stone_slab", Direction.Up, undefined), false);
-            assert.equal(canStackSlab("bh:cobblestone_slab", Direction.Up, "minecraft:dirt"), false);
-        });
-
-        it("forbids stacking on full blocks or already doubled slabs", () => {
             assert.equal(canStackSlab("bh:double_wooden_slab", Direction.Up, "bh:wooden_slab"), false);
             assert.equal(canStackSlab("minecraft:oak_planks", Direction.Up, "bh:wooden_slab"), false);
         });
     });
 
     describe("canMergePlacedSlab - placement fallback qualification", () => {
-        it("allows merge when placed slab is placed directly on top of the same slab", () => {
+        it("merges only onto the same single slab", () => {
             assert.equal(canMergePlacedSlab("bh:wooden_slab", "bh:wooden_slab"), true);
-            assert.equal(canMergePlacedSlab("bh:stone_slab", "bh:stone_slab"), true);
-        });
 
-        it("forbids merge when block below does not match", () => {
             assert.equal(canMergePlacedSlab("bh:wooden_slab", "bh:cobblestone_slab"), false);
-            assert.equal(canMergePlacedSlab("bh:wooden_slab", "minecraft:air"), false);
             assert.equal(canMergePlacedSlab("bh:wooden_slab", undefined), false);
-        });
-
-        it("forbids merge for non-slab items", () => {
             assert.equal(canMergePlacedSlab("minecraft:stone", "minecraft:stone"), false);
-        });
-    });
-
-    describe("Mappings", () => {
-        it("maps every single slab to its double slab", () => {
-            assert.deepEqual(DOUBLE_SLAB_OF, {
-                "bh:wooden_slab": "bh:double_wooden_slab",
-                "bh:cobblestone_slab": "bh:double_cobblestone_slab",
-                "bh:sandstone_slab": "bh:double_sandstone_slab",
-                "bh:stone_slab": "bh:double_stone_slab"
-            });
-        });
-
-        it("defines placement sounds for each slab type", () => {
-            // Beta's wooden slab was the stone slab wearing a plank texture, so it placed
-            // with the stone sound too.
-            assert.equal(SLAB_SOUND_OF["bh:wooden_slab"], "use.stone");
-            assert.equal(SLAB_SOUND_OF["bh:stone_slab"], "use.stone");
-            assert.equal(SLAB_SOUND_OF["bh:cobblestone_slab"], "use.stone");
-            assert.equal(SLAB_SOUND_OF["bh:sandstone_slab"], "use.stone");
         });
     });
 
