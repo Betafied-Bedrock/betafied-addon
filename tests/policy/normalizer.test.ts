@@ -62,6 +62,26 @@ describe("Heuristic Inverse Normalizer", () => {
             );
         });
 
+        it("keeps a slab's own family and a stair's species out of the stone fallback", () => {
+            // Cobblestone and sandstone answer with a slab of their own, so neither may fall through to
+            // the stone/wood split below them.
+            assert.deepEqual(resolvePlacerTarget("minecraft:cobblestone_slab"), {
+                action: "convert",
+                targetId: "bh:cobblestone_slab"
+            });
+            assert.deepEqual(resolvePlacerTarget("minecraft:sandstone_slab"), {
+                action: "convert",
+                targetId: "bh:sandstone_slab"
+            });
+
+            // The species sits inside a compound suffix here, so a prefix read off the whole id would
+            // miss the wood and send a wooden stair to the stone one.
+            assert.deepEqual(resolvePlacerTarget("minecraft:oak_mosaic_stairs"), {
+                action: "convert",
+                targetId: "bh:oak_stairs"
+            });
+        });
+
         it("converts modern stone, deepslate, and copper variants", () => {
             assert.deepEqual(normalizeItem("minecraft:andesite"), { action: "convert", targetId: "minecraft:stone" });
             assert.deepEqual(normalizeItem("minecraft:cobbled_deepslate"), { action: "convert", targetId: "minecraft:cobblestone" });

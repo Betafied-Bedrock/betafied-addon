@@ -101,17 +101,25 @@ function singlePermutation(latch: CardinalDirection): BlockPermutation {
     return BlockPermutation.resolve(SINGLE_CHEST_ID, { [DIRECTION_STATE]: latch });
 }
 
+/**
+ * The half's container could not be reached, so every stack is dropped where the chest stands. Called
+ * instead of a write, never after one: a stack that has already been placed must not be duplicated.
+ */
+function spillContents(block: Block, contents: readonly (ItemStack | undefined)[]): void {
+    for (const stack of contents) {
+        if (!stack) continue;
+        guard("spawnUnplacedStack", () => block.dimension.spawnItem(stack, block.center()));
+    }
+}
+
 function handBackContents(block: Block, contents: readonly (ItemStack | undefined)[]): void {
     const container = containerOf(block);
-    if (container.ok) {
-        for (const stack of writeSlots(container.value, contents)) {
-            guard("spawnUnplacedStack", () => block.dimension.spawnItem(stack, block.center()));
-        }
+    if (!container.ok) {
+        spillContents(block, contents);
         return;
     }
 
-    for (const stack of contents) {
-        if (!stack) continue;
+    for (const stack of writeSlots(container.value, contents)) {
         guard("spawnUnplacedStack", () => block.dimension.spawnItem(stack, block.center()));
     }
 }
@@ -146,53 +154,84 @@ function restoreSingles(master: Block, shadow: Block, saved: SavedPair): void {
     console.warn("doubleChest: pairing failed, kept two single chests");
 }
 
-export function mergePair(master: Block, shadow: Block, state: CardinalDirection): void {
-    const saved = savePair(master, shadow);
-    if (!saved) return;
-
-    const dimensionId = master.dimension.id;
+/**
+ * The one way back out of a merge: every bail-out restores the same pre-merge state, so they share
+ * this path. The cells are re-read because assembling the pair replaces the blocks the caller
+ * passed, which go stale under `fillBlocks`; `liveMaster`/`liveShadow` are the freshest handles for
+ * those two cells at the point of failure.
+ */
+function makeAbandon(
+    dimensionId: string,
+    master: Block,
+    shadow: Block,
+    saved: SavedPair
+): (liveMaster: Block, liveShadow: Block) => void {
     const masterCell = cellOf(master);
     const shadowCell = cellOf(shadow);
 
-    // Both bail-outs are the same operation, so they share one path. The cells are re-read because
-    // assembling the pair replaces the blocks the caller passed, which go stale under `fillBlocks`;
-    // `liveMaster`/`liveShadow` are the freshest handles for those two cells at the point of failure.
-    const rollBack = (liveMaster: Block, liveShadow: Block): void => {
+    return (liveMaster, liveShadow) => {
         restoreSingles(
             valueOr(blockAt(dimensionId, masterCell), liveMaster),
             valueOr(blockAt(dimensionId, shadowCell), liveShadow),
             saved
         );
     };
+}
 
-    // A half that would not clear still holds stacks the merged write would duplicate, so the pair is
-    // abandoned instead of built on top of them. Nothing is lost: both reads are already in hand.
-    const cleared = clearSlots(saved.masterContainer, SINGLE_CHEST_SLOTS).ok
+/**
+ * A half that would not clear still holds stacks the merged write would duplicate, so the pair is
+ * abandoned instead of built on top of them. Nothing is lost: both reads are already in hand.
+ */
+function clearSavedHalves(saved: SavedPair): boolean {
+    return clearSlots(saved.masterContainer, SINGLE_CHEST_SLOTS).ok
         && clearSlots(saved.shadowContainer, SINGLE_CHEST_SLOTS).ok;
-    if (!cleared) {
-        rollBack(master, shadow);
-        return;
-    }
+}
 
-    const cells = assemblePair(master, shadow, state);
-    if (!cells) {
-        rollBack(master, shadow);
-        return;
-    }
+/** The freshest handles for the pair's two cells, falling back to the caller's when a read fails. */
+function liveCells(
+    dimensionId: string,
+    cells: PairCells,
+    master: Block,
+    shadow: Block
+): { home: Block; other: Block } {
+    return {
+        home: valueOr(blockAt(dimensionId, cells.home), master),
+        other: valueOr(blockAt(dimensionId, cells.other), shadow)
+    };
+}
 
-    const home = valueOr(blockAt(dimensionId, cells.home), master);
-    const other = valueOr(blockAt(dimensionId, cells.other), shadow);
-
+/**
+ * Writes both halves' contents into the half the engine made the pair's home, then empties the other.
+ * Answers false when the home half has no readable container: an unreadable half is not an empty one,
+ * and a write into the failed handle would strand the pair's contents, so the caller hands the two
+ * singles back instead.
+ */
+function writeMerged(saved: SavedPair, home: Block, other: Block): boolean {
     const homeContainer = containerOf(home);
-    if (!homeContainer.ok) {
-        rollBack(home, other);
-        return;
-    }
+    if (!homeContainer.ok) return false;
 
     writeSlots(homeContainer.value, mergeContents(saved.masterContents, saved.shadowContents));
 
     const otherContainer = containerOf(other);
     if (otherContainer.ok) clearSlots(otherContainer.value, DOUBLE_CHEST_SLOTS);
+
+    return true;
+}
+
+export function mergePair(master: Block, shadow: Block, state: CardinalDirection): void {
+    const saved = savePair(master, shadow);
+    if (!saved) return;
+
+    const dimensionId = master.dimension.id;
+    const abandon = makeAbandon(dimensionId, master, shadow, saved);
+
+    if (!clearSavedHalves(saved)) return abandon(master, shadow);
+
+    const cells = assemblePair(master, shadow, state);
+    if (!cells) return abandon(master, shadow);
+
+    const { home, other } = liveCells(dimensionId, cells, master, shadow);
+    if (!writeMerged(saved, home, other)) return abandon(home, other);
 }
 
 export function mergeChestAt(dimensionId: string, location: ChestLocation): void {
