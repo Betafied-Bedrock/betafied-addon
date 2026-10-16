@@ -220,5 +220,5 @@ tickManager.register("armorDisplay", ARMOR_DISPLAY_INTERVAL_TICKS, () => {
     for (const player of world.getAllPlayers()) {
         updatePlayerArmorDisplay(player);
     }
-});
+}, 0);
 

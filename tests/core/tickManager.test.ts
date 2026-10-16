@@ -93,7 +93,7 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
         let runs = 0;
         tickManager.register("tempTask", 1, () => {
             runs++;
-        });
+        }, 0);
 
         tickManager.step();
         assert.equal(runs, 1);

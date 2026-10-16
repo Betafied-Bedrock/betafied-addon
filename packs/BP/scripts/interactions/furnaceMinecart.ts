@@ -280,7 +280,7 @@ function startMinecartMovement(entity: Entity): void {
 
     tickManager.register(cartTaskId(entityId), CONFIG.TICK_INTERVAL, () => {
         runMinecartStep(entity, entityId);
-    });
+    }, 0);
 }
 
 const FUEL_ITEM_IDS: ReadonlySet<string> = Object.freeze(new Set(["minecraft:coal", "minecraft:charcoal"]));

@@ -441,4 +441,4 @@ eventBus.onPlayerPlaceBlock((event) => {
     forgetLandingsAt(event.block.location);
 });
 
-tickManager.register("cropTrampling", CONFIG.TICK_INTERVAL, cropTramplingJob);
+tickManager.register("cropTrampling", CONFIG.TICK_INTERVAL, cropTramplingJob, 0);

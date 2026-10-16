@@ -78,7 +78,7 @@ function watchTool(bonus: ToolBonus): void {
                 applyBonus(bonus, active, player)
             );
         }
-    });
+    }, 0);
 
     eventBus.onPlayerLeave((ev) => {
         active.delete(ev.playerId);

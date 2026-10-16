@@ -7,7 +7,7 @@ export type TaskCallback = () => void | Generator<void, void, unknown>;
 export interface ScheduledTask {
     readonly id: string;
     readonly intervalTicks: number;
-    readonly offset: number;
+    readonly phase: number;
     readonly task: TaskCallback;
 }
 
@@ -18,7 +18,12 @@ export class TickManager {
     private masterIntervalId: number | null = null;
     private currentTick: number = 0;
 
-    register(id: string, intervalTicks: number, task: TaskCallback, offset?: number): void {
+    /**
+     * The phase is required, and it is the module's own tick alignment. It used to default to the
+     * registry size, which made every sweep's phase depend on how many tasks happened to be
+     * registered before it: inserting one import into main.ts re-phased everything below it.
+     */
+    register(id: string, intervalTicks: number, task: TaskCallback, phase: number): void {
         // A second registration under a live id would silently replace that schedule, so the first
         // one keeps running and the collision is reported instead of losing a subsystem's ticks.
         const existing = this.tasks.get(id);
@@ -31,12 +36,12 @@ export class TickManager {
         }
 
         const validInterval = Math.max(1, Math.floor(intervalTicks));
-        const computedOffset = offset !== undefined ? Math.max(0, Math.floor(offset)) : this.tasks.size % validInterval;
+        const validPhase = Math.max(0, Math.floor(phase));
 
         this.tasks.set(id, {
             id,
             intervalTicks: validInterval,
-            offset: computedOffset,
+            phase: validPhase,
             task
         });
     }
@@ -65,7 +70,7 @@ export class TickManager {
     step(): void {
         const tick = this.currentTick++;
         for (const task of this.tasks.values()) {
-            if ((tick - task.offset) % task.intervalTicks === 0) {
+            if ((tick - task.phase) % task.intervalTicks === 0) {
                 if (this.inFlightJobs.has(task.id)) continue;
 
                 runCatching({ system: "tickManager", operation: `task:${task.id}` }, () => {

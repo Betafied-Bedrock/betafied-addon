@@ -76,4 +76,4 @@ eventBus.onPlayerLeave((event) => {
     tintedPlayers.delete(event.playerId);
 });
 
-tickManager.register("underwaterOverlay", CONFIG.CHECK_INTERVAL, underwaterOverlayJob);
+tickManager.register("underwaterOverlay", CONFIG.CHECK_INTERVAL, underwaterOverlayJob, 0);

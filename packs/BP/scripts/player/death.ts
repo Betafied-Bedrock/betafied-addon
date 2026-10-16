@@ -308,7 +308,7 @@ tickManager.register("deathState", DEATH_STATE_INTERVAL_TICKS, () => {
             showDeathScreen(player, DEATH_SCREEN_HANDLERS);
         }
     }
-});
+}, 0);
 
 eventBus.onPlayerSpawn((ev) => {
     if (!ev.initialSpawn) return;

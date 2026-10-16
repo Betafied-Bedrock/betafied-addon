@@ -133,7 +133,7 @@ eventBus.onItemStartUse((ev) => {
             reportError({ system: "machineGunBow", operation: "holdFire", target: player.name }, e);
             stopHoldFiring(player.id);
         }
-    });
+    }, 0);
 });
 
 eventBus.onItemStopUse((ev) => {

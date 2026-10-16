@@ -258,4 +258,4 @@ export function* sweepPairsJob(): Generator<void, void, unknown> {
     }
 }
 
-tickManager.register("doubleChest:sweep", SWEEP_INTERVAL_TICKS, sweepPairsJob);
+tickManager.register("doubleChest:sweep", SWEEP_INTERVAL_TICKS, sweepPairsJob, 0);
