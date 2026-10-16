@@ -161,7 +161,7 @@ describe("Door Punch - Beta 1.7.3 punch-to-toggle wooden door", () => {
         });
 
         it("ignores hits from non-player entities", () => {
-            const { dim, lower, upper } = spawnDoorInWorld({ x: 30, y: 64, z: 20 }, false);
+            const { dim, lower } = spawnDoorInWorld({ x: 30, y: 64, z: 20 }, false);
             const nonPlayer = { typeId: "minecraft:zombie" };
 
             eventBus.dispatch("entityHitBlock", {
