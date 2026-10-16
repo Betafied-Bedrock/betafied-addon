@@ -36,6 +36,8 @@ const BYPASS_SOURCES = Object.freeze(new Set([
     "suicide"
 ]));
 
+const ARMOR_DISPLAY_INTERVAL_TICKS = 5;
+
 export function damageArmor(player: Player): void {
     const equip = player.getComponent(EntityComponentTypes.Equippable);
     if (!equip) return;
@@ -214,7 +216,7 @@ eventBus.onPlayerLeave((ev) => {
     clearPlayerDamageCarryover(ev.playerId);
 });
 
-tickManager.register("armorDisplay", 5, () => {
+tickManager.register("armorDisplay", ARMOR_DISPLAY_INTERVAL_TICKS, () => {
     for (const player of world.getAllPlayers()) {
         updatePlayerArmorDisplay(player);
     }

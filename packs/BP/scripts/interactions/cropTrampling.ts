@@ -7,6 +7,7 @@ import { BH_FENCE_ID } from "../core/betaRegistry.js";
 import { eraRulesApply } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({
+    TICK_INTERVAL: 1,
     MOB_INTERVAL: 2,
     MOB_RADIUS: 24,
     DISTANCE_WALKED_MODIFIER: 0.6,
@@ -440,4 +441,4 @@ eventBus.onPlayerPlaceBlock((event) => {
     forgetLandingsAt(event.block.location);
 });
 
-tickManager.register("cropTrampling", 1, cropTramplingJob);
+tickManager.register("cropTrampling", CONFIG.TICK_INTERVAL, cropTramplingJob);

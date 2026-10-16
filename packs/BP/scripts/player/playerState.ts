@@ -3,6 +3,8 @@ import { tickManager } from "../core/tickManager.js";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
 
+const PLAYER_STATE_INTERVAL_TICKS = 2;
+
 const SUPPRESSED_HUD_ELEMENTS = [
     HudElement.Hunger,
     HudElement.ProgressBar
@@ -84,5 +86,5 @@ export function playerStateJob(): void {
     }
 }
 
-tickManager.register("playerState", 2, playerStateJob, 1);
+tickManager.register("playerState", PLAYER_STATE_INTERVAL_TICKS, playerStateJob, 1);
 

@@ -298,7 +298,9 @@ const DEATH_SCREEN_HANDLERS: DeathScreenHandlers = {
     onTitleMenu: (player) => respawnPlayer(player)
 };
 
-tickManager.register("deathState", 2, () => {
+const DEATH_STATE_INTERVAL_TICKS = 2;
+
+tickManager.register("deathState", DEATH_STATE_INTERVAL_TICKS, () => {
     for (const player of world.getAllPlayers()) {
         assertDeathState(player);
 

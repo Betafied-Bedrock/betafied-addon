@@ -15,6 +15,7 @@ const ENTITY_ID = "bh:herobrine";
 
 const CONFIG = Object.freeze({
     SWEEP_INTERVAL_TICKS: 20,
+    MAINTAIN_INTERVAL_TICKS: 10,
     MIN_REST_TICKS: 576000,
     INITIAL_GAP_MIN_TICKS: 24000,
     INITIAL_GAP_MAX_TICKS: 72000,
@@ -332,4 +333,4 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
 });
 
 tickManager.register("herobrine:sweep", CONFIG.SWEEP_INTERVAL_TICKS, rollSweep, 120);
-tickManager.register("herobrine:maintain", 10, maintainSighting, 130);
+tickManager.register("herobrine:maintain", CONFIG.MAINTAIN_INTERVAL_TICKS, maintainSighting, 130);

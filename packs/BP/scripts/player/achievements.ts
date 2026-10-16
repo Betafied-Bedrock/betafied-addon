@@ -12,6 +12,8 @@ import { reportError } from "../core/errorReporter.js";
 import { BETA_HOSTILE_TYPES, BH_CAKE_ID, BH_CRAFTING_TABLE_ID } from "../core/betaRegistry.js";
 
 
+const ACHIEVEMENT_SWEEP_INTERVAL_TICKS = 100;
+
 const ACH = Object.freeze({
     TAKING_INVENTORY: "inv",
     GETTING_WOOD: "wood",
@@ -114,7 +116,7 @@ class AchievementSystem {
             }
         });
 
-        tickManager.register("achievements:checkPlayers", 100, () => this.checkAllPlayers(), 45);
+        tickManager.register("achievements:checkPlayers", ACHIEVEMENT_SWEEP_INTERVAL_TICKS, () => this.checkAllPlayers(), 45);
 
         eventBus.onEntityDie((ev) => {
             const damager = ev.damageSource.damagingEntity;
