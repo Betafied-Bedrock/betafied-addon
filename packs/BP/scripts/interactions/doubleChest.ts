@@ -9,7 +9,7 @@ import type {
 } from "@minecraft/server";
 import { eventBus, guarded } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
-import type { ChestLocation } from "./chestPairing.js";
+import type { ChestLocation, PlacementBlockInput } from "./chestPairing.js";
 import { DOUBLE_CHEST_ID, SINGLE_CHEST_ID, planChestPlacement, planPlacementBlocked } from "./chestPairing.js";
 import { neighbourTypeIds, solidAbove } from "./chestCells.js";
 import { closePair, openPair, pairInUse, releaseViewer, viewerIdOf } from "./chestMirror.js";
@@ -65,8 +65,9 @@ function handleInteractWithBlock(event: PlayerInteractWithBlockBeforeEvent): voi
 
     if (block.typeId === SINGLE_CHEST_ID || block.typeId === DOUBLE_CHEST_ID) {
         const placing = event.player.isSneaking && event.itemStack !== undefined;
+        const blocked: PlacementBlockInput = { placing, aboveSolid: solidAbove(block) };
 
-        if (planPlacementBlocked({ placing, aboveSolid: solidAbove(block) })) {
+        if (planPlacementBlocked(blocked)) {
             event.cancel = true;
             return;
         }

@@ -1,7 +1,15 @@
 import { world } from "@minecraft/server";
 import type { Block, ContainerAccessSource } from "@minecraft/server";
 import { tickManager } from "../core/tickManager.js";
-import type { ChestHalf, ChestLocation, MirrorMove, PairResolution } from "./chestPairing.js";
+import type {
+    ChestHalf,
+    ChestLocation,
+    CloseDecisionInput,
+    MirrorMove,
+    OpenDecisionInput,
+    PairResolution,
+    SweepInput
+} from "./chestPairing.js";
 import {
     DOUBLE_CHEST_ID,
     INVERSE_DIRECTION,
@@ -151,14 +159,15 @@ export function openPair(block: Block, viewerId: string | undefined): void {
     // player is looking at, so the pair is left untouched and the sweep retries the move later.
     if (!masterHasItems.ok || !shadowHasItems.ok) return;
 
-    const move = planOpen({
+    const input: OpenDecisionInput = {
         half,
         firstViewer,
         masterHasItems: masterHasItems.value,
         shadowHasItems: shadowHasItems.value,
         masterViewers,
         shadowViewers
-    });
+    };
+    const move = planOpen(input);
     dropIfIdle(session, key, applyMove(move, session));
 }
 
@@ -175,11 +184,12 @@ export function closePair(block: Block, viewerId: string | undefined): void {
     const shadowHasItems = containerHasItems(session.dimensionId, session.shadow);
     if (!shadowHasItems.ok) return;
 
-    const move = planClose({
+    const input: CloseDecisionInput = {
         half,
         remainingViewers: session.shadowViewers.size,
         shadowHasItems: shadowHasItems.value
-    });
+    };
+    const move = planClose(input);
     dropIfIdle(session, key, applyMove(move, session));
 }
 
@@ -244,7 +254,8 @@ function sweepSession(key: string, session: PairSession): void {
         return;
     }
 
-    dropIfIdle(session, key, applyMove(planSweep({ shadowViewers: 0, shadowHasItems: shadowHasItems.value }), session));
+    const input: SweepInput = { shadowViewers: 0, shadowHasItems: shadowHasItems.value };
+    dropIfIdle(session, key, applyMove(planSweep(input), session));
 }
 
 export function* sweepPairsJob(): Generator<void, void, unknown> {
