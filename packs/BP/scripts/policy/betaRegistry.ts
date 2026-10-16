@@ -270,7 +270,12 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     // boundaries agreeing: the scrubber preserves the block, and the drop boundary keeps the item the
     // block pays. A private list in either pass is how the block came to survive while its drop did not.
     "minecraft:deadbush", "minecraft:web", "minecraft:mob_spawner",
-    "minecraft:unpowered_repeater", "minecraft:powered_repeater", "minecraft:stone_block_slab"
+    "minecraft:unpowered_repeater", "minecraft:powered_repeater", "minecraft:stone_block_slab",
+    // Three era blocks with no item form and no other owner in the pack, so a missing entry is
+    // silent: only the world pass notices. The portal (block 90), fire (51) and farmland (60) were
+    // all read as modern terrain and erased by the sweep — a lit portal died with its obsidian frame
+    // still standing, which is what players reported as a portal that keeps breaking.
+    "minecraft:portal", "minecraft:fire", "minecraft:farmland"
 ]));
 
 export function isBetaEntity(typeId: string): boolean {

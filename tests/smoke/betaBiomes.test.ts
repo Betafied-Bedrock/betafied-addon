@@ -11,7 +11,13 @@ import {
     UNMANAGED_BIOME_IDENTIFIERS,
     biomeIdentifier
 } from "../../scripts/lib/betaBiomes.mjs";
-import { BETA_PROFILE_TINTS, buildClientBiome, resolveBiomeTint } from "../../scripts/lib/betaBiomeTints.mjs";
+import {
+    BETA_PROFILE_TINTS,
+    NETHER_CLIENT_FOG_ID,
+    buildClientBiome,
+    buildNetherClientBiome,
+    resolveBiomeTint
+} from "../../scripts/lib/betaBiomeTints.mjs";
 import { COLORMAP_TEXTURES, biomeSamplePoint, colormapWrites } from "../../scripts/lib/betaColormap.mjs";
 import { colormapCoordinate, decodePng, toArgbBuffer, toHex } from "../../scripts/lib/betaColorizer.mjs";
 
@@ -117,11 +123,21 @@ describe("Beta 1.7.3 Biome Table - Overworld Remap and Appearance", () => {
 
 describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
     const clientBiomesDir = resolve(process.cwd(), "packs/RP/biomes");
-    const managed = new Set(OVERWORLD_BIOME_IDS.map(biomeIdentifier));
+    const managed = new Set([...OVERWORLD_BIOME_IDS, ...NETHER_BIOME_IDS].map(biomeIdentifier));
 
     it("keeps the on-disk client biomes byte-identical to the tint table, with no stray file beside them", () => {
         for (const shortId of OVERWORLD_BIOME_IDS) {
             const expected = `${JSON.stringify(buildClientBiome(shortId, OVERWORLD_BIOME_PROFILE[shortId]), null, 2)}\n`;
+            const actual = readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8");
+            assert.equal(
+                actual,
+                expected,
+                `${shortId}.client_biome.json is out of date with scripts/lib/betaBiomeTints.mjs`
+            );
+        }
+
+        for (const shortId of NETHER_BIOME_IDS) {
+            const expected = `${JSON.stringify(buildNetherClientBiome(shortId), null, 2)}\n`;
             const actual = readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8");
             assert.equal(
                 actual,
@@ -136,6 +152,40 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
             assert.ok(
                 managed.has(identifier),
                 `${file} defines '${identifier}', which the Beta biome table does not manage`
+            );
+        }
+    });
+
+    it("claims each Nether biome's fog and air, which vanilla's client biomes otherwise own", () => {
+        // Beta's Nether was one red fog with nothing in the air, and a client biome file is what owns
+        // both since 1.21.40. Vanilla's Nether client biomes are still there under the pack's, and
+        // they declare the biome fogs, the ash and spores (`minecraft:precipitation`), the ambient
+        // loops and the Nether's music — all of it from the Nether Update.
+        for (const shortId of NETHER_BIOME_IDS) {
+            const content = JSON.parse(readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8"));
+            const components = content["minecraft:client_biome"].components;
+
+            assert.equal(
+                components["minecraft:fog_appearance"]?.fog_identifier,
+                NETHER_CLIENT_FOG_ID,
+                `${shortId} must wear the pack's one Nether fog`
+            );
+            assert.equal(
+                components["minecraft:biome_music"]?.music_definition,
+                "",
+                `${shortId} must switch off the Nether's music rather than leave the component unset`
+            );
+            // Declared rather than left out: unset only removes the vanilla ash and spores when the
+            // engine replaces the vanilla definition, and a zero density stops them either way.
+            assert.equal(
+                components["minecraft:precipitation"]?.ash,
+                0,
+                `${shortId} must declare a zero ash density`
+            );
+            assert.deepEqual(
+                Object.keys(components).sort(),
+                ["minecraft:biome_music", "minecraft:fog_appearance", "minecraft:precipitation"],
+                `${shortId} may declare nothing else: no ambience or atmosphere`
             );
         }
     });
@@ -225,7 +275,8 @@ describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
         // The biome that lost the pixel still renders its own tint, because its client biome file
         // pins it, and the group's pixel keeps the colour of the biome whose climate is nearest.
         for (const name of COLORMAP_TEXTURES) {
-            const colormap = loadColormap(name);
+            // The load is for its own assertions; this case reads the client biome files, not the pixels.
+            loadColormap(name);
             for (const shortId of OVERWORLD_BIOME_IDS) {
                 const [x, y] = biomeSamplePoint(shortId);
                 if (!colormapWrites(name).get(`${x},${y}`).contested.includes(shortId)) {

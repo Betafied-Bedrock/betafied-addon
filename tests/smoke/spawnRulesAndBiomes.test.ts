@@ -172,18 +172,28 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
         assert.equal(melee.reach_multiplier, 0, "Beta creepers chase but do no melee damage");
     });
 
-    it("verifies the pig loot table caps porkchops at Beta's 0-2", () => {
-        const content = JSON.parse(readFileSync(resolve(root, "packs/BP/loot_tables/entities/pig.json"), "utf-8"));
-        const porkchops = (content.pools ?? [])
-            .flatMap((pool: any) => pool.entries ?? [])
-            .filter((entry: any) => entry.name === "minecraft:porkchop");
-        assert.ok(porkchops.length > 0, "pig.json must drop porkchops");
+    it("caps each mob's meat drop at the count Beta's own drop rule rolled", () => {
+        // Beta pays `rand.nextInt(3)` copies of `getDropItemId()` — zero, one or two
+        // (EntityLiving.java:405-413) — and the pig and the pigman each name one meat there
+        // (EntityPig.java:45, EntityPigZombie.java:85). A table capped at one pays half the era's rate.
+        const meats: readonly (readonly [string, string])[] = [
+            ["pig.json", "minecraft:porkchop"],
+            ["zombie_pigman.json", "minecraft:cooked_porkchop"]
+        ];
 
-        for (const entry of porkchops) {
-            const setCount = (entry.functions ?? []).find((f: any) => f.function === "set_count");
-            assert.ok(setCount, "every porkchop entry must declare a set_count");
-            assert.equal(setCount.count.min, 0, "Beta pigs could drop no porkchop at all");
-            assert.equal(setCount.count.max, 2, "Beta pigs never dropped more than two porkchops");
+        for (const [file, item] of meats) {
+            const content = JSON.parse(readFileSync(resolve(root, `packs/BP/loot_tables/entities/${file}`), "utf-8"));
+            const entries = (content.pools ?? [])
+                .flatMap((pool: any) => pool.entries ?? [])
+                .filter((entry: any) => entry.name === item);
+            assert.ok(entries.length > 0, `${file} must drop ${item}`);
+
+            for (const entry of entries) {
+                const setCount = (entry.functions ?? []).find((f: any) => f.function === "set_count");
+                assert.ok(setCount, `every ${item} entry must declare a set_count`);
+                assert.equal(setCount.count.min, 0, "one roll in three paid no meat at all");
+                assert.equal(setCount.count.max, 2, "Beta never paid more than two of one meat");
+            }
         }
     });
 });

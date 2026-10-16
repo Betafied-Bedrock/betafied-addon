@@ -35,7 +35,9 @@ describe("Welcome - the first join's greeting", () => {
 
         assert.equal(player.messagesSent.length, 1);
         assert.match(player.messagesSent[0], /^§e§lWelcome to Betafied!/);
-        assert.match(player.messagesSent[0], /\(v\d+\.\d+\.\d+\)/, "and says which build it runs");
+        // The banner carries the release tag, which drops a zero patch: 5.9.2 and 5.10 are both
+        // shapes a release ships. That the tag is the checkout's own is pinned by the carrier test.
+        assert.match(player.messagesSent[0], /\(v\d+(?:\.\d+)+\)/, "and says which build it runs");
     });
 
     it("greets a session once, however often the spawn event repeats", () => {

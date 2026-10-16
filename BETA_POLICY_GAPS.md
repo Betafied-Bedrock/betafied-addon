@@ -1,10 +1,14 @@
 # Beta policy gaps
 
-Open decisions found while collapsing the three parallel Beta truth tables (`betaRegistry.ts`,
-`normalizer.ts`, `compatibilityPolicy.ts`) into one owner each. Each item below is a place where a
-declared rule and the shipped behaviour disagree. None of them is a bug in the collapse itself —
-they are pre-existing, and they were previously invisible because a test asserted the declared table
-rather than the code path that runs.
+Open decisions left by the three parallel Beta truth tables: `betaRegistry.ts` (the era's id sets),
+`normalizer.ts` (the translations between eras) and `compatibilityPolicy.ts` (policy across addons).
+The ownership map at the top of `betaRegistry.ts` states which module owns which question. Each item
+below is a place where a declared rule and the shipped behaviour disagree, and it names the module
+that has to decide it — with one owner per table, a gap is the residue of the split rather than a
+rule nobody ever implemented.
+
+Most of them were invisible because a test asserted the declared table rather than the code path that
+runs.
 
 Deciding an item means picking one of:
 
@@ -1013,6 +1017,100 @@ Still open:
 - **Whether the four-cell read matches a blocked move.** Beta tested the boat's own box against the block's,
   which is why a boat sliding along a wall it already touched counted as blocked. The read here is
   centre-plus-one in each of the four directions, so a wall the box is not touching reads as shoreline too.
+
+## 24. Resolved: the Bedrock spellings of six era blocks live in the registry
+
+`chunkScrubber` kept a private list of legacy Bedrock spellings (`minecraft:deadbush`,
+`minecraft:web`, `minecraft:mob_spawner`, the two repeater ids, `minecraft:stone_block_slab`) beside
+`BETA_BLOCK_IDS`. The scrubber's filter read that list, so the block survived, while the drop
+boundary read `betaRegistry` alone and deleted the item the block pays — the era's dead bush and
+cobweb came through as blocks and vanished as drops. Both spellings now sit in `BETA_BLOCK_IDS`, the
+one set `isBetaBlock`, `isBetaItem` and the scrubber's untouched filter all read.
+
+## 25. Generated chests are deleted by the sweep while the id stays authentic to the drop boundary
+
+A structure chest carries loot from the Nether Update, and the chest this pack hands a player is
+`bh:chest`, so a `minecraft:chest` in the world is always a generated one. `minecraft:chest` still reads
+as authentic Beta terrain in `BETA_BLOCK_IDS` — the drop boundary needs the item the block pays, and the
+id is the era's own — while `chunkScrubber` deletes the block. The two stances cannot be folded into one
+table: the untouched-terrain filter excludes everything in `BETA_BLOCK_IDS`, so "preserve this block" and
+"delete this block" cannot both be expressed there. The chest pass reads the filtered volume directly
+instead, and deletes rather than retypes onto `bh:chest`, because a retype would open the pack's
+container screen over the structure's loot.
+
+The ring the sweep walks went from one chunk to two for the same reason: the chest sits at the portal,
+which is usually in the chunk past the old ring, so the loot stayed until the player walked into it.
+
+**Still open:** the sweep is Nether-only, so a loot chest in the pre-generated Overworld template, or in
+the Overworld terrain the engine generates beyond it, survives. Whether the Overworld should run this
+pass on its own, without the rest of the sweep, is undecided.
+
+## 26. The Nether's client biomes are claimed here, and what they replace is not unambiguous
+
+Since base game 1.21.40 a pack's client biome file owns a biome's fog, ambient sounds, music and airborne
+particles, and `biomes_client.json` is the pre-1.21.40 route. The pack emitted client biomes for the
+Overworld only, so vanilla's five Nether client biomes stayed in charge of the Nether: the biome fogs,
+the ambient loops, the Nether's music and the ash and spore precipitation. All five are emitted now, each
+with the era's one fog, a zero precipitation density and an empty music definition, and every Nether
+ambient definition is blanked in `packs/RP/sounds/sound_definitions.json` the way `ambient.nether_wastes`
+already was.
+
+**Still open:** whether a client biome file replaces the vanilla definition for its biome or merges into
+it. Fog, music and precipitation are declared, so they land either way, and the loops are blanked in the
+sound definitions as well, so they are silent either way. What the answer decides is the Vibrant Visuals
+set — `minecraft:atmosphere_identifier` and `minecraft:lighting_identifier` — which the pack's Overworld
+files also leave to vanilla. If the engine merges, every Overworld biome keeps vanilla's atmospherics
+too, and the two dimensions need the same decision.
+
+## 27. Resolved: three era blocks were missing from the registry, so the sweep erased them
+
+`BETA_BLOCK_IDS` is the one set `isBetaBlock`, `isBetaItem` and the scrubber's untouched filter all
+read, so an era block the set omits is **deleted** from the Nether instead of preserved: the filter
+yields it as modern terrain and the fine pass clears it. Three had been left out, and all
+three share the shape that makes an omission invisible — no item form, and no other table in the pack
+that names the id. `minecraft:portal` (block 90), `minecraft:fire` (51) and `minecraft:farmland` (60).
+
+A lit portal died with its obsidian frame still standing, because `minecraft:obsidian` was in the set
+all along. That is the reported symptom: not missing blocks, a dead portal.
+
+All three are in the set now, and `tests/integration/chunkScrubberRemoval.test.ts` pins each one
+through `scrubFineDetails` rather than asserting the table. **Still open, and the reason this was
+reachable:** the set is hand-maintained against the era's own block list, and an id has a second line
+of defence only when something else in the pack also names it. Making the fine pass leave an
+unrecognised non-air block alone would close the class; that reverses the sweep's default from
+delete to keep, so it needs a decision.
+
+## 28. Post-Beta blocks render as vanilla again; the mask that hid them is gone
+
+The pack used to hide a post-Beta block rather than leave it to the engine: `terrain_texture.json`
+pointed **131 atlas tiles** at the transparent `textures/blocks/invisible.png`, and `blocks.json` gave
+**16 blocks** `blockshape: "invisible"` — firefly bush, leaf litter, the four double plants, vines,
+kelp, seagrass, campfire, both lanterns, soul fire, spore blossom, cactus flower and bubble column.
+Vanilla masks nothing, so both mechanisms were the pack's own, and nothing but the smoke test's
+allowlist said so.
+
+Two of them also could not work. The engine animates the **atlas tile**, not the JSON entry, so
+vanilla's own `flipbook_textures.json` repaints a masked tile from its source file: it drives
+`atlas_index 1` of the `firefly_bush` entry from `textures/blocks/firefly_bush_firefly`, which is why
+the masked bush still had animated fireflies on it. That is the same class of defect as the pack's own
+two fire entries, which fed vanilla's fire frames to the **soul fire** tiles.
+
+Decided and implemented: the masking is gone. **105** tiles resolve to their real art again — vanilla's
+own declaration where the corpus has one, otherwise the texture file the pack ships — and the **16**
+block definitions carry vanilla's entry plus the pack's `isotropic: false` convention. **26** shadow
+entries were dropped outright, all legacy shortnames with no art under their own name (`kelp`,
+`tall_seagrass_*`, `double_plant_*`, the per-wood `*_leaf_litter`): vanilla's atlas or the engine's own
+fallback resolves those, and an entry that can only ever resolve to the sentinel is worse than none.
+The pack's two flipbook entries animate the fire tiles they are named for.
+`tests/smoke/maskedBlocks.test.ts` now asserts the inverse of what it used to: no block definition and
+no atlas entry may reach the sentinel, and no flipbook may paint a tile with another tile's frames.
+
+**Still open, and it is the reason the masks existed:** nothing else hides modern decoration, so the
+pre-generated Overworld template (§7) now shows its own plants — firefly bushes, leaf litter, coral,
+kelp — as vanilla art, in a world that is otherwise the era's. Hiding them again means removing them
+**in the world**, which for the Overworld is generation or a wider sweep, never a masked tile. Both
+halves need an in-game look: the atlas cannot be compiled offline, so no test here can show that a
+restored tile actually draws.
 
 ## Why this file exists
 

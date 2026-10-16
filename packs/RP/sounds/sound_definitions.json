@@ -1,6 +1,24 @@
 {
     "format_version": "1.20.20",
     "sound_definitions": {
+        "ambient.basalt_deltas.additions": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.basalt_deltas.loop": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.basalt_deltas.mood": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
         "ambient.cave": {
             "category": "ambient",
             "max_distance": null,
@@ -21,6 +39,24 @@
                 "sounds/cave/cave13"
             ]
         },
+        "ambient.crimson_forest.additions": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.crimson_forest.loop": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.crimson_forest.mood": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
         "ambient.nether_wastes.additions": {
             "category": "ambient",
             "max_distance": null,
@@ -39,6 +75,24 @@
             "min_distance": null,
             "sounds": []
         },
+        "ambient.soulsand_valley.additions": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.soulsand_valley.loop": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.soulsand_valley.mood": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
         "ambient.underwater.enter": {
             "category": "player",
             "max_distance": null,
@@ -47,6 +101,24 @@
         },
         "ambient.underwater.exit": {
             "category": "player",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.warped_forest.additions": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.warped_forest.loop": {
+            "category": "ambient",
+            "max_distance": null,
+            "min_distance": null,
+            "sounds": []
+        },
+        "ambient.warped_forest.mood": {
+            "category": "ambient",
             "max_distance": null,
             "min_distance": null,
             "sounds": []

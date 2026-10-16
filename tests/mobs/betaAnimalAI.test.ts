@@ -160,6 +160,32 @@ describe("Beta Animal AI - Hop Triggers", () => {
         });
     });
 
+    it("stops at the water answer instead of asking the questions a dry animal asks", () => {
+        const wadingCow = {
+            id: "cow_wading",
+            typeId: "minecraft:cow",
+            isValid: true,
+            location: { x: 10.5, y: 63, z: 10.5 },
+            getViewDirection: () => ({ x: 1, y: 0, z: 0 })
+        };
+        const wadingField = {
+            getBlock: (loc: { x: number }) => loc.x === 10
+                ? { isSolid: false, isLiquid: true, typeId: "minecraft:water" }
+                : { isSolid: true, isLiquid: false, typeId: "minecraft:stone" },
+            getEntities: () => []
+        };
+
+        // 0.8 is above the water chance (0.70) and below the obstacle chance (0.85), so a true answer
+        // here could only come from consulting the block ahead: the water roll is what decides.
+        withFixedRoll(0.8, () => {
+            assert.equal(
+                evaluateHopConditions(wadingCow as any, wadingField as any),
+                false,
+                "the water roll is the answer, and does not hand the hop to the block ahead"
+            );
+        });
+    });
+
     it("applies an upward and forward impulse when the hop runs", () => {
         let appliedImpulse: { x: number; y: number; z: number } | null = null;
         const mob = {

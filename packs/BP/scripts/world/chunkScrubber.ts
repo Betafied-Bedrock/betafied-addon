@@ -10,7 +10,9 @@ import { NETHER_ID } from "../policy/betaConstants.js";
 const SCRUB_DUE_AT = new Map<string, number>();
 const MAX_TRACKED_CHUNKS = 8192;
 const CHUNKS_PER_TICK_LIMIT = 1;
-const SCRUB_RADIUS = 1;
+// A ruined portal is the one vanilla structure the Nether still generates, and its chest sits at the
+// portal: a single chunk of ring left the loot in the next chunk over until the player walked into it.
+const SCRUB_RADIUS = 2;
 
 function buildNeighbourhood(): (readonly [number, number])[] {
     const offsets: [number, number][] = [];
@@ -30,6 +32,9 @@ const BAND_HEIGHT = 128;
 const CHUNK_SIZE = 16;
 const REVERIFY_INTERVAL_TICKS = 2400;
 const REVERIFY_SPREAD_TICKS = 600;
+// One read batch is one tick's slice of the fine pass: it ends in a yield, and the band is asked
+// whether anything unclassified is left once it has classified a type.
+const FINE_READ_BATCH = 512;
 
 function reverifyOffset(key: string): number {
     let hash = 0;
@@ -43,7 +48,7 @@ function reverifyOffset(key: string): number {
  * Filter for authentic Beta blocks preserved by fine pass volume queries. Only air is added here: the
  * registry already carries the era's ids in every spelling the engine answers to.
  */
-function buildUntouchedFilter(): BlockFilter {
+function buildUntouchedTypes(): string[] {
     const excludeTypes: string[] = [];
     const candidates = new Set<string>([
         "minecraft:air",
@@ -59,10 +64,12 @@ function buildUntouchedFilter(): BlockFilter {
         }
     }
 
-    return Object.freeze({ excludeTypes });
+    return excludeTypes;
 }
 
-const UNTOUCHED_FILTER: BlockFilter = buildUntouchedFilter();
+const UNTOUCHED_TYPES: string[] = buildUntouchedTypes();
+
+const UNTOUCHED_FILTER: BlockFilter = Object.freeze({ excludeTypes: UNTOUCHED_TYPES });
 
 const PLANKS_TARGET = BLOCK_BULK_REPLACEMENTS.find(([target]) => target.endsWith("_planks"))?.[1] ?? "minecraft:planks";
 
@@ -167,61 +174,45 @@ function fill(dim: Dimension, x1: number, y1: number, z1: number, x2: number, y2
     }
 }
 
-const PERM_CACHE = new Map<string, BlockPermutation | null>();
-function getPermutation(typeId: string): BlockPermutation | null {
-    if (PERM_CACHE.has(typeId)) return PERM_CACHE.get(typeId) ?? null;
-    try {
-        const perm = BlockPermutation.resolve(typeId);
-        PERM_CACHE.set(typeId, perm);
-        return perm;
-    } catch {
-        PERM_CACHE.set(typeId, null);
-        return null;
-    }
+/**
+ * What one block type becomes, from its id alone. The consolidated Bedrock planks block is the one
+ * exception: its wood species lives in a block state, and a fill sets a type without touching states,
+ * so it keeps the per-block path. Every other id answers for itself, which is what lets a whole type
+ * be written by one filtered fill instead of one write per block.
+ */
+const PLANKS_RETYPE = "planks:retype";
+
+/** A target a fill can write, unless it is the consolidated planks block a fill cannot restate. */
+function toFillTarget(target: string): string {
+    return target === PLANKS_TARGET ? PLANKS_RETYPE : target;
 }
 
-function applyReplacement(block: Block, targetId: string): void {
-    if (targetId === "minecraft:air") {
-        block.setType("minecraft:air");
-        return;
-    }
-    if (targetId === "minecraft:water") {
-        block.setType("minecraft:water");
-        return;
-    }
-    const permutation = getPermutation(targetId);
-    if (permutation) {
-        block.setPermutation(permutation);
-    }
-}
-
-function applyFineScrub(block: Block): void {
-    let typeId = block.typeId;
+function fineTargetOf(typeId: string): string | undefined {
+    if (typeId === PLANKS_TARGET) return PLANKS_RETYPE;
 
     const bulkTarget = BULK_BY_TARGET.get(typeId);
-    if (bulkTarget !== undefined) {
-        applyReplacement(block, bulkTarget);
-        if (bulkTarget !== "minecraft:planks") return;
-        typeId = bulkTarget;
-    }
-
-    if (typeId === "minecraft:planks") {
-        if (block.permutation.getState("wood_type") !== "oak") {
-            block.setPermutation(BlockPermutation.resolve("minecraft:planks").withState("wood_type", "oak"));
-        }
-        return;
-    }
+    if (bulkTarget !== undefined) return toFillTarget(bulkTarget);
 
     const fineTarget = BLOCK_FINE_REPLACEMENTS[typeId];
-    const blockNorm = fineTarget === undefined
-        ? normalizeBlock(typeId)
-        : { action: "convert" as const, targetId: fineTarget };
+    if (fineTarget !== undefined) return toFillTarget(fineTarget);
 
-    if (blockNorm.action === "convert") {
-        applyReplacement(block, blockNorm.targetId);
-    } else if (blockNorm.action === "remove") {
-        block.setType("minecraft:air");
-    }
+    const norm = normalizeBlock(typeId);
+    if (norm.action === "convert") return toFillTarget(norm.targetId);
+    return norm.action === "remove" ? "minecraft:air" : undefined;
+}
+
+function retypePlanks(block: Block): void {
+    if (block.permutation.getState("wood_type") === "oak") return;
+    block.setPermutation(BlockPermutation.resolve(PLANKS_TARGET).withState("wood_type", "oak"));
+}
+
+/**
+ * The types a band's read batch has already classified, so the volume can be asked whether anything
+ * it would still return is of a type no fill covers yet. A refused query falls back to `true`, which
+ * keeps the answer on the conservative side: keep reading.
+ */
+function unclassifiedFilter(classified: ReadonlyMap<string, string>): BlockFilter {
+    return { excludeTypes: [...UNTOUCHED_TYPES, ...classified.keys()] };
 }
 
 function containsBlocksIn(dimension: Dimension, volume: BlockVolume, filter: BlockFilter): boolean {
@@ -262,9 +253,29 @@ function runBulkReplacements(dimension: Dimension, volume: BlockVolume, cx: numb
     }
 }
 
+/**
+ * A structure chest carries loot the era never had, and the chest the pack gives a player is
+ * `bh:chest`, so a `minecraft:chest` in the world is always a generated one. It is deleted rather
+ * than retyped: opening it would run the pack's container screen over the structure's own loot. The
+ * id stays in `BETA_BLOCK_IDS` for the drop boundary, so this cannot live in the compatibility
+ * tables — which is also what keeps the untouched-terrain filter from preserving it as Beta terrain.
+ */
+const GENERATED_CHEST_FILTER: BlockFilter = Object.freeze({ includeTypes: ["minecraft:chest"] });
+
+function clearGeneratedChests(dimension: Dimension, volume: BlockVolume, x1: number, bandBottom: number, z1: number, bandTop: number): void {
+    if (!containsBlocksIn(dimension, volume, GENERATED_CHEST_FILTER)) return;
+    fill(dimension, x1, bandBottom, z1, x1 + CHUNK_SIZE - 1, bandTop, z1 + CHUNK_SIZE - 1, "minecraft:air", GENERATED_CHEST_FILTER);
+}
+
 // Dimension.getBlocks may throw unhandled native errors on certain engine builds; latch to avoid log spam.
 let fineQueryRefusalReported = false;
 
+/**
+ * The pass the tables did not claim: what the bulk replacements leave behind, classified by id. A type
+ * is written once for the whole band rather than once per block, and an id that answers for itself stops
+ * being read as soon as the band holds nothing else - the old shape paid one native read and one native
+ * write per block, which is thousands of calls for a chunk made of one modern rock type.
+ */
 export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number): Generator<void, boolean, unknown> {
     const { min: yMin, max: yMax } = dimension.heightRange;
     const x1 = cx * CHUNK_SIZE;
@@ -282,6 +293,7 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
         const volume = new BlockVolume({ x: x1, y, z: z1 }, { x: x1 + CHUNK_SIZE - 1, y: bandTop, z: z1 + CHUNK_SIZE - 1 });
 
         runBulkReplacements(dimension, volume, cx, cz, y, bandTop);
+        clearGeneratedChests(dimension, volume, x1, y, z1, bandTop);
 
         let matches: BlockLocationIterator | null = null;
         try {
@@ -303,22 +315,59 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
         }
 
         if (matches !== null) {
-            let inspected = 0;
+            const classified = new Map<string, string>();
+
             try {
-                for (const location of matches) {
-                    try {
-                        const block = dimension.getBlock(location);
-                        if (block) applyFineScrub(block);
-                    } catch (error) {
-                        refusedBlocks++;
-                        firstError ??= error;
+                const locations = matches[Symbol.iterator]();
+                let exhausted = false;
+
+                while (!exhausted) {
+                    let classifiedAnything = false;
+                    let reads = 0;
+
+                    while (reads < FINE_READ_BATCH) {
+                        const next = locations.next();
+                        if (next.done) {
+                            exhausted = true;
+                            break;
+                        }
+                        reads++;
+
+                        try {
+                            const block = dimension.getBlock(next.value);
+                            if (block) {
+                                const target = fineTargetOf(block.typeId);
+                                if (target === PLANKS_RETYPE) {
+                                    retypePlanks(block);
+                                } else if (target !== undefined && !classified.has(block.typeId)) {
+                                    classified.set(block.typeId, target);
+                                    classifiedAnything = true;
+                                }
+                            }
+                        } catch (error) {
+                            refusedBlocks++;
+                            firstError ??= error;
+                        }
                     }
 
-                    if (++inspected % 512 === 0) yield;
+                    // A batch that ran the band out is followed by the band's own yield, so yielding here
+                    // too would spend a whole tick on nothing.
+                    if (reads > 0 && !exhausted) yield;
+
+                    // A batch that classified nothing new cannot end the pass, so probing here would buy
+                    // a whole-volume scan to learn what the batch already said. When it does end the
+                    // pass, every block left unread in the band is of a type already covered by a fill.
+                    if (classifiedAnything && !exhausted && !containsBlocksIn(dimension, volume, unclassifiedFilter(classified))) {
+                        exhausted = true;
+                    }
                 }
             } catch (error) {
                 refusedReads++;
                 firstError ??= error;
+            }
+
+            for (const [typeId, target] of classified) {
+                fill(dimension, x1, y, z1, x1 + CHUNK_SIZE - 1, bandTop, z1 + CHUNK_SIZE - 1, target, { includeTypes: [typeId] });
             }
         }
 

@@ -1,4 +1,4 @@
-import { world, system, Entity, Player, ItemStack, EntityComponentTypes, Dimension } from "@minecraft/server";
+import { world, system, Entity, Player, ItemStack, EntityComponentTypes, Dimension, Vector3 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
@@ -69,9 +69,12 @@ eventBus.onEntityHurt((ev) => {
     }
 });
 
-export function evaluateHopConditions(entity: Entity, dimension: Dimension): boolean {
-    const loc = entity.location;
-
+/**
+ * The water question — the one probe whose answer is final either way. `undefined` says the question
+ * does not apply to this cell (no water to stand in, or a cell that could not be read) and leaves the
+ * decision to the probe that follows.
+ */
+function hopsFromWater(dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const currentBlock = dimension.getBlock({
             x: Math.floor(loc.x),
@@ -87,6 +90,14 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
         // to the checks below, so reporting it would log normal wandering as an error.
     }
 
+    return undefined;
+}
+
+/**
+ * Whether the cell the animal is facing is solid, fenced or walled. The era's animal hops on a winning
+ * roll and simply carries on asking on a losing one, so only a win is this probe's answer.
+ */
+function hopsFromObstacle(entity: Entity, dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const viewDir = entity.getViewDirection();
         const checkX = Math.floor(loc.x + viewDir.x * 0.9);
@@ -101,12 +112,21 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             if (Math.random() < CONFIG.OBSTACLE_HOP_CHANCE) {
                 return true;
             }
+            // A losing roll here is not an answer: the crowd question is still the animal's to ask.
         }
     } catch {
         // Same read, same expected throw: an unloaded obstacle cell is a cell with no obstacle in it,
         // so the animal keeps its chance of a plain wander hop rather than losing the whole decision.
     }
 
+    return undefined;
+}
+
+/**
+ * Whether the passive animals standing around this one are close enough to decide a hop. As with the
+ * obstacle, a losing roll leaves the question to the plain wander chance below it.
+ */
+function hopsFromCrowd(entity: Entity, dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const nearby = dimension.getEntities({
             location: loc,
@@ -132,6 +152,28 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             reportError({ system: "betaAnimalAI", operation: "countCrowdNeighbours", target: entity.id }, err);
         }
     }
+
+    return undefined;
+}
+
+/**
+ * The order the era's animal asks its questions in: the water it stands in, then the cell it faces,
+ * then the crowd around it, and last a plain wander chance. Each probe answers `undefined` for a
+ * question that does not apply here, which is why the answers are compared rather than chained with
+ * `||`: the water answer is final either way, so a water animal that rolls low does not then get to
+ * roll again for the obstacle it is facing.
+ */
+export function evaluateHopConditions(entity: Entity, dimension: Dimension): boolean {
+    const loc = entity.location;
+
+    const inWater = hopsFromWater(dimension, loc);
+    if (inWater !== undefined) return inWater;
+
+    const facingObstacle = hopsFromObstacle(entity, dimension, loc);
+    if (facingObstacle !== undefined) return facingObstacle;
+
+    const inCrowd = hopsFromCrowd(entity, dimension, loc);
+    if (inCrowd !== undefined) return inCrowd;
 
     return Math.random() < CONFIG.WANDER_HOP_CHANCE;
 }

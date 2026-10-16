@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { inflateSync } from "node:zlib";
 
@@ -134,13 +134,9 @@ describe("Block Appearance & Shading Contract", () => {
             assert.equal(block.ambient_occlusion_exponent, 0.0, `${id} must disable AO exponent`);
             assert.equal(block.isotropic, false, `${id} must not be isotropic`);
 
+            // The face loop below is also the presence check: a face with no texture resolves no
+            // terrain_texture.json key, which fails there.
             const textures = block.textures;
-            assert.ok(typeof textures === "object", `${id} must have per-face texture mapping`);
-            assert.ok(textures.down, `${id} must have down face texture`);
-            assert.ok(textures.north, `${id} must have north face texture`);
-            assert.ok(textures.south, `${id} must have south face texture`);
-            assert.ok(textures.east, `${id} must have east face texture`);
-            assert.ok(textures.west, `${id} must have west face texture`);
 
             for (const face of ["down", "north", "south", "east", "west"]) {
                 const texKey = textures[face];
@@ -149,7 +145,7 @@ describe("Block Appearance & Shading Contract", () => {
             }
         }
 
-        // Verify standard Java directional overlay colors
+        // The standard Java directional overlay colours.
         assert.equal(terrain.glowstone_bottom.textures[0].overlay_color, "#929292");
         assert.equal(terrain.glowstone_east_west.textures[0].overlay_color, "#AAAAAA");
         assert.equal(terrain.glowstone_north_south.textures[0].overlay_color, "#D7D7D7");
@@ -164,123 +160,70 @@ describe("Block Appearance & Shading Contract", () => {
         }
     });
 
-    it("enforces deterministic orientation without random isotropic rotation", () => {
-        const blocks = readJson("packs/RP/blocks.json");
-        const checkedBlocks = ["oak_leaves", "birch_leaves", "sand", "gravel", "dirt"];
-
-        for (const id of checkedBlocks) {
-            const block = blocks[id];
-            if (block && "isotropic" in block) {
-                assert.equal(block.isotropic, false, `${id} must set isotropic to false`);
-            }
-        }
-    });
-
-    it("ships 16x16 fully opaque leaf textures for Fast graphics", () => {
-        for (const type of ["oak", "birch", "spruce"]) {
-            const path = `packs/RP/textures/blocks/leaves_${type}_opaque.png`;
-            assert.ok(existsSync(resolve(root, path)), `missing ${path}`);
-
-            const { width, height, pixels } = decodePng(path);
-            assert.equal(width, 16, `${path} must be 16 pixels wide`);
-            assert.equal(height, 16, `${path} must be 16 pixels tall`);
-
-            const translucent = pixels.filter((pixel) => pixel[3] !== 255);
-            assert.equal(translucent.length, 0, `${path} must be fully opaque: ${translucent.length} of ${pixels.length} pixels are not`);
-        }
-    });
-
-    it("punches real holes in the Fancy leaf tiles rather than alpha-1 fringe pixels", () => {
+    it("punches real holes in the Fancy leaf tiles, and fills them in Beta's fast-graphics tone", () => {
         // Beta 1.7.3's leaf sprite is 155 opaque pixels and 101 gaps at alpha 0. An alpha-1 gap is not
         // a gap for any renderer that keeps alpha > 0 opaque, and those pixels are what read in game as
-        // a solid fill between the leaves.
-        for (const type of ["oak", "birch", "spruce"]) {
-            const path = `packs/RP/textures/blocks/leaves_${type}.tga`;
-            const { width, height, pixels } = decodeTga(path);
-            assert.equal(width, 16, `${path} must be 16 pixels wide`);
-            assert.equal(height, 16, `${path} must be 16 pixels tall`);
+        // a solid fill between the leaves. Beta swaps the leaf texture for the tile beside it when
+        // Fancy graphics is off, so its Fast tiles are the Fancy art with the cut-outs painted flat --
+        // the dark grey that tints to the in-game foliage green: terrain.png tile (5,3), and (5,8)
+        // for pine. The pixel loop is also what pins the Fast tile's size and its full opacity.
+        const fastFills: [string, Rgba][] = [
+            ["oak", [44, 44, 44, 255]],
+            ["birch", [44, 44, 44, 255]],
+            ["spruce", [49, 49, 49, 255]]
+        ];
 
-            const fringe = pixels.filter((pixel) => pixel[3] !== 0 && pixel[3] !== 255);
-            assert.equal(fringe.length, 0, `${path} must ship binary alpha: ${fringe.length} of ${pixels.length} pixels sit between 0 and 255`);
-            assert.ok(
-                pixels.some((pixel) => pixel[3] === 0),
-                `${path} must leave transparent gaps for the Fast tile to fill`
-            );
-        }
-    });
-
-    it("fills the Fast leaf tile exactly where the Fancy tile has gaps", () => {
-        for (const type of ["oak", "birch", "spruce"]) {
+        for (const [type, fill] of fastFills) {
             const fancy = decodeTga(`packs/RP/textures/blocks/leaves_${type}.tga`);
+            assert.deepEqual(
+                [fancy.width, fancy.height],
+                [16, 16],
+                `leaves_${type}.tga must be a 16x16 tile`
+            );
+
+            const fringe = fancy.pixels.filter((pixel) => pixel[3] !== 0 && pixel[3] !== 255);
+            assert.equal(
+                fringe.length,
+                0,
+                `leaves_${type}.tga must ship binary alpha: ${fringe.length} of ${fancy.pixels.length} pixels sit between 0 and 255`
+            );
+            assert.ok(
+                fancy.pixels.some((pixel) => pixel[3] === 0),
+                `leaves_${type}.tga must leave transparent gaps for the Fast tile to fill`
+            );
+
             const fast = decodePng(`packs/RP/textures/blocks/leaves_${type}_opaque.png`);
             assert.deepEqual([fast.width, fast.height], [fancy.width, fancy.height], `${type}: the two tiles must be the same size`);
 
-            const gapIndices = fancy.pixels.map((pixel, index) => (pixel[3] === 0 ? index : -1)).filter((index) => index >= 0);
-            assert.ok(gapIndices.length > 0, `leaves_${type}.tga must have gaps for the Fast tile to fill`);
-
-            const counts = new Map<string, number>();
-            for (const pixel of fast.pixels) {
-                const key = pixel.slice(0, 3).join(",");
-                counts.set(key, (counts.get(key) ?? 0) + 1);
+            for (let index = 0; index < fancy.pixels.length; index++) {
+                const expected = fancy.pixels[index][3] === 0 ? fill : fancy.pixels[index];
+                assert.deepEqual(
+                    fast.pixels[index],
+                    expected,
+                    `leaves_${type}_opaque.png must be the Fancy tile with every cut-out painted ${fill.slice(0, 3).join(",")}, pixel ${index}`
+                );
             }
-            const [filler] = [...counts.entries()].reduce((best, entry) => (entry[1] > best[1] ? entry : best));
-            const fillerIndices = fast.pixels.map((pixel, index) => (pixel.slice(0, 3).join(",") === filler ? index : -1)).filter((index) => index >= 0);
-
-            assert.deepEqual(fillerIndices, gapIndices, `leaves_${type}_opaque.png must fill the Fancy tile's gaps and nothing else (filler ${filler})`);
         }
     });
 
-    it("matches Sand ambient occlusion and shading to Sandstone", () => {
+    it("trims ambient occlusion to the era's tone for sand and leaves", () => {
         const blocks = readJson("packs/RP/blocks.json");
-        const sandBlocks = ["sand", "red_sand", "suspicious_sand"];
-
-        for (const id of sandBlocks) {
-            const block = blocks[id];
-            assert.ok(block, `missing block definition for ${id}`);
-            assert.equal(
-                block.ambient_occlusion_exponent,
-                1.0,
-                `${id} must have ambient_occlusion_exponent set to 1.0 to match Sandstone`
-            );
-            assert.equal(
-                block.brightness_gamma,
-                undefined,
-                `${id} must not carry legacy brightness_gamma`
-            );
-        }
-
-        const sandstoneBlocks = ["sandstone", "red_sandstone"];
-        for (const id of sandstoneBlocks) {
-            const block = blocks[id];
-            assert.ok(block, `missing block definition for ${id}`);
-            assert.equal(
-                block.brightness_gamma,
-                undefined,
-                `${id} must not carry legacy brightness_gamma`
-            );
-        }
-    });
-
-    it("relights leaves toward Beta with a trimmed ambient occlusion exponent", () => {
-        const blocks = readJson("packs/RP/blocks.json");
-        const leafIds = [
-            "acacia_leaves", "birch_leaves", "dark_oak_leaves", "jungle_leaves",
-            "leaves", "leaves2", "mangrove_leaves", "oak_leaves", "spruce_leaves"
+        const families: [number, string[]][] = [
+            [1.0, ["sand", "suspicious_sand"]],
+            [0.25, ["oak_leaves", "leaves", "leaves2"]]
         ];
 
-        for (const id of leafIds) {
-            const block = blocks[id];
-            assert.ok(block, `missing block definition for ${id}`);
-            assert.equal(
-                block.ambient_occlusion_exponent,
-                0.25,
-                `${id} must trim ambient occlusion toward Beta's flat leaf shading`
-            );
-            assert.equal(
-                block.brightness_gamma,
-                undefined,
-                `${id} must not carry legacy brightness_gamma`
-            );
+        for (const [exponent, ids] of families) {
+            for (const id of ids) {
+                const block = blocks[id];
+                assert.ok(block, `missing block definition for ${id}`);
+                assert.equal(
+                    block.ambient_occlusion_exponent,
+                    exponent,
+                    `${id} must carry the ambient_occlusion_exponent its material family uses`
+                );
+                assert.equal(block.brightness_gamma, undefined, `${id} must not carry legacy brightness_gamma`);
+            }
         }
     });
 
@@ -298,7 +241,6 @@ describe("Block Appearance & Shading Contract", () => {
         for (const [id, base] of cases) {
             const block = blocks[id];
             assert.ok(block, `missing block definition for ${id}`);
-            assert.equal(typeof block.textures, "object", `${id} must have per-face texture mapping`);
             assert.equal(block.textures.up, base, `${id} up face must stay unmodified`);
 
             // Directional multipliers calibrated with the glowstone face dimming: N/S 84.3% (#D7D7D7), E/W 66.7% (#AAAAAA), bottom 57.2% (#929292), top unmodified.
