@@ -33,8 +33,10 @@ export const PASSIVE_MOBS = Object.freeze(new Set([
 export const WOOL_DROP_MIN = 1;
 export const WOOL_DROP_MAX = 3;
 
-export const hurtCooldowns = new Map<string, number>();
-export const jumpCooldowns = new Map<string, number>();
+// The cooldown maps are this module's own bookkeeping: every read and write is below, so neither
+// has an importer and neither needs to be part of the module's surface.
+const hurtCooldowns = new Map<string, number>();
+const jumpCooldowns = new Map<string, number>();
 
 export function shearPunchedSheep(sheep: Entity): void {
     if (!sheep.isValid) return;
@@ -80,7 +82,9 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             return Math.random() < CONFIG.WATER_HOP_CHANCE;
         }
     } catch {
-        // Block coordinate unloaded or out of dimension bounds
+        // This runs per animal per pass, and a cell outside the loaded range is the ordinary case at the
+        // edge of a group: the water test simply has no answer for that cell and the hop falls through
+        // to the checks below, so reporting it would log normal wandering as an error.
     }
 
     try {
@@ -99,7 +103,8 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             }
         }
     } catch {
-        // The obstacle cell sits outside the loaded range, which is a cell with no obstacle in it.
+        // Same read, same expected throw: an unloaded obstacle cell is a cell with no obstacle in it,
+        // so the animal keeps its chance of a plain wander hop rather than losing the whole decision.
     }
 
     try {

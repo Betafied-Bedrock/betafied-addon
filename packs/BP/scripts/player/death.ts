@@ -11,7 +11,6 @@ import {
 import type { DimensionLocation, Vector3 } from "@minecraft/server";
 import { OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
-import { damageArmor } from "../combat/armor.js";
 import { eventBus } from "../core/eventBus.js";
 import { teleportQuietly } from "../core/quietTeleport.js";
 import { tickManager } from "../core/tickManager.js";
@@ -151,6 +150,14 @@ function puffDeathCorpse(player: Player): void {
     }
 }
 
+/** The corpse puff, on the tick the era removed the body; the player can respawn inside the delay. */
+function puffCorpseAfterFlop(player: Player): void {
+    if (!player.isValid || !isDead(player)) return;
+    runCatching({ system: "death", operation: "puffDeathCorpse", target: player.name }, () => {
+        puffDeathCorpse(player);
+    });
+}
+
 /**
  * `RenderLiving.rotateCorpse` turns a corpse `getDeathMaxRotation` degrees about Z over its first ~0.7s
  * (`RenderLiving.java:120-132`; 90 for a player, which `RenderPlayer` does not override for a dead one).
@@ -162,12 +169,7 @@ function playDeathFlop(player: Player): void {
         player.playAnimation(DEATH_FLOP_ANIMATION);
     });
 
-    system.runTimeout(() => {
-        if (!player.isValid || !isDead(player)) return;
-        runCatching({ system: "death", operation: "puffDeathCorpse", target: player.name }, () => {
-            puffDeathCorpse(player);
-        });
-    }, DEATH_PUFF_DELAY_TICKS);
+    system.runTimeout(() => puffCorpseAfterFlop(player), DEATH_PUFF_DELAY_TICKS);
 }
 
 function standCorpseBackUp(player: Player): void {
@@ -190,7 +192,6 @@ export function enterDeathState(player: Player): void {
         showDeathScreen(player, DEATH_SCREEN_HANDLERS);
         playDeathFlop(player);
 
-        damageArmor(player);
         dropMainInventory(player);
         dropWornEquipment(player);
     } catch (e) {

@@ -53,9 +53,9 @@ export interface PairSession {
  *   the per-tick sweep budget live.
  * - Viewer counts move only through `openPair` (add), `closePair` (remove) and `releaseViewer`
  *   (a player left), so a new event path cannot reproduce the bookkeeping by hand and get it wrong.
- * - The decision rule itself is pure and lives in `chestPairing.ts`; this file is what applies it.
+ * - The sessions themselves are private; the schedule shares only `sweepBatches`, its cadence.
  */
-export const sessions = new Map<string, PairSession>();
+const sessions = new Map<string, PairSession>();
 
 /** How a mirror attempt ended: nothing to do, moved a count, or unreadable and left for a retry. */
 export type MirrorOutcome = { kind: "none" } | { kind: "moved"; count: number } | { kind: "unreadable" };
@@ -258,15 +258,27 @@ function sweepSession(key: string, session: PairSession): void {
     dropIfIdle(session, key, applyMove(planSweep(input), session));
 }
 
-export function* sweepPairsJob(): Generator<void, void, unknown> {
+/**
+ * The sweep's per-tick budget, over whatever collection of sessions it is handed. The cadence is the
+ * part of the schedule a caller can hold on its own: `sweepPairsJob` supplies this module's sessions
+ * and the default step, and the map stays unreachable.
+ */
+export function* sweepBatches(
+    entries: Iterable<readonly [string, PairSession]>,
+    step: (key: string, session: PairSession) => void = sweepSession
+): Generator<void, void, unknown> {
     let processed = 0;
 
-    for (const [key, session] of sessions) {
-        sweepSession(key, session);
+    for (const [key, session] of entries) {
+        step(key, session);
 
         processed++;
         if (processed % CHEST_PAIRS_PER_TICK === 0) yield;
     }
+}
+
+export function* sweepPairsJob(): Generator<void, void, unknown> {
+    yield* sweepBatches(sessions);
 }
 
 tickManager.register("doubleChest:sweep", SWEEP_INTERVAL_TICKS, sweepPairsJob, 0);

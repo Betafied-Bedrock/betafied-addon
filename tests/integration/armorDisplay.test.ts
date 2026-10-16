@@ -291,6 +291,52 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             });
             assert.equal(bootsDur.damage, 6, "fall damage is one of Beta's causes");
         });
+
+        it("wears the plate on the blow that kills, and only once when both events carry it", () => {
+            const player = new Player();
+            player.id = "test_player_lethal_blow";
+            const chestDur = { maxDurability: 200, damage: 0 };
+
+            const equipment = new Map<EquipmentSlot, any>([
+                [EquipmentSlot.Chest, {
+                    typeId: "minecraft:diamond_chestplate",
+                    getComponent: (type: string) => type === ItemComponentTypes.Durability ? chestDur : null
+                }]
+            ]);
+
+            player.setComponent(EntityComponentTypes.Equippable, {
+                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null,
+                setEquipment: (slot: EquipmentSlot, item: any) => {
+                    if (!item) equipment.delete(slot);
+                    else equipment.set(slot, item);
+                    return true;
+                }
+            });
+
+            const health = { currentValue: 0, effectiveMax: 20, setCurrentValue(v: number) { this.currentValue = v; } };
+            player.setComponent(EntityComponentTypes.Health, health);
+
+            // The pack's death verdict cancels this event, so nothing below it runs for the killing
+            // blow -- the after-event this file's other cases use never arrives for it.
+            eventBus.dispatch("entityHurtBefore", {
+                cancel: false,
+                hurtEntity: player,
+                damage: 4,
+                damageSource: { cause: EntityDamageCause.entityAttack }
+            });
+
+            assert.equal(chestDur.damage, 1, "the plate is worn by the blow that killed its owner");
+
+            // A process that runs the armor feature without the death verdict delivers both events for
+            // that one hit, and one hit is one point of wear.
+            eventBus.dispatch("entityHurt", {
+                hurtEntity: player,
+                damage: 4,
+                damageSource: { cause: EntityDamageCause.entityAttack }
+            });
+
+            assert.equal(chestDur.damage, 1, "the same blow never wears the plate twice");
+        });
     });
 
     describe("computeBetaArmorMitigation", () => {

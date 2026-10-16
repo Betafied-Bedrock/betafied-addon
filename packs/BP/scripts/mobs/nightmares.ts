@@ -1,5 +1,5 @@
 import { world, system, Block, Player, Vector3 } from "@minecraft/server";
-import { eventBus } from "../core/eventBus.js";
+import { eventBus, InteractPriority } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
 import { JobRunner } from "../core/jobRunner.js";
 
@@ -26,7 +26,7 @@ const LIGHT_SOURCES = Object.freeze(new Set([
 
 const NIGHTMARE_MOBS = Object.freeze(["minecraft:zombie", "minecraft:skeleton"] as const);
 
-export interface BedInteraction {
+interface BedInteraction {
     count: number;
     playerId: string;
     dimensionId: string;
@@ -38,7 +38,10 @@ export interface BedInteraction {
 }
 
 export const nightmareJobRunner = new JobRunner();
-export const bedInteractions = new Map<string, BedInteraction>();
+
+// The module's own sighting state: a bed click is armed, watched and released here and nowhere else,
+// so a caller cannot hand this module a sighting it did not take.
+const bedInteractions = new Map<string, BedInteraction>();
 
 function isNight(): boolean {
     const time = world.getTimeOfDay();
@@ -236,9 +239,11 @@ export function handlePlayerLeave(event: { playerId: string }): void {
     }
 }
 
+// A bed click is observed rather than claimed, so the sighting has to be taken before any rule cancels
+// the click away from this handler.
 eventBus.onPlayerInteractWithBlock((event) => {
     noteBedInteraction(event.player, event.block);
-});
+}, InteractPriority.RULE);
 
 eventBus.onPlayerLeave((event) => {
     handlePlayerLeave(event);

@@ -2,109 +2,140 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import {
     lightCheckGenerator,
-    bedInteractions,
     nightmareJobRunner,
     noteBedInteraction,
-    handlePlayerLeave,
-    tryTriggerNightmare
+    handlePlayerLeave
 } from "../../packs/BP/scripts/mobs/nightmares.js";
-import { mockPlayers, resetMocks, world, Player } from "../mocks/minecraftServer.js";
+import {
+    mockPlayers,
+    resetMocks,
+    scheduledTimeouts,
+    world,
+    Player
+} from "../mocks/minecraftServer.js";
+
+const BED_ID = "minecraft:bed";
+const OVERWORLD = "minecraft:overworld";
+const NIGHT = 15000;
+
+type Cell = { x: number; y: number; z: number };
+
+/**
+ * One click on a bed, delivered the way the bus delivers it: the block the engine hands the handler is
+ * the one standing at that cell, so a later read of the same cell answers the same bed.
+ */
+function clickBed(player: Player, cell: Cell): string {
+    const block = world.getDimension(OVERWORLD).getBlock(cell) as any;
+    block.setType(BED_ID);
+
+    noteBedInteraction(player, block);
+    return `${OVERWORLD}:${cell.x},${cell.y},${cell.z}`;
+}
+
+/** A player standing at the bed, which is what the delayed trigger re-resolves by id. */
+function sleeper(id: string, cell: Cell): Player {
+    const player = new Player(id);
+    player.location = { ...cell };
+    mockPlayers.push(player);
+    return player;
+}
+
+/** Runs every callback the module parked on the tick, in the order it parked them. */
+function settle(): void {
+    let ran = 0;
+    while (scheduledTimeouts.length > 0) {
+        if (ran++ > 50) throw new Error("the delayed work never settled");
+        scheduledTimeouts.shift()!.callback();
+    }
+}
 
 describe("Nightmares Spatial Job Tracking & Cancellation", () => {
     beforeEach(() => {
         resetMocks();
-        bedInteractions.clear();
-        nightmareJobRunner.clear();
+        nightmareJobRunner.clearAll();
+        world.setTimeOfDay(0);
     });
 
-    it("batches spatial light checks and yields every 50 blocks", () => {
-        const bedKey = "minecraft:overworld:0,64,0";
-        bedInteractions.set(bedKey, {
-            count: 1,
-            playerId: "player_1",
-            dimensionId: "minecraft:overworld",
-            bedLocation: { x: 0, y: 64, z: 0 },
-            windowExpired: false,
-            scanComplete: false,
-            hasLight: null
-        });
+    it("slices the spatial light check and keeps the sighting running across a yield", () => {
+        const cell = { x: 0, y: 64, z: 0 };
+        const player = sleeper("player_1", cell);
+        const bedKey = clickBed(player, cell);
 
-        const gen = lightCheckGenerator("minecraft:overworld", { x: 0, y: 64, z: 0 }, bedKey);
+        assert.equal(nightmareJobRunner.activeCount, 1, "the click is what arms the bed's light check");
 
-        const firstStep = gen.next();
-        assert.equal(firstStep.done, false, "generator yields after first batch of 50 checks");
+        const scan = lightCheckGenerator(OVERWORLD, cell, bedKey);
 
-        const record = bedInteractions.get(bedKey);
-        assert.ok(record, "record persists across yields");
+        assert.equal(scan.next().done, false, "the sweep hands the tick back instead of reading every cell");
+        assert.equal(
+            nightmareJobRunner.activeCount,
+            1,
+            "and the bed's sighting is still running on the far side of that yield"
+        );
     });
 
-    it("cancels running spatial job when player interacts with bed a second time", () => {
-        const player = new Player("steve");
-        player.id = "steve_id";
-        mockPlayers.push(player);
+    it("ends the sighting when the same bed is clicked a second time", () => {
+        const cell = { x: 10, y: 64, z: 10 };
+        const player = sleeper("steve_id", cell);
 
-        const bedBlock = {
-            dimension: world.getDimension("minecraft:overworld"),
-            location: { x: 10, y: 64, z: 10 },
-            typeId: "minecraft:bed"
-        } as any;
+        clickBed(player, cell);
+        assert.equal(nightmareJobRunner.activeCount, 1);
 
-        noteBedInteraction(player, bedBlock);
+        clickBed(player, cell);
 
-        const bedKey = "minecraft:overworld:10,64,10";
-        const record = bedInteractions.get(bedKey);
-        assert.ok(record, "record created");
-        assert.ok(record.jobId !== undefined, "jobId tracked");
-        const activeJobId = record.jobId;
+        assert.equal(nightmareJobRunner.activeCount, 0, "the second click cancels the running light check");
 
-        assert.ok(nightmareJobRunner.has(activeJobId), "job registered in nightmareJobRunner");
-
-        noteBedInteraction(player, bedBlock);
-
-        assert.equal(bedInteractions.has(bedKey), false, "record deleted on second interaction");
-        assert.equal(nightmareJobRunner.has(activeJobId), false, "spatial job was cancelled in job runner");
+        clickBed(player, cell);
+        assert.equal(
+            nightmareJobRunner.activeCount,
+            1,
+            "and the earlier sighting is spent, so a later click arms a fresh scan"
+        );
     });
 
-    it("cancels running spatial job and cleans record on playerLeave", () => {
-        const player = new Player("alex");
-        player.id = "alex_id";
-        mockPlayers.push(player);
+    it("cancels the sighting when the player who clicked the bed leaves", () => {
+        const cell = { x: 20, y: 64, z: 20 };
+        const player = sleeper("alex_id", cell);
 
-        const bedBlock = {
-            dimension: world.getDimension("minecraft:overworld"),
-            location: { x: 20, y: 64, z: 20 },
-            typeId: "minecraft:bed"
-        } as any;
+        clickBed(player, cell);
+        assert.equal(nightmareJobRunner.activeCount, 1);
 
-        noteBedInteraction(player, bedBlock);
-        const bedKey = "minecraft:overworld:20,64,20";
-        const record = bedInteractions.get(bedKey);
-        assert.ok(record);
-        const activeJobId = record.jobId!;
+        handlePlayerLeave({ playerId: player.id });
 
-        assert.ok(nightmareJobRunner.has(activeJobId));
+        assert.equal(nightmareJobRunner.activeCount, 0, "a player who left can never finish the sleep");
 
-        handlePlayerLeave({ playerId: "alex_id" } as any);
-
-        assert.equal(bedInteractions.has(bedKey), false, "record cleared on player leave");
-        assert.equal(nightmareJobRunner.has(activeJobId), false, "spatial job cancelled on player leave");
+        clickBed(player, cell);
+        assert.equal(
+            nightmareJobRunner.activeCount,
+            1,
+            "and the bed holds no sighting for the player who is gone"
+        );
     });
 
-    it("aborts nightmare trigger safely if player is invalid/disconnected", () => {
-        const bedKey = "minecraft:overworld:30,64,30";
-        bedInteractions.set(bedKey, {
-            count: 1,
-            playerId: "missing_player_id",
-            dimensionId: "minecraft:overworld",
-            bedLocation: { x: 30, y: 64, z: 30 },
-            windowExpired: true,
-            scanComplete: true,
-            hasLight: false
-        });
+    it("spends a trigger whose viewer cannot be resolved, without crashing the tick", () => {
+        const cell = { x: 30, y: 64, z: 30 };
 
-        assert.doesNotThrow(() => {
-            tryTriggerNightmare(bedKey);
-        });
-        assert.equal(bedInteractions.has(bedKey), false);
+        // The night is what the trigger asks about, and this player is deliberately absent from the
+        // world: the state a trigger finds when its viewer disconnected mid-sleep.
+        world.setTimeOfDay(NIGHT);
+        const gone = new Player("missing_player_id");
+        gone.location = { ...cell };
+        const bedKey = clickBed(gone, cell);
+
+        // The click's own pass is registered as a job; a completed scan is what arms the trigger.
+        const scan = lightCheckGenerator(OVERWORLD, cell, bedKey);
+        while (!scan.next().done) {
+            // The pass is sliced, and this drives all of it.
+        }
+
+        assert.doesNotThrow(() => settle(), "a viewer that cannot be resolved is a skipped trigger");
+
+        const armed = nightmareJobRunner.activeCount;
+        clickBed(gone, cell);
+
+        assert.equal(
+            nightmareJobRunner.activeCount,
+            armed + 1,
+            "the trigger spent the sighting, so the next click arms a fresh scan rather than consuming one"
+        );
     });
 });
