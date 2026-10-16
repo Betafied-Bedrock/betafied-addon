@@ -63,6 +63,33 @@ describe("Changelog section extraction", () => {
   });
 });
 
+describe("The tracked changelog keeps the published shape", () => {
+  // The notes drifted into an explained paragraph per bullet twice and were cleaned up by hand both
+  // times, so the shape is asserted rather than remembered. Every bullet before 5.9.1 already sits
+  // inside these two limits, which is what makes them the register rather than a new invention.
+  const BULLET_CHARACTER_LIMIT = 140;
+
+  const bullets = (): string[] =>
+    fs
+      .readFileSync(path.join(ROOT, "CHANGELOG.md"), "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("- "))
+      // A code span can hold anything, including a full stop and a capital, so it is not prose here.
+      .map((line) => line.slice(2).replace(/`[^`]*`/g, "code"));
+
+  it("gives every bullet one sentence", () => {
+    for (const bullet of bullets()) {
+      assert.doesNotMatch(bullet, /\.\s+[A-Z]/, `a bullet carries a second sentence: ${bullet}`);
+    }
+  });
+
+  it("keeps every bullet inside one line of the notes", () => {
+    for (const bullet of bullets()) {
+      assert.ok(bullet.length <= BULLET_CHARACTER_LIMIT, `${bullet.length} characters: ${bullet}`);
+    }
+  });
+});
+
 describe("The tracked changelog covers the version about to be released", () => {
   it("has a section for package.json's version, so `npm run release` cannot publish empty notes", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
