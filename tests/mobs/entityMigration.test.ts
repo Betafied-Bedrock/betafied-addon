@@ -81,7 +81,11 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
         const cow = new Entity();
         cow.typeId = "minecraft:cow";
 
-        migrateEntity(cow, [{ identifier: "betarock:future_scale" }], []);
+        migrateEntity(cow, {
+            propertyRules: [{ identifier: "betarock:future_scale" }],
+            effectRules: [],
+            removalRules: []
+        });
         assert.equal(cow.getProperty("betarock:future_scale"), 1.5, "a declared definition answers the reset");
 
         const guarded = new Entity();
@@ -90,7 +94,11 @@ describe("EntityMigration - Future-Proof Entity Property & Effect Migration", ()
             throw new Error("resetProperty failed");
         };
 
-        migrateEntity(guarded, [{ identifier: "betarock:fallback_prop", defaultValue: 42 }], []);
+        migrateEntity(guarded, {
+            propertyRules: [{ identifier: "betarock:fallback_prop", defaultValue: 42 }],
+            effectRules: [],
+            removalRules: []
+        });
         assert.equal(guarded.getProperty("betarock:fallback_prop"), 42, "and the rule's own default covers a refusal");
     });
 

@@ -43,15 +43,31 @@ export const BETA_ENTITY_EFFECT_REMOVAL_RULES: readonly EntityEffectRemovalRule[
     }
 ]);
 
+/**
+ * What one migration pass runs. Configuration arrives as a single object, the way the sibling
+ * sanitizer takes it, so the two hooks a caller runs over an entity are configured alike.
+ */
+export interface EntityMigrationOptions {
+    readonly propertyRules: readonly EntityPropertyRule[];
+    readonly effectRules: readonly EntityEffectRule[];
+    readonly removalRules: readonly EntityEffectRemovalRule[];
+}
+
+export const BETA_ENTITY_MIGRATION: EntityMigrationOptions = Object.freeze({
+    propertyRules: BETA_ENTITY_PROPERTY_RULES,
+    effectRules: BETA_ENTITY_EFFECT_RULES,
+    removalRules: BETA_ENTITY_EFFECT_REMOVAL_RULES
+});
+
 export function migrateEntity(
     entity: Entity | undefined,
-    propertyRules: readonly EntityPropertyRule[] = BETA_ENTITY_PROPERTY_RULES,
-    effectRules: readonly EntityEffectRule[] = BETA_ENTITY_EFFECT_RULES,
-    removalRules: readonly EntityEffectRemovalRule[] = BETA_ENTITY_EFFECT_REMOVAL_RULES
+    options: EntityMigrationOptions = BETA_ENTITY_MIGRATION
 ): void {
     if (!entity || !entity.isValid) return;
 
     if (!isBetaMob(entity.typeId)) return;
+
+    const { propertyRules, effectRules, removalRules } = options;
 
     for (const rule of propertyRules) {
         if (rule.targetTypes && !rule.targetTypes.has(entity.typeId)) continue;

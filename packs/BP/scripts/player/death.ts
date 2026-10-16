@@ -27,6 +27,17 @@ export const DEAD_PROPERTY = "bh:dead";
 export const PRE_DEATH_GAMEMODE_PROPERTY = "bh:pre_death_gamemode";
 
 /**
+ * The modes a death can hand back. Spectator is excluded because it is the pack's own park for the
+ * dead, and the rest are checked as members rather than trusted: a property written by an older
+ * build, or edited by hand, otherwise reaches setGameMode as a mode that does not exist.
+ */
+const RESTORABLE_MODES: ReadonlySet<string> = Object.freeze(new Set([
+    GameMode.Survival,
+    GameMode.Creative,
+    GameMode.Adventure
+]));
+
+/**
  * The respawn's destination for a player without a bed, recorded once per world. Bedrock reports the
  * world spawn's height as the unresolved 32767 sentinel — "the height is determined by surrounding
  * blocks" — and only its own spawn pass resolves it, so a teleport to that value drops the player above
@@ -234,8 +245,10 @@ export function respawnPlayer(player: Player): void {
         standCorpseBackUp(player);
         setMovementLocked(player, false);
 
-        const mode = typeof remembered === "string" ? (remembered as GameMode) : GameMode.Survival;
-        player.setGameMode(mode === GameMode.Spectator ? GameMode.Survival : mode);
+        const mode = typeof remembered === "string" && RESTORABLE_MODES.has(remembered)
+            ? (remembered as GameMode)
+            : GameMode.Survival;
+        player.setGameMode(mode);
 
         player.getComponent(EntityComponentTypes.Health)?.resetToMaxValue();
 
