@@ -1055,10 +1055,20 @@ with the era's one fog, a zero precipitation density and an empty music definiti
 ambient definition is blanked in `packs/RP/sounds/sound_definitions.json` the way `ambient.nether_wastes`
 already was.
 
+**The fog half of this was settled by a second mechanism that outranked both routes.** `/fog push` puts a
+fog on the player's own stack, above the biome layer, and that stack belongs to the player rather than to
+the dimension. `classicFog.ts` pushed the Overworld fog for a player seen in the Overworld and popped it
+only once a sweep saw them somewhere else, so the Nether's biome fog was never what decided the Nether:
+while that entry stood, the Overworld's blue haze was the fog on screen, which is the reported symptom.
+The sweep now reads the era's fog from a table keyed by dimension, clears its one stack id and pushes
+that dimension's fog, so what shows is always the entry this pass put there rather than whatever a pop
+managed to reach. The client biome fog above stays declared: it is what shows before the sweep's next
+pass, and it is the answer if the stack is emptied by something outside the pack.
+
 **Still open:** whether a client biome file replaces the vanilla definition for its biome or merges into
-it. Fog, music and precipitation are declared, so they land either way, and the loops are blanked in the
-sound definitions as well, so they are silent either way. What the answer decides is the Vibrant Visuals
-set — `minecraft:atmosphere_identifier` and `minecraft:lighting_identifier` — which the pack's Overworld
+it. Fog is no longer the thing the answer decides, since the command layer now carries it in both
+dimensions, and the loops are blanked in the sound definitions as well, so they are silent either way.
+What is left is the Vibrant Visuals set — `minecraft:atmosphere_identifier` and `minecraft:lighting_identifier` — which the pack's Overworld
 files also leave to vanilla. If the engine merges, every Overworld biome keeps vanilla's atmospherics
 too, and the two dimensions need the same decision.
 

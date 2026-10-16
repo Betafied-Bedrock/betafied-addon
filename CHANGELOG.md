@@ -2,6 +2,15 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.10.1 — 2026-10-16
+
+5.10.1 fixes the Nether wearing the Overworld's blue fog.
+
+### Nether
+
+- Fixed the Nether's red fog losing to the Overworld's blue one: a fog pushed with `/fog` outranks the fog a biome names, and the Overworld's entry was left on the stack after a portal crossing.
+- Changed the classic fog sweep to push the era's fog for the dimension the player is in (`classic_water:default_fog` in the Overworld, `mgg:fog_hell` in the Nether), clearing that stack entry with `fog @s remove` first.
+
 ## 5.10 — 2026-10-16
 
 5.10 keeps lit Nether portals standing, returns the era's ambience to the Nether, and stops the pack hiding the blocks it cannot remove.
