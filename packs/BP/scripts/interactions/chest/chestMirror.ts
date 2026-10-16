@@ -1,6 +1,6 @@
 import { world } from "@minecraft/server";
 import type { Block, ContainerAccessSource } from "@minecraft/server";
-import { tickManager } from "../core/tickManager.js";
+import { tickManager } from "../../core/tickManager.js";
 import type {
     ChestHalf,
     ChestLocation,

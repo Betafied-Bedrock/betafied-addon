@@ -1,6 +1,6 @@
 import { BlockPermutation, BlockVolume } from "@minecraft/server";
 import type { Block, Container, ItemStack } from "@minecraft/server";
-import { reportError } from "../core/errorReporter.js";
+import { reportError } from "../../core/errorReporter.js";
 import type { CardinalDirection, ChestLocation } from "./chestPairing.js";
 import {
     DOUBLE_CHEST_ID,

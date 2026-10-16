@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     sweepPairsJob,
     sessions
-} from "../../packs/BP/scripts/interactions/chestMirror.js";
+} from "../../packs/BP/scripts/interactions/chest/chestMirror.js";
 import { resetMocks } from "../mocks/minecraftServer.js";
 
 describe("Double Chest Session Sweep Generator & Batching", () => {

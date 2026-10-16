@@ -1,4 +1,4 @@
-import { BH_CHEST_ID } from "../core/betaRegistry.js";
+import { BH_CHEST_ID } from "../../policy/betaRegistry.js";
 
 export const SINGLE_CHEST_ID = BH_CHEST_ID;
 export const DOUBLE_CHEST_ID = "bh:double_chest";

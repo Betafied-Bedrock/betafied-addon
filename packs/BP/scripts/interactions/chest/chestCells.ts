@@ -1,6 +1,6 @@
 import { world } from "@minecraft/server";
 import type { Block, Container, ItemStack } from "@minecraft/server";
-import { runCatching } from "../core/errorReporter.js";
+import { runCatching } from "../../core/errorReporter.js";
 import type { CardinalDirection, ChestLocation, ChestNeighbour, PairResolution } from "./chestPairing.js";
 import {
     DOUBLE_CHEST_ID,

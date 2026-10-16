@@ -25,7 +25,6 @@ import "./world/chunkScrubber.js";
 import "./world/netherIce.js";
 import "./world/classicFog.js";
 import "./world/underwaterOverlay.js";
-import "./world/island.js";
 import "./world/dimensionBoundary.js";
 import "./interactions/fenceConnectivity.js";
 import "./interactions/slabStacking.js";
@@ -37,7 +36,7 @@ import "./mobs/entityCleaner.js";
 import "./mobs/betaAnimalAI.js";
 import "./mobs/nightmares.js";
 import "./mobs/herobrine.js";
-import "./interactions/doubleChest.js";
+import "./interactions/chest/doubleChest.js";
 
 eventBus.init();
 

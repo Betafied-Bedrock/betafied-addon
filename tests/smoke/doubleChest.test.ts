@@ -24,7 +24,7 @@ import {
     planPlacementBlocked,
     planSweep,
     resolveHalf
-} from "../../packs/BP/scripts/interactions/chestPairing.js";
+} from "../../packs/BP/scripts/interactions/chest/chestPairing.js";
 
 const root = process.cwd();
 
