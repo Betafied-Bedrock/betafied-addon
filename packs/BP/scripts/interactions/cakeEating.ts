@@ -1,7 +1,7 @@
 import { BlockPermutation, EntityComponentTypes, system, world } from "@minecraft/server";
 import type { Block, Player, PlayerInteractWithBlockBeforeEvent } from "@minecraft/server";
 import { BH_CAKE_ID } from "../policy/betaRegistry.js";
-import { eventBus } from "../core/eventBus.js";
+import { eventBus, InteractPriority } from "../core/eventBus.js";
 import type { Cell } from "./cell.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 
@@ -108,5 +108,5 @@ eventBus.onPlayerInteractWithBlock((event: PlayerInteractWithBlockBeforeEvent) =
             );
         }
     });
-});
+}, InteractPriority.RULE);
 

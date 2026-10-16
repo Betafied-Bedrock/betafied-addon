@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { BlockPermutation, Direction, ItemStack, Player, resetMocks } from "@minecraft/server";
 import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
 import "../../packs/BP/scripts/world/buildHeightLimit.js";
+import "../../packs/BP/scripts/interactions/placement.js";
+import "../../packs/BP/scripts/interactions/cakeEating.js";
 import { dimension } from "../support/world.js";
 
 function click(block: any, blockFace: string, player: Player, itemStack?: any) {
@@ -85,6 +87,33 @@ describe("Build height limit", () => {
                 `${id} at the ceiling is a sign already up, not a placement`
             );
             assert.equal(player.messagesSent.length, 0, `${id}: no message for a click nobody built with`);
+        }
+    });
+
+    // The ceiling is an area veto, not a rule about the click: it is registered below every rule that
+    // answers the click itself, so at height it can only refuse what nothing else claimed. A cancel
+    // without the ceiling's own message is how these cases see that -- the veto always says so.
+    it("leaves the click at the ceiling to whatever rule claims it, and says nothing about the height", () => {
+        const claims: [string, string, number][] = [
+            ["bh:cake", "minecraft:wooden_pickaxe", 200],
+            ["minecraft:short_grass", "minecraft:bone_meal", 200]
+        ];
+
+        for (const [id, held, y] of claims) {
+            const target = dimension().getBlock({ x: 18, y, z: 18 });
+            target.setPermutation(BlockPermutation.resolve(id));
+            const label = `${held} on ${id}`;
+            const player = new Player("tapper", "Tapper");
+
+            const event = click(target, Direction.Up, player, new ItemStack(held, 1));
+            eventBus.dispatch("playerInteractWithBlock", event);
+
+            assert.equal(event.cancel, true, `${label}: the click is spent, but not by the ceiling`);
+            assert.equal(
+                player.messagesSent.length,
+                0,
+                `${label}: a click no placement was attempted from must not report the ceiling`
+            );
         }
     });
 

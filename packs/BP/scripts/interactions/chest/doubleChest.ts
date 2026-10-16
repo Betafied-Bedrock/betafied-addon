@@ -7,7 +7,7 @@ import type {
     PlayerPlaceBlockAfterEvent,
     PlayerPlaceBlockBeforeEvent
 } from "@minecraft/server";
-import { eventBus, guarded } from "../../core/eventBus.js";
+import { eventBus, guarded, InteractPriority } from "../../core/eventBus.js";
 import { reportError } from "../../core/errorReporter.js";
 import type { ChestLocation, PlacementBlockInput } from "./chestPairing.js";
 import { DOUBLE_CHEST_ID, SINGLE_CHEST_ID, planChestPlacement, planPlacementBlocked } from "./chestPairing.js";
@@ -89,4 +89,7 @@ eventBus.onBlockContainerClosed(guarded({ system: "doubleChest", operation: "con
 
 eventBus.onPlayerLeave(guarded({ system: "doubleChest", operation: "playerLeave" }, handlePlayerLeave));
 
-eventBus.onPlayerInteractWithBlock(guarded({ system: "doubleChest", operation: "interactWithBlock" }, handleInteractWithBlock));
+eventBus.onPlayerInteractWithBlock(
+    guarded({ system: "doubleChest", operation: "interactWithBlock" }, handleInteractWithBlock),
+    InteractPriority.RULE
+);

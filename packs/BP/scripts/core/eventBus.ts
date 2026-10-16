@@ -45,6 +45,19 @@ export function guarded<T>(
     };
 }
 
+/**
+ * Precedence for the handlers that share a cancellable event. Dispatch runs the highest priority first
+ * and stops at the first cancel, so a rule that answers a click has to be placed against the broad
+ * vetoes it shares the event with. The values live here rather than at the registration order in
+ * `main.ts`, which is otherwise the only tie-break and would let a reordered import change gameplay.
+ */
+export const InteractPriority = Object.freeze({
+    /** A rule that answers this click itself: cake, slabs, chests, bonemeal, placement, sleep. */
+    RULE: 10,
+    /** A veto over an area rather than the click: the era's build ceiling, applied to what no rule claimed. */
+    AREA_VETO: -10
+} as const);
+
 interface RegisteredHandler<T> {
     id: number;
     priority: number;

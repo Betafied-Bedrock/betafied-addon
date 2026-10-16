@@ -5,7 +5,7 @@ import {
     system,
     world
 } from "@minecraft/server";
-import { eventBus } from "../core/eventBus.js";
+import { eventBus, InteractPriority } from "../core/eventBus.js";
 import { reportError, runCatching } from "../core/errorReporter.js";
 import { consumeHeldItem } from "../core/heldItem.js";
 import type { Cell } from "./cell.js";
@@ -77,7 +77,7 @@ eventBus.onPlayerInteractWithBlock(event => {
 
     const cell: Cell = { x: block.location.x, y: block.location.y, z: block.location.z };
     scheduleSlabDoubling(block.dimension.id, cell, slabId, doubleId, player);
-}, 10);
+}, InteractPriority.RULE);
 
 eventBus.onPlayerPlaceBlockBefore(event => {
     const { block, permutationToPlace, player } = event;

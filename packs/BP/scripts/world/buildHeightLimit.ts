@@ -1,5 +1,5 @@
 import { Direction } from "@minecraft/server";
-import { eventBus, guarded } from "../core/eventBus.js";
+import { eventBus, guarded, InteractPriority } from "../core/eventBus.js";
 import { BETA_FLOOR_Y, BETA_HEIGHT_LIMIT, OVERWORLD_ID } from "../policy/betaConstants.js";
 import { BETA_BED_BLOCK_IDS, BETA_SIGN_BLOCK_IDS } from "../policy/betaRegistry.js";
 
@@ -37,7 +37,7 @@ eventBus.onPlayerInteractWithBlock(guarded({ system: "buildHeightLimit", operati
         event.cancel = true;
         player.sendMessage(HEIGHT_MESSAGE);
     }
-}));
+}), InteractPriority.AREA_VETO);
 
 eventBus.onPlayerPlaceBlock(guarded({ system: "buildHeightLimit", operation: "ceilingEnforce" }, (event) => {
     const { player, block } = event;
