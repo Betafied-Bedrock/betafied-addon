@@ -3,6 +3,7 @@ import { isBetaEntity, isVanillaId } from "../core/betaRegistry.js";
 import { isForeignOwnedEntity } from "../core/compatibilityPolicy.js";
 import { resolveDropTarget } from "../core/normalizer.js";
 import { eventBus, guarded } from "../core/eventBus.js";
+import { reportError } from "../core/errorReporter.js";
 import { migrateEntity } from "./entityMigration.js";
 
 const recentBrokenLeaves = new Map<string, number>();
@@ -148,8 +149,15 @@ function planStackedDrops(itemId: string, amount: number): ItemStack[] | undefin
             stacks.push(new ItemStack(itemId, stackSize));
             remaining -= stackSize;
         }
-    } catch {
-        // An id this engine has no item for: the caller keeps the engine's own drop instead.
+    } catch (err) {
+        // Reaching here means a conversion target our own tables name is not an item this engine can
+        // build, so the caller keeps the engine's own drop. That is a data defect rather than an
+        // ordinary condition, and it repeats on every such drop until someone fixes the table.
+        reportError({
+            system: "entitySpawnHandler",
+            operation: "planConvertedDropStacks",
+            target: itemId
+        }, err);
         return undefined;
     }
 

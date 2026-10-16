@@ -85,9 +85,15 @@ export function tryTriggerNightmare(bedKey: string): void {
                 return;
             }
             spawnNightmare(player, bedBlock);
-        } catch {
+        } catch (err) {
             // The bed's chunk can be unloaded by the time this delayed read runs, which makes the
-            // block lookup throw.
+            // block lookup throw. The sighting is then simply skipped, and the reason has to reach
+            // the log or a bed that never fires looks like a broken trigger.
+            reportError({
+                system: "nightmares",
+                operation: "readBedBlock",
+                target: player.name
+            }, err);
         }
     }, CONFIG.SPAWN_DELAY);
 }
@@ -119,7 +125,10 @@ export function* lightCheckGenerator(dimensionId: string, bedLoc: Vector3, bedKe
                         return;
                     }
                 } catch {
-                    // Chunk edge boundary during spatial scan
+                    // A cell past the loaded chunk rim makes the read throw, and the scan is meant to run
+                    // past that rim: the cell reads as no light source, which is what `continue` does.
+                    // Reporting each one would drown the log in a 26x11x26 sweep, so this stays silent
+                    // by design rather than by omission.
                 }
 
                 checked++;

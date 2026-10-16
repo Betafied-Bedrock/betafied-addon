@@ -22,7 +22,10 @@ const PUSHABLE_CART_TYPES = Object.freeze(new Set([
     "minecraft:tnt_minecart"
 ]));
 
-const activeIntervals = new Map<string, number>();
+/** One task per moving cart: the tick manager owns the schedule the cart's own loop used to hold. */
+function cartTaskId(entityId: string): string {
+    return `furnaceMinecart:cart:${entityId}`;
+}
 
 const DIMENSION_IDS = Object.freeze([OVERWORLD_KEY, NETHER_KEY, END_KEY] as const);
 
@@ -67,6 +70,8 @@ function isValidPositionJson(raw: unknown): Vector3 | null {
             }
         }
     } catch {
+        // A malformed value is the repair path, not a failure: readProperty reports it and rewrites
+        // the key, so a report here would double the log for one bad value.
         return null;
     }
     return null;
@@ -163,7 +168,10 @@ function isOnRail(entity: Entity): boolean {
     try {
         const block = entity.dimension.getBlock(entity.location);
         return Boolean(block?.typeId.includes("minecraft:") && block?.typeId.includes("rail"));
-    } catch {
+    } catch (err) {
+        // A cart crossing an unloaded chunk throws on the block read, and the false below is what
+        // clears its velocity: the reason it stopped has to be visible.
+        reportError({ system: "furnaceMinecart", operation: "isOnRail", target: entity.id }, err);
         return false;
     }
 }
@@ -217,11 +225,7 @@ function applyMovementImpulse(entity: Entity, movementDir: Vector3, onRail: bool
 }
 
 function stopMinecartMovement(entityId: string, entity?: Entity): void {
-    const intervalId = activeIntervals.get(entityId);
-    if (intervalId !== undefined) {
-        system.clearRun(intervalId);
-        activeIntervals.delete(entityId);
-    }
+    tickManager.unregister(cartTaskId(entityId));
 
     if (entity?.isValid) {
         try {
@@ -272,13 +276,11 @@ function runMinecartStep(entity: Entity, entityId: string): void {
 
 function startMinecartMovement(entity: Entity): void {
     const entityId = entity.id;
-    if (activeIntervals.has(entityId)) return;
+    if (tickManager.isRegistered(cartTaskId(entityId))) return;
 
-    const intervalId = system.runInterval(() => {
+    tickManager.register(cartTaskId(entityId), CONFIG.TICK_INTERVAL, () => {
         runMinecartStep(entity, entityId);
-    }, CONFIG.TICK_INTERVAL);
-
-    activeIntervals.set(entityId, intervalId);
+    });
 }
 
 const FUEL_ITEM_IDS: ReadonlySet<string> = Object.freeze(new Set(["minecraft:coal", "minecraft:charcoal"]));
@@ -314,7 +316,7 @@ function sweeperJob(): void {
         try {
             const entities = dimension.getEntities({ type: CONFIG.FURNACE_TYPE_ID });
             for (const entity of entities) {
-                if (FurnaceState.getFuel(entity) > 0 && !activeIntervals.has(entity.id)) {
+                if (FurnaceState.getFuel(entity) > 0 && !tickManager.isRegistered(cartTaskId(entity.id))) {
                     startMinecartMovement(entity);
                 }
             }

@@ -7,6 +7,7 @@ import {
 import type { Container } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
+import { tickManager } from "../core/tickManager.js";
 import { BH_BOW_ID } from "../core/betaRegistry.js";
 import { getPrivilegeReason } from "../core/permissions.js";
 
@@ -16,7 +17,11 @@ const CONFIG = Object.freeze({
 });
 
 const lastFireTime = new Map<string, number>();
-const holdIntervals = new Map<string, number>();
+
+/** The tick manager owns the hold loop's schedule; this id is what starts and stops it. */
+function holdTaskId(playerId: string): string {
+    return `machineGunBow:hold:${playerId}`;
+}
 
 function takeArrowFrom(inv: Container): boolean {
     const size = inv.size;
@@ -94,11 +99,7 @@ function fireArrow(player: Player): void {
 }
 
 function stopHoldFiring(playerId: string): void {
-    const interval = holdIntervals.get(playerId);
-    if (interval !== undefined) {
-        system.clearRun(interval);
-        holdIntervals.delete(playerId);
-    }
+    tickManager.unregister(holdTaskId(playerId));
 }
 
 eventBus.onItemUseAfter((ev) => {
@@ -119,7 +120,7 @@ eventBus.onItemStartUse((ev) => {
 
     stopHoldFiring(player.id);
 
-    const intervalId = system.runInterval(() => {
+    tickManager.register(holdTaskId(player.id), CONFIG.HOLD_FIRE_RATE, () => {
         try {
             if (!player.isValid || !holdingBetaBow(player)) {
                 stopHoldFiring(player.id);
@@ -132,9 +133,7 @@ eventBus.onItemStartUse((ev) => {
             reportError({ system: "machineGunBow", operation: "holdFire", target: player.name }, e);
             stopHoldFiring(player.id);
         }
-    }, CONFIG.HOLD_FIRE_RATE);
-
-    holdIntervals.set(player.id, intervalId);
+    });
 });
 
 eventBus.onItemStopUse((ev) => {

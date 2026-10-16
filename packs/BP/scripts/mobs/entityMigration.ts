@@ -1,6 +1,6 @@
 import { Entity, EntityComponentTypes } from "@minecraft/server";
 import { isBetaMob } from "../core/betaRegistry.js";
-import { runCatching } from "../core/errorReporter.js";
+import { reportError, runCatching } from "../core/errorReporter.js";
 
 export interface EntityPropertyRule {
     readonly identifier: string;
@@ -62,9 +62,19 @@ export function migrateEntity(
             target: `${entity.typeId}:${rule.identifier}`
         }, () => {
             if (entity.getProperty(rule.identifier) === undefined) {
+                const propertyTarget = `${entity.typeId}:${rule.identifier}`;
+
                 try {
                     entity.resetProperty(rule.identifier);
-                } catch {
+                } catch (err) {
+                    // A refused reset is what routes us to the rule's default, and it is the only
+                    // signal that the property was repaired rather than already correct.
+                    reportError({
+                        system: "entityMigration",
+                        operation: "resetProperty",
+                        target: propertyTarget
+                    }, err);
+
                     if (rule.defaultValue !== undefined) {
                         entity.setProperty(rule.identifier, rule.defaultValue);
                     }

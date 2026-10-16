@@ -101,6 +101,9 @@ function isFooting(dimension: Dimension, x: number, y: number, z: number): boole
         if (!ground.isSolid || ground.isLiquid) return false;
         return feet.isAir && head.isAir;
     } catch {
+        // A cell outside the loaded chunk makes the read throw, and "no footing here" is the honest
+        // answer for one: the picker moves on to its next candidate, so this is a normal outcome of
+        // the search rather than a failure to report.
         return false;
     }
 }

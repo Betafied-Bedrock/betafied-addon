@@ -99,7 +99,13 @@ class FoodAndHealth {
                 const inventory = invComp?.container;
                 const healthComponent = player.getComponent(EntityComponentTypes.Health);
 
-                if (!inventory || !healthComponent) return;
+                if (!inventory || !healthComponent) {
+                    reportError(
+                        { system: "foodAndHealth", operation: "consumeFoodDeferred", target: player.name },
+                        `the cancelled use of ${foodId} found no inventory or health component to consume it`
+                    );
+                    return;
+                }
 
                 const selectedSlot = player.selectedSlotIndex;
                 const slotItem = inventory.getItem(selectedSlot);
@@ -166,7 +172,13 @@ class FoodAndHealth {
                 return inventory.addItem(itemStack) === undefined;
             }
             return false;
-        } catch {
+        } catch (err) {
+            // The bowl is already spent from the stack by the time this runs, so a failure here loses
+            // it with no other trace: that is worth a report even though the eat itself succeeded.
+            reportError(
+                { system: "foodAndHealth", operation: "returnContainer", target: itemStack.typeId },
+                err
+            );
             return false;
         }
     }

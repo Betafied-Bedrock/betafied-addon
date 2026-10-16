@@ -99,7 +99,7 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             }
         }
     } catch {
-        // Spatial query out of bounds
+        // The obstacle cell sits outside the loaded range, which is a cell with no obstacle in it.
     }
 
     try {
@@ -119,8 +119,13 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
         if (passiveNeighbors > 0 && Math.random() < CONFIG.CROWD_HOP_CHANCE) {
             return true;
         }
-    } catch {
-        // Transient entity query failure
+    } catch (err) {
+        // Unlike the cell reads above, a failed crowd query on a live animal is not an expected
+        // condition: the neighbour count is what decides a crowd hop, so losing it silently turns
+        // the animal's behaviour into a coin flip nobody can diagnose.
+        if (entity.isValid) {
+            reportError({ system: "betaAnimalAI", operation: "countCrowdNeighbours", target: entity.id }, err);
+        }
     }
 
     return Math.random() < CONFIG.WANDER_HOP_CHANCE;
@@ -143,8 +148,12 @@ export function applyRandomHop(entity: Entity): void {
                     y: CONFIG.JUMP_IMPULSE_Y,
                     z: viewDir.z * CONFIG.FORWARD_IMPULSE
                 });
-            } catch {
-                // Entity despawned during staggered impulse timeout
+            } catch (err) {
+                // A despawn between the validity check and the read is how a staggered impulse normally
+                // ends, so only a failure on an entity that is still live is worth reporting.
+                if (entity.isValid) {
+                    reportError({ system: "betaAnimalAI", operation: "applyHopImpulse", target: entity.id }, err);
+                }
             }
         }, i * 12);
     }
@@ -161,7 +170,12 @@ function tryAnimalHop(entity: Entity, dimension: Dimension, currentTick: number)
     try {
         const vel = entity.getVelocity();
         if (Math.abs(vel.y) > 0.15) return;
-    } catch {
+    } catch (err) {
+        // The animal most often despawns between the cooldown checks and this read; a throw while it
+        // is still valid is a real fault, and both cases skip the hop exactly as before.
+        if (entity.isValid) {
+            reportError({ system: "betaAnimalAI", operation: "readHopVelocity", target: entity.id }, err);
+        }
         return;
     }
 

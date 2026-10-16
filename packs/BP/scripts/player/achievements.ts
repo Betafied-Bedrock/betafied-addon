@@ -170,7 +170,9 @@ class AchievementSystem {
                 this.grant(player, ACH.ON_A_RAIL);
             }
         } catch {
-            // entityRidingOn can throw if vehicle entity became invalid
+            // entityRidingOn throws once the mount is gone, which is an ordinary dismount rather than a
+            // failure of this sweep: this pass runs every 100 ticks per player, so reporting the race
+            // would log normal play as an error.
         }
     }
 
