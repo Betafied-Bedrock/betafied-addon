@@ -1,10 +1,14 @@
 # Beta policy gaps
 
-Open decisions found while collapsing the three parallel Beta truth tables (`betaRegistry.ts`,
-`normalizer.ts`, `compatibilityPolicy.ts`) into one owner each. Each item below is a place where a
-declared rule and the shipped behaviour disagree. None of them is a bug in the collapse itself —
-they are pre-existing, and they were previously invisible because a test asserted the declared table
-rather than the code path that runs.
+Open decisions left by the three parallel Beta truth tables: `betaRegistry.ts` (the era's id sets),
+`normalizer.ts` (the translations between eras) and `compatibilityPolicy.ts` (policy across addons).
+The ownership map at the top of `betaRegistry.ts` states which module owns which question. Each item
+below is a place where a declared rule and the shipped behaviour disagree, and it names the module
+that has to decide it — with one owner per table, a gap is the residue of the split rather than a
+rule nobody ever implemented.
+
+Most of them were invisible because a test asserted the declared table rather than the code path that
+runs.
 
 Deciding an item means picking one of:
 
@@ -436,21 +440,41 @@ survives in an existing world, and the player's 2x2 grid offers only them. That 
 single interface — the modern recipe set is not a second way to reach the era's items — but it does
 change what an existing world can craft without the pack's table.
 
-## 13. Resolved: sugar cane is `minecraft:reeds`, never `minecraft:sugar_cane`
+## 13. Sugar cane is two ids on this engine: `minecraft:reeds` (block) and `minecraft:sugar_cane` (item)
 
-Both tables registered the era's sugar cane as `minecraft:sugar_cane`, which is not the id the game
-uses. Bedrock's block is `minecraft:reeds` (its only state is `age`), the era's item is `minecraft:reeds`
-— Mojang's own `sugar.json` and `paper.json` recipes still name it — and `minecraft:sugar_cane` is a
-second, later item id for the same plant. The mismatch was invisible where it was most expensive:
-`resolveDropId("minecraft:reeds")` answered *remove*, so a broken cane was deleted at `entityLoad` (the
-chunk-loading pass, which is why the cane vanished as a player walked up to it), the drop entity was
-deleted again by the cleaner's 32-block sweep, and the inventory sweep reported the era's own item as
-nonexistent. Only the block path was masked, by a hand-written `"minecraft:reeds"` entry in the
-scrubber's exclude list.
+Beta 1.7.3 had one id for the plant — `Block.reed` and `Item.reed`, `minecraft:reeds` in the recovered
+client. This engine splits it. `minecraft:reeds` is the block and only the block: its only state is
+`age`, and it is the cane entry in the block-id enum. The item a broken cane pays is
+`minecraft:sugar_cane`, the id in the item-id enum and in `/loot`'s item list.
 
-`minecraft:reeds` now sits in both `BETA_ITEM_IDS` and `BETA_BLOCK_IDS`, the scrubber's duplicate entry
-is gone so the registry owns the fact, and `normalizer.ITEM_ID_ALIASES` folds `minecraft:sugar_cane`
-back onto it rather than deleting a stack that carries the newer id.
+Both halves of that split cost the drop on the way here:
+
+- Both tables first registered the era's cane as `minecraft:sugar_cane` and read `minecraft:reeds` as a
+  post-Beta id, so a broken cane was deleted at `entityLoad` (the chunk-loading pass, which is why the
+  cane vanished as a player walked up to it), deleted again by the cleaner's 32-block sweep, and
+  reported as nonexistent by the inventory sweep. Only the block path was masked, by a hand-written
+  `"minecraft:reeds"` entry in the scrubber's exclude list.
+- The repair inverted it, folding `minecraft:sugar_cane` onto the block id — which handed the ground
+  item to the engine under an id it has no item for. The drop arrived, was retyped, and left nothing
+  behind: `handleItemDrop` removed the entity before it built the replacement, and the replacement
+  could not be built. The offline suite could not see that, because the mock's `ItemStack` accepts any
+  id.
+
+Settled now, one owner each: `minecraft:sugar_cane` is in `BETA_ITEM_IDS`, `minecraft:reeds` is in
+`BETA_BLOCK_IDS` (the scrubber's duplicate entry is gone, so the registry owns the fact), and
+`normalizer.ITEM_ID_ALIASES` is deleted — the only fold it could make was onto an id that is not an
+item. The pack's own `sugar.json` and `paper.json` name `minecraft:sugar_cane`. Vanilla's copies of those
+two recipes still name `minecraft:reeds`, which stays the block's spelling and a recipe ingredient the
+engine resolves; they are not the pack's to fix.
+
+A conversion that cannot land no longer costs the item: `entitySpawnHandler` builds the replacement
+stacks before it removes the entity holding the drop, and leaves an engine-held drop alone when the
+target cannot be built. `tests/integration/dropConversion.test.ts` pins both — the second by patching
+the mock's `ItemStack` into an engine that refuses one id.
+
+**Needs an in-game look:** that a broken cane now drops `minecraft:sugar_cane`, and that a legacy save's
+`minecraft:reeds` stacks still open. `/give @s sugar_cane` and `/give @s reeds` are the two commands that
+settle which spelling this engine accepts; the inventory sweep keeps the old spelling either way.
 
 **Same shape, still open:** the scrubber's exclude list is a hand-maintained table of Bedrock's legacy
 spellings for blocks the registry names the Java way — `deadbush`, `web`, `mob_spawner`,
@@ -964,6 +988,139 @@ Still open:
   answers with the unresolved world spawn there, the same void loop is reachable through the bed branch.
 - **Whether a bed spawn wants the era's `+0.5 / +1 / +0.5` offset.** §19 already carries this one for the
   respawn as a whole; the recorded world spawn does not add it either.
+
+## 23. A boat breaks only on a blocked move above the era's collision speed
+
+`EntityBoat.onUpdate` destroyed a boat at `isCollidedHorizontally && var6 > 0.15D`, `var6` being
+`sqrt(motionX * motionX + motionZ * motionZ)` in blocks a tick and read before the collision's own damping;
+a slower contact fell to the `else` branch, which decayed the motion and left the boat alone.
+`boatCollision.ts` read no speed at all: any solid block in one of the four cells at the boat's own level
+broke the boat on the spot, so a boat moored against a dock, a boat resting on the shore and a boat in a
+stream all broke where the era kept them.
+
+The pass takes the era's threshold now. `BREAK_SPEED` gates the four-cell read, and the read no longer
+counts a liquid as shoreline - `minecraft:flowing_water` is a block id of its own here and is what a
+stream's surface cell carries, so the block's `isLiquid` decides instead of a list of ids - and
+`TICK_INTERVAL` came down from 10 to 2 for the same rule. At 0.4 blocks a tick a rammed boat covers four
+blocks between the old passes and has already stopped when the next one runs, so the era's condition could
+not have been read there at all; two ticks is 0.8 blocks and catches the approach inside the block-wide
+window the read covers. The mock was part of why this was invisible: `getVelocity()` answered a standstill
+for every entity, so no test could exercise a pass that decides on speed. It carries a settable per-entity
+`velocity` now.
+
+Still open:
+
+- **Whether `Entity.getVelocity()` still reports the travel of a boat a block has just stopped.** The era
+  read its motion on the tick the move was blocked, before the damping. If the engine answers zero by the
+  time the pass runs, a ram breaks nothing where the era broke the boat - the opposite complaint to this
+  one - and the check would have to compare successive positions instead. One in-game ram decides it.
+- **Whether the four-cell read matches a blocked move.** Beta tested the boat's own box against the block's,
+  which is why a boat sliding along a wall it already touched counted as blocked. The read here is
+  centre-plus-one in each of the four directions, so a wall the box is not touching reads as shoreline too.
+
+## 24. Resolved: the Bedrock spellings of six era blocks live in the registry
+
+`chunkScrubber` kept a private list of legacy Bedrock spellings (`minecraft:deadbush`,
+`minecraft:web`, `minecraft:mob_spawner`, the two repeater ids, `minecraft:stone_block_slab`) beside
+`BETA_BLOCK_IDS`. The scrubber's filter read that list, so the block survived, while the drop
+boundary read `betaRegistry` alone and deleted the item the block pays — the era's dead bush and
+cobweb came through as blocks and vanished as drops. Both spellings now sit in `BETA_BLOCK_IDS`, the
+one set `isBetaBlock`, `isBetaItem` and the scrubber's untouched filter all read.
+
+## 25. Generated chests are deleted by the sweep while the id stays authentic to the drop boundary
+
+A structure chest carries loot from the Nether Update, and the chest this pack hands a player is
+`bh:chest`, so a `minecraft:chest` in the world is always a generated one. `minecraft:chest` still reads
+as authentic Beta terrain in `BETA_BLOCK_IDS` — the drop boundary needs the item the block pays, and the
+id is the era's own — while `chunkScrubber` deletes the block. The two stances cannot be folded into one
+table: the untouched-terrain filter excludes everything in `BETA_BLOCK_IDS`, so "preserve this block" and
+"delete this block" cannot both be expressed there. The chest pass reads the filtered volume directly
+instead, and deletes rather than retypes onto `bh:chest`, because a retype would open the pack's
+container screen over the structure's loot.
+
+The ring the sweep walks went from one chunk to two for the same reason: the chest sits at the portal,
+which is usually in the chunk past the old ring, so the loot stayed until the player walked into it.
+
+**Still open:** the sweep is Nether-only, so a loot chest in the pre-generated Overworld template, or in
+the Overworld terrain the engine generates beyond it, survives. Whether the Overworld should run this
+pass on its own, without the rest of the sweep, is undecided.
+
+## 26. The Nether's client biomes are claimed here, and what they replace is not unambiguous
+
+Since base game 1.21.40 a pack's client biome file owns a biome's fog, ambient sounds, music and airborne
+particles, and `biomes_client.json` is the pre-1.21.40 route. The pack emitted client biomes for the
+Overworld only, so vanilla's five Nether client biomes stayed in charge of the Nether: the biome fogs,
+the ambient loops, the Nether's music and the ash and spore precipitation. All five are emitted now, each
+with the era's one fog, a zero precipitation density and an empty music definition, and every Nether
+ambient definition is blanked in `packs/RP/sounds/sound_definitions.json` the way `ambient.nether_wastes`
+already was.
+
+**The fog half of this was settled by a second mechanism that outranked both routes.** `/fog push` puts a
+fog on the player's own stack, above the biome layer, and that stack belongs to the player rather than to
+the dimension. `classicFog.ts` pushed the Overworld fog for a player seen in the Overworld and popped it
+only once a sweep saw them somewhere else, so the Nether's biome fog was never what decided the Nether:
+while that entry stood, the Overworld's blue haze was the fog on screen, which is the reported symptom.
+The sweep now reads the era's fog from a table keyed by dimension, clears its one stack id and pushes
+that dimension's fog, so what shows is always the entry this pass put there rather than whatever a pop
+managed to reach. The client biome fog above stays declared: it is what shows before the sweep's next
+pass, and it is the answer if the stack is emptied by something outside the pack.
+
+**Still open:** whether a client biome file replaces the vanilla definition for its biome or merges into
+it. Fog is no longer the thing the answer decides, since the command layer now carries it in both
+dimensions, and the loops are blanked in the sound definitions as well, so they are silent either way.
+What is left is the Vibrant Visuals set — `minecraft:atmosphere_identifier` and `minecraft:lighting_identifier` — which the pack's Overworld
+files also leave to vanilla. If the engine merges, every Overworld biome keeps vanilla's atmospherics
+too, and the two dimensions need the same decision.
+
+## 27. Resolved: three era blocks were missing from the registry, so the sweep erased them
+
+`BETA_BLOCK_IDS` is the one set `isBetaBlock`, `isBetaItem` and the scrubber's untouched filter all
+read, so an era block the set omits is **deleted** from the Nether instead of preserved: the filter
+yields it as modern terrain and the fine pass clears it. Three had been left out, and all
+three share the shape that makes an omission invisible — no item form, and no other table in the pack
+that names the id. `minecraft:portal` (block 90), `minecraft:fire` (51) and `minecraft:farmland` (60).
+
+A lit portal died with its obsidian frame still standing, because `minecraft:obsidian` was in the set
+all along. That is the reported symptom: not missing blocks, a dead portal.
+
+All three are in the set now, and `tests/integration/chunkScrubberRemoval.test.ts` pins each one
+through `scrubFineDetails` rather than asserting the table. **Still open, and the reason this was
+reachable:** the set is hand-maintained against the era's own block list, and an id has a second line
+of defence only when something else in the pack also names it. Making the fine pass leave an
+unrecognised non-air block alone would close the class; that reverses the sweep's default from
+delete to keep, so it needs a decision.
+
+## 28. Post-Beta blocks render as vanilla again; the mask that hid them is gone
+
+The pack used to hide a post-Beta block rather than leave it to the engine: `terrain_texture.json`
+pointed **131 atlas tiles** at the transparent `textures/blocks/invisible.png`, and `blocks.json` gave
+**16 blocks** `blockshape: "invisible"` — firefly bush, leaf litter, the four double plants, vines,
+kelp, seagrass, campfire, both lanterns, soul fire, spore blossom, cactus flower and bubble column.
+Vanilla masks nothing, so both mechanisms were the pack's own, and nothing but the smoke test's
+allowlist said so.
+
+Two of them also could not work. The engine animates the **atlas tile**, not the JSON entry, so
+vanilla's own `flipbook_textures.json` repaints a masked tile from its source file: it drives
+`atlas_index 1` of the `firefly_bush` entry from `textures/blocks/firefly_bush_firefly`, which is why
+the masked bush still had animated fireflies on it. That is the same class of defect as the pack's own
+two fire entries, which fed vanilla's fire frames to the **soul fire** tiles.
+
+Decided and implemented: the masking is gone. **105** tiles resolve to their real art again — vanilla's
+own declaration where the corpus has one, otherwise the texture file the pack ships — and the **16**
+block definitions carry vanilla's entry plus the pack's `isotropic: false` convention. **26** shadow
+entries were dropped outright, all legacy shortnames with no art under their own name (`kelp`,
+`tall_seagrass_*`, `double_plant_*`, the per-wood `*_leaf_litter`): vanilla's atlas or the engine's own
+fallback resolves those, and an entry that can only ever resolve to the sentinel is worse than none.
+The pack's two flipbook entries animate the fire tiles they are named for.
+`tests/smoke/maskedBlocks.test.ts` now asserts the inverse of what it used to: no block definition and
+no atlas entry may reach the sentinel, and no flipbook may paint a tile with another tile's frames.
+
+**Still open, and it is the reason the masks existed:** nothing else hides modern decoration, so the
+pre-generated Overworld template (§7) now shows its own plants — firefly bushes, leaf litter, coral,
+kelp — as vanilla art, in a world that is otherwise the era's. Hiding them again means removing them
+**in the world**, which for the Overworld is generation or a wider sweep, never a masked tile. Both
+halves need an in-game look: the atlas cannot be compiled offline, so no test here can show that a
+restored tile actually draws.
 
 ## Why this file exists
 

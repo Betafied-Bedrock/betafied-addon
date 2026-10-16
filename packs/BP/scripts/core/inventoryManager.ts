@@ -13,9 +13,9 @@ import { reportError } from "./errorReporter.js";
 import {
     BH_BOW_ID, BETA_CAPPED_ITEM_IDS, BETA_CAPPED_ITEM_OF, BETA_CAPPED_VANILLA_IDS,
     isBetaItem, isModItem, isVanillaId
-} from "./betaRegistry.js";
+} from "../policy/betaRegistry.js";
 import { ARMOR_SLOTS } from "./equipmentSlots.js";
-import { normalizeItem, resolvePlacerReplacement, FOOD_CONVERSIONS } from "./normalizer.js";
+import { normalizeItem, resolvePlacerTarget, FOOD_CONVERSIONS } from "../policy/normalizer.js";
 import { tickManager } from "./tickManager.js";
 import { eventBus } from "./eventBus.js";
 
@@ -45,15 +45,21 @@ const EQUIPMENT_SLOTS: readonly EquipmentSlot[] = Object.freeze([
 
 type SlotKey = number | EquipmentSlot;
 
-interface SlotAccessor {
-    readonly keys: readonly SlotKey[];
+/**
+ * Each accessor's key domain is known exactly where it is built, so the interface is parameterised
+ * over it: the container accessor takes slot indices and the equipment accessor takes
+ * `EquipmentSlot`s, and neither has to assert a key back down to the type it actually needs. Only
+ * keys from that accessor's own `keys` array are valid, which the type now enforces.
+ */
+interface SlotAccessor<K extends SlotKey> {
+    readonly keys: readonly K[];
     readonly label: string;
-    get(key: SlotKey): ItemStack | undefined;
-    set(key: SlotKey, item: ItemStack | undefined): void;
-    split?(key: SlotKey, targetId: string, amount: number): void;
+    get(key: K): ItemStack | undefined;
+    set(key: K, item: ItemStack | undefined): void;
+    split?(key: K, targetId: string, amount: number): void;
 }
 
-function inventorySlots(player: Player): SlotAccessor | undefined {
+function inventorySlots(player: Player): SlotAccessor<number> | undefined {
     const container = player.getComponent(EntityComponentTypes.Inventory)?.container;
     if (!container) return undefined;
 
@@ -62,33 +68,33 @@ function inventorySlots(player: Player): SlotAccessor | undefined {
     return {
         keys,
         label: "INV: Removed",
-        get: (key) => container.getItem(key as number),
-        set: (key, item) => container.setItem(key as number, item),
-        split: (key, targetId, amount) => handleItemUnstacking(player, container, key as number, targetId, amount)
+        get: (key) => container.getItem(key),
+        set: (key, item) => container.setItem(key, item),
+        split: (key, targetId, amount) => unstackItem(player, container, key, targetId, amount)
     };
 }
 
-function equipmentSlots(player: Player): SlotAccessor | undefined {
+function equipmentSlots(player: Player): SlotAccessor<EquipmentSlot> | undefined {
     const equippable = player.getComponent(EntityComponentTypes.Equippable);
     if (!equippable) return undefined;
 
     return {
         keys: EQUIPMENT_SLOTS,
         label: "INV: Removed equipped",
-        get: (key) => equippable.getEquipment(key as EquipmentSlot),
-        set: (key, item) => equippable.setEquipment(key as EquipmentSlot, item)
+        get: (key) => equippable.getEquipment(key),
+        set: (key, item) => equippable.setEquipment(key, item)
     };
 }
 
-function sweepPlacers(accessor?: SlotAccessor): void {
+function sweepPlacers(accessor?: SlotAccessor<SlotKey>): void {
     if (!accessor) return;
 
     for (const key of accessor.keys) {
         const item = accessor.get(key);
         if (!item) continue;
 
-        const targetId = resolvePlacerReplacement(item.typeId);
-        if (targetId) accessor.set(key, new ItemStack(targetId, item.amount));
+        const target = resolvePlacerTarget(item.typeId);
+        if (target && target.action === "convert") accessor.set(key, new ItemStack(target.targetId, item.amount));
     }
 }
 
@@ -226,11 +232,12 @@ function evaluateVanillaOverride(id: string, item: ItemStack): ItemNormalization
 }
 
 function evaluateRetargetedItem(id: string, item: ItemStack): ItemNormalizationAction | undefined {
-    const placerTarget = resolvePlacerReplacement(id);
-    if (placerTarget) {
-        return item.amount > 1 && BETA_CAPPED_ITEM_IDS.has(placerTarget)
-            ? { type: "unstack_utility", targetId: placerTarget, totalAmount: item.amount }
-            : { type: "replace", item: new ItemStack(placerTarget, item.amount) };
+    const placer = resolvePlacerTarget(id);
+    if (placer && placer.action === "convert") {
+        const targetId = placer.targetId;
+        return item.amount > 1 && BETA_CAPPED_ITEM_IDS.has(targetId)
+            ? { type: "unstack_utility", targetId, totalAmount: item.amount }
+            : { type: "replace", item: new ItemStack(targetId, item.amount) };
     }
 
     const cappedItem = BETA_CAPPED_ITEM_OF[id];
@@ -253,7 +260,7 @@ function evaluateNormalizedItem(id: string, item: ItemStack): ItemNormalizationA
         return { type: "delete", reason: "banned" };
     }
 
-    if (norm.action === "convert" && norm.targetId) {
+    if (norm.action === "convert") {
         const replacement = new ItemStack(norm.targetId, item.amount);
         preserveDurability(item, replacement);
         return { type: "replace", item: replacement };
@@ -277,7 +284,7 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         ?? evaluateNormalizedItem(id, item);
 }
 
-function handleItemUnstacking(player: Player, inv: Container, slotIndex: number, targetId: string, amount: number): void {
+function unstackItem(player: Player, inv: Container, slotIndex: number, targetId: string, amount: number): void {
     const maxStack = maxBetaStackSize(targetId);
     const slotAmount = Math.min(amount, maxStack);
     inv.setItem(slotIndex, new ItemStack(targetId, slotAmount));
@@ -300,7 +307,7 @@ function handleItemUnstacking(player: Player, inv: Container, slotIndex: number,
     }
 }
 
-function sweepStrict(player: Player, accessor?: SlotAccessor): { removed: boolean; stripped: boolean } {
+function sweepStrict(player: Player, accessor?: SlotAccessor<SlotKey>): { removed: boolean; stripped: boolean } {
     if (!accessor) return { removed: false, stripped: false };
 
     let removed = false;

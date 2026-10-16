@@ -54,14 +54,12 @@ test("Quiet teleport", async (t) => {
         teleportQuietly(player, { x: 12, y: 70, z: -4 });
 
         assert.deepEqual(commandFeedbackWrites, [false], "feedback is off before the move is issued");
-        assert.equal(world.gameRules.sendCommandFeedback, false);
         assert.deepEqual(player.location, { x: 0, y: 64, z: 0 }, "the move waits for the rule to land");
 
         drainDeferred();
 
         assert.deepEqual(player.location, { x: 12, y: 70, z: -4 }, "the move still happens");
         assert.deepEqual(commandFeedbackWrites, [false, true], "the restore ends the mute");
-        assert.equal(world.gameRules.sendCommandFeedback, true);
     });
 
     await t.test("says nothing in the player's chat", () => {

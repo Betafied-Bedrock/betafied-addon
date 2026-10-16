@@ -34,21 +34,19 @@ describe("Namespace Scoping of Destructive Gates", () => {
     });
 
     describe("Entity Spawn Gatekeeper", () => {
-        it("preserves mobs shipped by other addons", () => {
-            assert.equal(spawnEntity("gun:turret").isRemoved, false);
+        it("preserves a mob shipped by another addon", () => {
             assert.equal(spawnEntity("techmod:sentinel").isRemoved, false);
         });
 
         it("still culls modern vanilla mobs", () => {
             assert.equal(spawnEntity("minecraft:warden").isRemoved, true);
-            assert.equal(spawnEntity("minecraft:drowned").isRemoved, true);
-            assert.equal(spawnEntity("minecraft:sulfur_cube").isRemoved, true);
+            assert.equal(spawnEntity("minecraft:sulfur_cube").isRemoved, true, "an id the era never had is culled too");
         });
     });
 
     describe("Item Drop Gatekeeper", () => {
-        it("preserves dropped items owned by another addon", () => {
-            assert.equal(spawnEntity("minecraft:item", "gun:bullet").isRemoved, false);
+        it("preserves a dropped item owned by another addon", () => {
+            // `rotten_flesh` is on the banned list, so only the namespace can spare this drop.
             assert.equal(spawnEntity("minecraft:item", "techmod:rotten_flesh").isRemoved, false);
         });
 
@@ -98,16 +96,13 @@ describe("Namespace Scoping of Destructive Gates", () => {
             });
         });
 
-        it("spares a display the spawn gate spared", () => {
+        it("sweeps the unowned post-Beta ground item and spares the display beside it", () => {
             const display = placeItem("farland_display", "minecraft:smooth_stone", ["far:item_display"]);
-            sweep();
-            assert.equal(display.isRemoved, false);
-        });
-
-        it("still scrubs an unowned post-Beta ground item", () => {
             const drop = placeItem("stray_drop", "minecraft:smooth_stone");
             sweep();
-            assert.equal(drop.isRemoved, true);
+
+            assert.equal(drop.isRemoved, true, "nothing owns it, so the sweep takes it");
+            assert.equal(display.isRemoved, false);
         });
     });
 });

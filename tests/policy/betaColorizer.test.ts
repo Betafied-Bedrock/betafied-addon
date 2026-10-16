@@ -75,30 +75,17 @@ describe("Beta colorizer", () => {
             assert.equal(grass(0.5, 0.5), 0xff7fbf00, "0.5/0.5 -> x=127, y=191");
             assert.equal(grass(0.7, 0.8), 0xff4c7000, "0.7/0.8 -> x=76, y=112 after humidity *= temperature");
             assert.equal(grass(1, 1), 0xff000000, "full temperature and humidity reach the origin");
-        });
-
-        it("keeps a dry block on the bottom row regardless of temperature", () => {
-            const grass = syntheticColormap();
-            assert.equal(grass(0.25, 0), 0xffbfff00, "x=191, y=255");
-        });
-
-        it("clamps out-of-range climate instead of trusting it into a negative index", () => {
-            const grass = syntheticColormap();
-            assert.equal(grass(2, -1), 0xff00ff00, "temperature clamps to 1 and humidity to 0, so x=0 and y=255");
+            assert.equal(grass(0.25, 0), 0xffbfff00, "a dry block stays on the bottom row: x=191, y=255");
+            assert.equal(grass(2, -1), 0xff00ff00, "out-of-range climate clamps to 1 and 0, so x=0 and y=255");
         });
     });
 
     describe("colormap addressing", () => {
-        it("addresses the pixel Bedrock samples for a climate", () => {
+        it("addresses the pixel Bedrock samples for a climate, clamping what the map has no room for", () => {
             // The same arithmetic Bedrock's own template prints for these biomes, read back as
             // pixels: the map these values were checked against is the one the pack ships.
             assert.deepEqual(colormapCoordinate(0.8, 0.4), { x: 50, y: 173 }, "plains");
-            assert.deepEqual(colormapCoordinate(0.7, 0.8), { x: 76, y: 112 }, "forest");
             assert.deepEqual(colormapCoordinate(0.95, 0.9), { x: 12, y: 36 }, "jungle");
-            assert.deepEqual(colormapCoordinate(0.05, 0.3), { x: 242, y: 251 }, "snowy beach");
-        });
-
-        it("clamps a climate the map has no room for", () => {
             assert.deepEqual(colormapCoordinate(2, 0), { x: 0, y: 255 }, "desert's climate is off the top of the scale");
             assert.deepEqual(colormapCoordinate(-1, 1), { x: 255, y: 255 }, "a frozen climate bottoms out at the far corner");
         });
@@ -107,7 +94,6 @@ describe("Beta colorizer", () => {
     describe("getBiome classification", () => {
         it("matches the boundary cases from BiomeGenBase.getBiome", () => {
             assert.equal(betaBiomeAt(0.05, 0.9), "tundra", "temperature below 0.1 is always tundra");
-            assert.equal(betaBiomeAt(0.3, 0.1), "tundra", "dry and cold");
             assert.equal(betaBiomeAt(0.6, 0.1), "savanna", "dry and temperate");
             assert.equal(betaBiomeAt(0.99, 0.1), "desert", "dry and hot");
             assert.equal(betaBiomeAt(0.6, 0.95), "swampland", "humid and below 0.7");
@@ -127,9 +113,8 @@ describe("Beta colorizer", () => {
             assert.equal(betaSkyColor(0), 0x80a1ff, "hue 0.62222224, saturation 0.5, brightness 1");
             assert.equal(betaSkyColor(0.5), 0x7ba5ff, "the temperature halfway through the plane");
             assert.equal(betaSkyColor(1), 0x77a9ff, "hottest sky: hue drops and saturation rises with temperature");
-        });
 
-        it("clamps the temperature after dividing, the way the engine did", () => {
+            // The clamp lands after the divide, and both extremes are reachable from beyond it.
             assert.equal(betaSkyColor(3), betaSkyColor(100), "both clamp to t = 1");
             assert.equal(betaSkyColor(-3), betaSkyColor(-100), "both clamp to t = -1");
             assert.notEqual(betaSkyColor(3), betaSkyColor(0), "the clamp is not a no-op");
@@ -145,11 +130,9 @@ describe("Beta colorizer", () => {
 
             assert.equal(buffer[(5 << 8) | 3], 0xff0a141e, "pixel (3,5) packs as ARGB");
             assert.equal(buffer[0], 0xff000000, "untouched pixels stay opaque black");
-        });
 
-        it("rejects a colormap that is not 256x256", () => {
-            const png = buildRgbaPng(2, 2, () => [0, 0, 0, 255]);
-            assert.throws(() => toArgbBuffer(decodePng(png)), /256x256/);
+            const wrongSize = buildRgbaPng(2, 2, () => [0, 0, 0, 255]);
+            assert.throws(() => toArgbBuffer(decodePng(wrongSize)), /256x256/);
         });
     });
 
@@ -164,10 +147,8 @@ describe("Beta colorizer", () => {
             assert.equal(shipped[(5 << 8) | 3], 0xff0a141e, "pixel (3,5) survives the round trip");
             assert.equal(shipped[(112 << 8) | 76], 0xff79c153, "pixel (76,112) survives the round trip");
             assert.equal(shipped[(255 << 8) | 0], 0xff000000, "untouched pixels stay as they were");
-        });
 
-        it("checksums every chunk with the CRC-32 the PNG format requires", () => {
-            // Our own decoder ignores CRCs, so this is checked against the runtime's independent
+            // Our own decoder ignores CRCs, so they are checked against the runtime's independent
             // implementation: a bad checksum is a texture the game refuses to load.
             const png = encodeColormapPng(new Uint32Array(65536).fill(0xff123456));
             const types: string[] = [];

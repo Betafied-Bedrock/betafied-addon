@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -25,7 +25,6 @@ const MOB_CONTROLLERS: Record<string, string> = {
     "controller.render.spider": "packs/RP/entity/spider.entity.json",
     "controller.render.squid": "packs/RP/entity/squid.entity.json",
     "controller.render.wolf": "packs/RP/entity/wolf.entity.json",
-    "controller.render.wolf.v2": "packs/RP/entity/wolf.entity.json",
     "controller.render.zombie": "packs/RP/entity/zombie.entity.json",
     "controller.render.zombie_pigman": "packs/RP/entity/zombie_pigman.entity.json"
 };
@@ -84,11 +83,39 @@ describe("Beta Mob Shading - resource pack contract", () => {
 
     it("darkens wolves further when wet in water or rain", () => {
         const wolf = controllers()["controller.render.wolf"];
-        assert.ok(wolf, "controller.render.wolf must be defined");
         assert.ok(
             String(wolf.light_color_multiplier).includes("is_in_water_or_rain"),
             "wolf must darken when wet"
         );
+    });
+
+    it("keeps the wolf on Beta's one skin set instead of the modern coat variants", () => {
+        // Beta 1.7.3 has a single wolf skin in three states. Vanilla's current client entity indexes
+        // the coat by query.variant and, apart from pale, points every coat at art only vanilla's
+        // own resource pack ships, so a wolf still carrying variant data draws a modern coat.
+        const entityPath = "packs/RP/entity/wolf.entity.json";
+        const description = readJson(entityPath)["minecraft:client_entity"].description;
+        const shipped = controllers();
+
+        for (const identifier of description.render_controllers) {
+            const definition = shipped[identifier];
+            assert.ok(definition, `${entityPath} references ${identifier}, which the pack does not define`);
+            assert.ok(
+                !JSON.stringify(definition).includes("query.variant"),
+                `${identifier} must not pick a coat by variant`
+            );
+        }
+
+        assert.deepEqual(
+            Object.keys(description.textures),
+            ["default", "angry", "tame"],
+            "an unused coat slot would fall through to vanilla's own wolf art"
+        );
+
+        for (const path of Object.values(description.textures) as string[]) {
+            const onDisk = ["png", "tga"].some(ext => existsSync(resolve(root, `packs/RP/${path}.${ext}`)));
+            assert.ok(onDisk, `${entityPath} points at ${path}, which the pack does not ship`);
+        }
     });
 
     it("shades the player with UI paperdoll protection and disables on-fire overlay", () => {

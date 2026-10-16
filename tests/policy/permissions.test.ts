@@ -1,46 +1,80 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { GameMode } from "@minecraft/server";
-import { isInventoryExempt, PRIVILEGED_TAGS } from "../../packs/BP/scripts/core/permissions.js";
+import {
+    getPrivilegeReason,
+    isInventoryExempt,
+    PLAYER_TAGS
+} from "../../packs/BP/scripts/core/permissions.js";
+
+function playerHandle(id: string, gameMode: string, tagged = false): any {
+    return {
+        id,
+        name: id,
+        getGameMode: () => gameMode,
+        hasTag: (tag: string) => tagged && tag === PLAYER_TAGS.BUILDER_EXEMPT
+    };
+}
 
 describe("Permissions & Authorization Policy Tests", () => {
-    it("exempts players in Creative mode", () => {
-        const player = {
-            id: "player_creative_1",
-            name: "Steve",
-            getGameMode: () => GameMode.Creative,
-            hasTag: () => false
+    let lines: string[];
+    let restoreWarnings: () => void;
+
+    // The bypass audit writes through the ambient Bedrock console, so capture it rather than let every
+    // privileged case print a line into the test output.
+    beforeEach(() => {
+        lines = [];
+        const original = console.warn;
+        console.warn = (message?: unknown) => {
+            lines.push(String(message));
         };
-        assert.equal(isInventoryExempt(player as any), true);
+        restoreWarnings = () => {
+            console.warn = original;
+        };
     });
 
-    it("exempts survival players who have the builder_exempt privileged tag", () => {
-        const player = {
-            id: "player_staff_1",
-            name: "Alex",
-            getGameMode: () => GameMode.Survival,
-            hasTag: (tag: string) => tag === PRIVILEGED_TAGS.BUILDER_EXEMPT
-        };
-        assert.equal(isInventoryExempt(player as any), true);
+    afterEach(() => {
+        restoreWarnings();
     });
 
-    it("does not exempt standard survival players without privileged tags", () => {
-        const player = {
-            id: "player_survival_1",
-            name: "Notch",
-            getGameMode: () => GameMode.Survival,
-            hasTag: () => false
-        };
-        assert.equal(isInventoryExempt(player as any), false);
+    it("exempts only Creative and tagged Survival players from the sweep", () => {
+        const cases: [string, string, boolean, boolean][] = [
+            ["player_creative_1", GameMode.Creative, false, true],
+            ["player_staff_1", GameMode.Survival, true, true],
+            ["player_survival_1", GameMode.Survival, false, false],
+            ["player_adv_1", GameMode.Adventure, false, false]
+        ];
+
+        for (const [id, mode, tagged, exempt] of cases) {
+            assert.equal(isInventoryExempt(playerHandle(id, mode, tagged)), exempt, `${id} in ${mode}`);
+        }
     });
 
-    it("does not exempt adventure mode players without tags", () => {
-        const player = {
-            id: "player_adv_1",
-            name: "Herobrine",
-            getGameMode: () => GameMode.Adventure,
-            hasTag: () => false
-        };
-        assert.equal(isInventoryExempt(player as any), false);
+    it("names the reason behind each privileged player, and none behind a survival one", () => {
+        assert.equal(getPrivilegeReason(playerHandle("reason_creative", GameMode.Creative)), "creative");
+        assert.equal(getPrivilegeReason(playerHandle("reason_spectator", GameMode.Spectator)), "spectator");
+        assert.equal(getPrivilegeReason(playerHandle("reason_tagged", GameMode.Survival, true)), "tag");
+        assert.equal(getPrivilegeReason(playerHandle("reason_plain", GameMode.Survival)), null);
+    });
+
+    it("reads a handle that answers no game mode as an unprivileged player", () => {
+        const shapeless = { id: "reason_shapeless", name: "Shapeless", hasTag: () => false };
+
+        assert.equal(getPrivilegeReason(shapeless as any), null);
+    });
+
+    it("records each bypass once per cooldown window, naming the privilege it took", () => {
+        const player = playerHandle("audited_creative", GameMode.Creative);
+
+        isInventoryExempt(player);
+        isInventoryExempt(player);
+        isInventoryExempt(playerHandle("audited_tagged", GameMode.Survival, true));
+
+        assert.equal(lines.length, 2, "a repeat inside the cooldown window is silent");
+        assert.match(
+            lines[0],
+            /^AUTH: Player 'audited_creative' \(audited_creative\) bypassed inventory check via creative mode\.$/
+        );
+        assert.match(lines[1], /bypassed inventory check via builder_exempt tag\.$/);
     });
 });

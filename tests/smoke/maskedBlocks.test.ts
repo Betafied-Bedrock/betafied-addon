@@ -1,31 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Plants, flat overlays and water decorations have no cube silhouette, so masking them is a
-// reasonable way to make a post-Beta block disappear. Anything with a solid cube silhouette is
-// deliberately not listed: masking a cube punches a see-through hole in the terrain until a script
-// gets around to it, and a hole is never what a player should see.
-const MAY_BE_INVISIBLE = new Set([
-    "bubble_column",
-    "cactus_flower",
-    "campfire",
-    "firefly_bush",
-    "kelp",
-    "lantern",
-    "leaf_litter",
-    "lilac",
-    "peony",
-    "pitcher_plant",
-    "rose_bush",
-    "seagrass",
-    "soul_fire",
-    "soul_lantern",
-    "spore_blossom",
-    "sunflower",
-    "vine"
-]);
+// The pack used to make a post-Beta block disappear instead of removing it: a blocks.json entry with
+// blockshape "invisible", or an atlas tile pointed at the transparent sentinel below. Both leave the
+// block standing but unrendered, vanilla masks nothing, and the engine's own flipbook repaints a
+// masked tile from its source file anyway -- which is how a masked firefly bush kept its animated
+// fireflies. These cases keep either mechanism from coming back: a block that post-dates the era
+// belongs to the scrubber, not to the atlas.
+const MASKED_PATH = "textures/blocks/invisible";
+const MASKED_SHORTNAME = "invisible";
 
 // Shortnames the pack's own blocks.json asks the atlas to resolve for Beta materials. Each one has
 // to be declared here: an undeclared shortname falls back to resolution behaviour the pack does not
@@ -65,32 +50,66 @@ const VANILLA_ANIMATED_TILES = [
     "fire_1"
 ];
 
-// The pack's deliberate "make this disappear" sentinel. Masked tiles share it on purpose and a
-// flipbook repainting one with itself is a no-op, so only real block paths are worth asserting on.
-const MASKED_PATH = "textures/blocks/invisible";
-
 const readJson = (path: string): any => JSON.parse(readFileSync(path, "utf-8"));
+
+// Mojang's own files open with a "do not copy this file" comment, which JSON.parse rejects.
+const readCorpusJson = (path: string): any =>
+    JSON.parse(readFileSync(path, "utf-8").replace(/^\s*\/\/.*$/gm, ""));
 
 // The single texture path of an atlas entry, or undefined when it fans out across several tiles.
 const solePath = (entry: any): string | undefined =>
     typeof entry?.textures === "string" ? entry.textures : undefined;
 
-describe("Block Appearance - masked blocks and atlas shortnames", () => {
+// Every tile an atlas entry resolves to, whichever of the three shapes it uses.
+const tilePaths = (entry: any): string[] => {
+    if (!Array.isArray(entry?.textures)) return [entry?.textures].filter((t) => typeof t === "string");
+    return entry.textures.map((t: any) => (typeof t === "string" ? t : t?.path)).filter(Boolean);
+};
+
+// Every shortname a block definition names, carried textures included, so a mask cannot hide behind
+// a carried_textures map the way `seagrass` used to.
+const declaredNames = (definition: any): string[] => {
+    const names: string[] = [];
+    for (const field of ["textures", "carried_textures"]) {
+        const value = definition?.[field];
+        if (typeof value === "string") names.push(value);
+        else if (value && typeof value === "object") names.push(...Object.values(value) as string[]);
+    }
+    return names;
+};
+
+describe("Block Appearance - nothing is masked", () => {
     const root = process.cwd();
     const blocks = readJson(resolve(root, "packs/RP/blocks.json"));
     const atlas = readJson(resolve(root, "packs/RP/textures/terrain_texture.json")).texture_data;
 
-    it("never masks a full cube with the invisible block shape", () => {
+    it("never unrenders a block from its own definition", () => {
         const masked = Object.entries(blocks)
-            .filter(([, definition]: [string, any]) => definition?.blockshape === "invisible")
+            .filter(([, definition]: [string, any]) => {
+                if (definition?.blockshape === "invisible") return true;
+                return declaredNames(definition).some(
+                    (name) => name === MASKED_SHORTNAME || name === MASKED_PATH
+                );
+            })
             .map(([name]) => name);
 
-        for (const name of masked) {
-            assert.ok(
-                MAY_BE_INVISIBLE.has(name),
-                `${name} is a full cube masked with blockshape "invisible"; map it onto a Beta block instead`
-            );
-        }
+        assert.deepEqual(
+            masked,
+            [],
+            "a block may not be masked away; convert it in the scrubber or leave it to vanilla"
+        );
+    });
+
+    it("never points an atlas tile at the transparent sentinel", () => {
+        const masked = Object.entries(atlas)
+            .filter(([, entry]: [string, any]) => tilePaths(entry).includes(MASKED_PATH))
+            .map(([name]) => name);
+
+        assert.deepEqual(
+            masked,
+            [],
+            "an atlas entry must resolve to block art, never to the invisible sentinel"
+        );
     });
 
     // Vanilla's own flipbook targets atlas_index 1 of this entry ("firefly_bush_firefly"), so the
@@ -121,7 +140,7 @@ describe("Block Appearance - masked blocks and atlas shortnames", () => {
 
         for (const [name, entry] of Object.entries(atlas)) {
             const path = solePath(entry);
-            if (path === undefined || path === MASKED_PATH) continue;
+            if (path === undefined) continue;
             for (const [animatedName, animatedPath] of animated) {
                 if (name === animatedName || animatedPath !== path) continue;
                 assert.fail(
@@ -129,6 +148,37 @@ describe("Block Appearance - masked blocks and atlas shortnames", () => {
                         `give '${name}' its own texture file so the flipbook cannot repaint it`
                 );
             }
+        }
+    });
+
+    // A flipbook entry pulls its frames from a texture file and paints them onto an atlas tile, so a
+    // pack entry that names a source file vanilla animates elsewhere is a texture swap dressed as an
+    // override. The two fire entries once did exactly that, feeding vanilla's fire frames to the
+    // soul fire tile the era has no block for. The pack may re-declare an entry -- to step its frames
+    // without blending -- but it has to animate the tile vanilla takes that art for.
+    it("never paints a tile with another tile's frames", () => {
+        const corpus = resolve(
+            root,
+            "reference-docs/bedrock-samples/resource_pack/textures/flipbook_textures.json"
+        );
+        const flipbooks = readJson(resolve(root, "packs/RP/textures/flipbook_textures.json"));
+
+        // reference-docs is a local clone of vanilla's resources and is deliberately not tracked,
+        // so the only list the pack can be held against is the one a developer has restored.
+        if (!existsSync(corpus)) return;
+
+        const vanillaTile = new Map<string, string>(
+            readCorpusJson(corpus).map((entry: any): [string, string] => [entry.flipbook_texture, entry.atlas_tile])
+        );
+
+        for (const entry of flipbooks) {
+            const expected = vanillaTile.get(entry.flipbook_texture);
+            if (expected === undefined) continue;
+            assert.equal(
+                entry.atlas_tile,
+                expected,
+                `${entry.flipbook_texture} animates '${expected}' for vanilla; the pack cannot paint it onto '${entry.atlas_tile}'`
+            );
         }
     });
 });

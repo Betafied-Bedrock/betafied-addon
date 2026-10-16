@@ -3,6 +3,71 @@ import assert from "node:assert/strict";
 import { fogJob } from "../../packs/BP/scripts/world/classicFog.js";
 import { resetMocks, world, Player, mockPlayers } from "../mocks/minecraftServer.js";
 
+const NETHER = "minecraft:nether";
+const OVERWORLD_FOG = "fog @s push classic_water:default_fog beta";
+const NETHER_FOG = "fog @s push mgg:fog_hell beta";
+const CLEAR_OWN_ENTRY = "fog @s remove beta";
+
+/**
+ * The mock registers its nether under Java's `minecraft:the_nether`, which is not the id a real
+ * `Dimension` reports, so this asks for the dimension whose id matches what the engine answers.
+ */
+function nether() {
+    return world.getDimension(NETHER) as any;
+}
+
+function drain(job: Generator<void, void, unknown>): void {
+    while (!job.next().done) {}
+}
+
+describe("Classic Fog Dimension Table", () => {
+    beforeEach(() => {
+        resetMocks();
+    });
+
+    it("pushes the era's own fog for the Nether, not the Overworld's", () => {
+        const player = new Player("nether_fog_player", "nether_fog_player");
+        player.dimension = nether();
+        mockPlayers.push(player);
+
+        drain(fogJob());
+
+        assert.deepEqual(player.commandsRun, [NETHER_FOG]);
+    });
+
+    it("swaps the entry for the Nether's when the player crosses into it", () => {
+        const player = new Player("fog_crosser", "fog_crosser");
+        player.dimension = world.getDimension("minecraft:overworld") as any;
+        mockPlayers.push(player);
+
+        drain(fogJob());
+        drain(fogJob());
+        assert.deepEqual(player.commandsRun, [OVERWORLD_FOG], "a settled player is not re-pushed every pass");
+
+        player.dimension = nether();
+        drain(fogJob());
+
+        assert.deepEqual(
+            player.commandsRun,
+            [OVERWORLD_FOG, CLEAR_OWN_ENTRY, NETHER_FOG],
+            "the Overworld's entry is cleared before the Nether's goes on top of it"
+        );
+    });
+
+    it("leaves the pack's entry off a player in a dimension the era had no fog for", () => {
+        const player = new Player("end_fog_player", "end_fog_player");
+        player.dimension = world.getDimension("minecraft:overworld") as any;
+        mockPlayers.push(player);
+
+        drain(fogJob());
+
+        player.dimension = world.getDimension("minecraft:the_end") as any;
+        drain(fogJob());
+
+        assert.deepEqual(player.commandsRun, [OVERWORLD_FOG, CLEAR_OWN_ENTRY]);
+    });
+});
+
 describe("Classic Fog Player Sweep Batching", () => {
     beforeEach(() => {
         resetMocks();
@@ -17,7 +82,6 @@ describe("Classic Fog Player Sweep Batching", () => {
         }
 
         const job = fogJob();
-        assert.ok(typeof job.next === "function", "fogJob is a generator");
 
         // Batch 1: 5 players
         const step1 = job.next();

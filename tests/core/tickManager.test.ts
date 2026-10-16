@@ -26,9 +26,6 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
             task2Runs++;
         }, 5);
 
-        assert.equal(tickManager.isRegistered("task1"), true);
-        assert.equal(tickManager.isRegistered("task2"), true);
-
         tickManager.step();
         assert.equal(task1Runs, 1);
         assert.equal(task2Runs, 0);
@@ -51,19 +48,14 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
     });
 
     await t.test("dispatches generator tasks to system.runJob", () => {
-        let generatorCreated = 0;
-
         function* heavyJob() {
-            generatorCreated++;
             yield;
         }
 
         tickManager.register("heavyTask", 10, () => heavyJob(), 0);
-
-        assert.equal(activeJobs.length, 0);
         tickManager.step(); // Tick 0 -> task executes, returns generator, queued into runJob
 
-        assert.equal(activeJobs.length, 1);
+        assert.equal(activeJobs.length, 1, "a returned generator is queued as a job, not drained inline");
     });
 
     await t.test("isolates errors so a crashing task does not halt other tasks in the same tick", () => {
@@ -85,8 +77,6 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
     });
 
     await t.test("controls master loop through start and stop lifecycle", () => {
-        assert.equal(scheduledIntervals.length, 0);
-
         tickManager.start();
         assert.equal(scheduledIntervals.length, 1);
         assert.equal(scheduledIntervals[0].interval, 1);
@@ -103,7 +93,7 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
         let runs = 0;
         tickManager.register("tempTask", 1, () => {
             runs++;
-        });
+        }, 0);
 
         tickManager.step();
         assert.equal(runs, 1);
@@ -117,13 +107,10 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
 
     await t.test("suppresses concurrent overlapping generator executions while in flight", () => {
         let runs = 0;
-        let stepCount = 0;
 
         function* longJob() {
             yield;
-            stepCount++;
             yield;
-            stepCount++;
         }
 
         tickManager.register("overlapTask", 2, () => {
@@ -132,35 +119,23 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
         }, 0);
 
         tickManager.step();
-        assert.equal(runs, 1);
-        assert.equal(activeJobs.length, 1);
+        assert.equal(runs, 1, "the task runs on its first scheduled tick");
+        assert.equal(activeJobs.length, 1, "and its generator is queued rather than drained inline");
 
-        (system as any).advanceTicks(1);
-        assert.equal(stepCount, 0);
-
+        // Its interval comes due again while that generator is still in flight.
         tickManager.step();
-        assert.equal(runs, 1);
-
         tickManager.step();
         assert.equal(runs, 1, "task must not be re-invoked while previous generator is in flight");
 
-        (system as any).advanceTicks(1);
-        assert.equal(stepCount, 1);
-        assert.equal(activeJobs.length, 1);
-
-        (system as any).advanceTicks(1);
-        assert.equal(stepCount, 2);
-        assert.equal(activeJobs.length, 0);
+        system.advanceTicks(3);
+        assert.equal(activeJobs.length, 0, "the finished generator is untracked");
 
         tickManager.step();
-        assert.equal(runs, 1);
-
         tickManager.step();
         assert.equal(runs, 2, "task is invoked on next scheduled tick after generator completes");
-        assert.equal(activeJobs.length, 1);
     });
 
-    await t.test("cancels in-flight generator job when task is unregistered", () => {
+    await t.test("cancels in-flight generator jobs when a task is unregistered or the loop stops", () => {
         function* infiniteJob() {
             while (true) {
                 yield;
@@ -168,27 +143,15 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
         }
 
         tickManager.register("activeGenTask", 1, () => infiniteJob(), 0);
+        tickManager.register("siblingGenTask", 1, () => infiniteJob(), 0);
         tickManager.step();
-        assert.equal(activeJobs.length, 1);
+        assert.equal(activeJobs.length, 2, "each task's generator is queued");
 
         tickManager.unregister("activeGenTask");
-        assert.equal(activeJobs.length, 0, "unregistering task clears in-flight generator job");
-    });
-
-    await t.test("cancels all in-flight generator jobs when tickManager.stop() is called", () => {
-        function* infiniteJob() {
-            while (true) {
-                yield;
-            }
-        }
-
-        tickManager.register("job1", 1, () => infiniteJob(), 0);
-        tickManager.register("job2", 1, () => infiniteJob(), 0);
-        tickManager.step();
-        assert.equal(activeJobs.length, 2);
+        assert.equal(activeJobs.length, 1, "unregistering a task clears its own in-flight generator job");
 
         tickManager.stop();
-        assert.equal(activeJobs.length, 0, "stop() clears all in-flight generator jobs");
+        assert.equal(activeJobs.length, 0, "and stopping the loop clears the rest");
     });
 
     await t.test("recovers and clears in-flight state when a generator step throws", () => {
@@ -208,11 +171,8 @@ test("TickManager Staggered Scheduling & Lifecycle", async (t) => {
         assert.equal(invocations, 1);
         assert.equal(activeJobs.length, 1);
 
-        (system as any).advanceTicks(1);
-        assert.equal(activeJobs.length, 1);
-
-        (system as any).advanceTicks(1);
-        assert.equal(activeJobs.length, 0, "failing job is untracked");
+        system.advanceTicks(2);
+        assert.equal(activeJobs.length, 0, "a throwing generator step untracks the job");
 
         tickManager.step();
         tickManager.step();

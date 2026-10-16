@@ -110,7 +110,7 @@ describe("Chunk scrubber - visit order", () => {
         } as never);
 
         // One chunk is swept per pass, so the whole neighbourhood takes one pass per chunk.
-        for (let pass = 0; pass < 9; pass++) {
+        for (let pass = 0; pass < 25; pass++) {
             drain(chunkScanJob());
         }
 
@@ -119,15 +119,13 @@ describe("Chunk scrubber - visit order", () => {
 
         const visited = visitedChunks(log);
 
-        assert.equal(visited.size, 9, `expected a 3x3 neighbourhood, got ${visited.size}: ${[...visited].join(" ")}`);
+        assert.equal(visited.size, 25, `expected a 5x5 neighbourhood, got ${visited.size}: ${[...visited].join(" ")}`);
 
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dz = -1; dz <= 1; dz++) {
-                assert.ok(
-                    visited.has(`${playerChunkX + dx},${playerChunkZ + dz}`),
-                    `expected chunk ${dx},${dz} to be swept`
-                );
-            }
+        for (const [dx, dz] of [[-2, -2], [-2, 2], [2, -2], [2, 2]] as const) {
+            assert.ok(
+                visited.has(`${playerChunkX + dx},${playerChunkZ + dz}`),
+                `expected the corner ${dx},${dz} to be in the ring`
+            );
         }
     });
 
@@ -145,17 +143,17 @@ describe("Chunk scrubber - visit order", () => {
         mockPlayers.push({ isValid: true, location: { x: 3000, y: 13, z: 3000 }, dimension } as never);
 
         // One chunk is swept per pass, so the neighbourhood takes one pass per chunk.
-        for (let pass = 0; pass < 9; pass++) {
+        for (let pass = 0; pass < 25; pass++) {
             drain(chunkScanJob());
         }
 
         assert.equal(
             warnings.lines.filter(line => line.includes("during fineScrubQuery")).length,
             1,
-            `expected one line for nine chunks, got: ${warnings.lines.join(" | ")}`
+            `expected one line for twenty-five chunks, got: ${warnings.lines.join(" | ")}`
         );
         // The sweep still did its work; silencing the report must not be done by skipping the pass.
-        assert.equal(visitedChunks(log).size, 9, "the whole neighbourhood must still be swept");
+        assert.equal(visitedChunks(log).size, 25, "the whole neighbourhood must still be swept");
     });
 
     it("moves on while the chunk under the player is still mid-sweep", () => {
@@ -207,7 +205,7 @@ describe("Chunk scrubber - visit order", () => {
             mockPlayers.length = 0;
             mockPlayers.push({ isValid: true, location: { x: 0, y: 13, z: 0 }, dimension: scanDimension(log, undefined, id) } as never);
 
-            for (let pass = 0; pass < 9; pass++) {
+            for (let pass = 0; pass < 25; pass++) {
                 drain(chunkScanJob());
             }
 

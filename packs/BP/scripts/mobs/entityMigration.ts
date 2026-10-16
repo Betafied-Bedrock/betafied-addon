@@ -1,6 +1,6 @@
 import { Entity, EntityComponentTypes } from "@minecraft/server";
-import { isBetaMob } from "../core/betaRegistry.js";
-import { runCatching } from "../core/errorReporter.js";
+import { isBetaMob } from "../policy/betaRegistry.js";
+import { reportError, runCatching } from "../core/errorReporter.js";
 
 export interface EntityPropertyRule {
     readonly identifier: string;
@@ -43,67 +43,111 @@ export const BETA_ENTITY_EFFECT_REMOVAL_RULES: readonly EntityEffectRemovalRule[
     }
 ]);
 
+/**
+ * What one migration pass runs. Configuration arrives as a single object, the way the sibling
+ * sanitizer takes it, so the two hooks a caller runs over an entity are configured alike.
+ */
+export interface EntityMigrationOptions {
+    readonly propertyRules: readonly EntityPropertyRule[];
+    readonly effectRules: readonly EntityEffectRule[];
+    readonly removalRules: readonly EntityEffectRemovalRule[];
+}
+
+export const BETA_ENTITY_MIGRATION: EntityMigrationOptions = Object.freeze({
+    propertyRules: BETA_ENTITY_PROPERTY_RULES,
+    effectRules: BETA_ENTITY_EFFECT_RULES,
+    removalRules: BETA_ENTITY_EFFECT_REMOVAL_RULES
+});
+
+/** A rule without a type list is one every entity the pass sees is asked about. */
+function ruleAppliesTo(rule: { readonly targetTypes?: ReadonlySet<string> }, typeId: string): boolean {
+    return rule.targetTypes === undefined || rule.targetTypes.has(typeId);
+}
+
+/**
+ * A property the entity does not carry yet is the unmigrated one. The reset asks the entity's own
+ * definition for it, and a refusal there is the only signal that the rule's default is what repairs
+ * the value rather than the definition already agreeing with it.
+ */
+function repairProperty(entity: Entity, rule: EntityPropertyRule): void {
+    if (entity.getProperty(rule.identifier) !== undefined) return;
+
+    try {
+        entity.resetProperty(rule.identifier);
+    } catch (err) {
+        // A refused reset is what routes us to the rule's default, and it is the only signal that the
+        // property was repaired rather than already correct.
+        reportError({
+            system: "entityMigration",
+            operation: "resetProperty",
+            target: `${entity.typeId}:${rule.identifier}`
+        }, err);
+
+        if (rule.defaultValue !== undefined) {
+            entity.setProperty(rule.identifier, rule.defaultValue);
+        }
+    }
+}
+
+/** The effect an entity is missing, added only where its own definition can carry the swap. */
+function applyEffect(entity: Entity, rule: EntityEffectRule): void {
+    if (rule.requireComponent && !entity.hasComponent(rule.requireComponent)) return;
+    if (entity.getEffect(rule.effectType)) return;
+
+    entity.addEffect(rule.effectType, rule.duration, {
+        showParticles: rule.showParticles
+    });
+}
+
+/**
+ * An effect this pack put on an entity that no longer justifies it. Twenty million ticks outlive the
+ * save, so it has to be taken back rather than waited out.
+ */
+function withdrawEffect(entity: Entity, rule: EntityEffectRemovalRule): void {
+    if (entity.hasComponent(rule.absentComponent)) return;
+    if (!entity.getEffect(rule.effectType)) return;
+
+    entity.removeEffect(rule.effectType);
+}
+
 export function migrateEntity(
     entity: Entity | undefined,
-    propertyRules: readonly EntityPropertyRule[] = BETA_ENTITY_PROPERTY_RULES,
-    effectRules: readonly EntityEffectRule[] = BETA_ENTITY_EFFECT_RULES,
-    removalRules: readonly EntityEffectRemovalRule[] = BETA_ENTITY_EFFECT_REMOVAL_RULES
+    options: EntityMigrationOptions = BETA_ENTITY_MIGRATION
 ): void {
     if (!entity || !entity.isValid) return;
 
     if (!isBetaMob(entity.typeId)) return;
 
+    const { propertyRules, effectRules, removalRules } = options;
+    const typeId = entity.typeId;
+
     for (const rule of propertyRules) {
-        if (rule.targetTypes && !rule.targetTypes.has(entity.typeId)) continue;
+        if (!ruleAppliesTo(rule, typeId)) continue;
 
         runCatching({
             system: "entityMigration",
             operation: "migrateProperty",
-            target: `${entity.typeId}:${rule.identifier}`
-        }, () => {
-            if (entity.getProperty(rule.identifier) === undefined) {
-                try {
-                    entity.resetProperty(rule.identifier);
-                } catch {
-                    if (rule.defaultValue !== undefined) {
-                        entity.setProperty(rule.identifier, rule.defaultValue);
-                    }
-                }
-            }
-        });
+            target: `${typeId}:${rule.identifier}`
+        }, () => repairProperty(entity, rule));
     }
 
     for (const rule of effectRules) {
-        if (rule.targetTypes && !rule.targetTypes.has(entity.typeId)) continue;
+        if (!ruleAppliesTo(rule, typeId)) continue;
 
         runCatching({
             system: "entityMigration",
             operation: "migrateEffect",
-            target: `${entity.typeId}:${rule.effectType}`
-        }, () => {
-            if (rule.requireComponent && !entity.hasComponent(rule.requireComponent)) return;
-
-            if (!entity.getEffect(rule.effectType)) {
-                entity.addEffect(rule.effectType, rule.duration, {
-                    showParticles: rule.showParticles
-                });
-            }
-        });
+            target: `${typeId}:${rule.effectType}`
+        }, () => applyEffect(entity, rule));
     }
 
     for (const rule of removalRules) {
-        if (rule.targetTypes && !rule.targetTypes.has(entity.typeId)) continue;
+        if (!ruleAppliesTo(rule, typeId)) continue;
 
         runCatching({
             system: "entityMigration",
             operation: "removeEffect",
-            target: `${entity.typeId}:${rule.effectType}`
-        }, () => {
-            if (entity.hasComponent(rule.absentComponent)) return;
-
-            if (entity.getEffect(rule.effectType)) {
-                entity.removeEffect(rule.effectType);
-            }
-        });
+            target: `${typeId}:${rule.effectType}`
+        }, () => withdrawEffect(entity, rule));
     }
 }

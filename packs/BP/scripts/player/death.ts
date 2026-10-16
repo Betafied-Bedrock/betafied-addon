@@ -9,9 +9,8 @@ import {
     world
 } from "@minecraft/server";
 import type { DimensionLocation, Vector3 } from "@minecraft/server";
-import { OVERWORLD_KEY } from "../core/betaConstants.js";
+import { OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
-import { damageArmor } from "../combat/armor.js";
 import { eventBus } from "../core/eventBus.js";
 import { teleportQuietly } from "../core/quietTeleport.js";
 import { tickManager } from "../core/tickManager.js";
@@ -25,6 +24,17 @@ import type { DeathScreenHandlers } from "./deathScreen.js";
 
 export const DEAD_PROPERTY = "bh:dead";
 export const PRE_DEATH_GAMEMODE_PROPERTY = "bh:pre_death_gamemode";
+
+/**
+ * The modes a death can hand back. Spectator is excluded because it is the pack's own park for the
+ * dead, and the rest are checked as members rather than trusted: a property written by an older
+ * build, or edited by hand, otherwise reaches setGameMode as a mode that does not exist.
+ */
+const RESTORABLE_MODES: ReadonlySet<string> = Object.freeze(new Set([
+    GameMode.Survival,
+    GameMode.Creative,
+    GameMode.Adventure
+]));
 
 /**
  * The respawn's destination for a player without a bed, recorded once per world. Bedrock reports the
@@ -140,6 +150,14 @@ function puffDeathCorpse(player: Player): void {
     }
 }
 
+/** The corpse puff, on the tick the era removed the body; the player can respawn inside the delay. */
+function puffCorpseAfterFlop(player: Player): void {
+    if (!player.isValid || !isDead(player)) return;
+    runCatching({ system: "death", operation: "puffDeathCorpse", target: player.name }, () => {
+        puffDeathCorpse(player);
+    });
+}
+
 /**
  * `RenderLiving.rotateCorpse` turns a corpse `getDeathMaxRotation` degrees about Z over its first ~0.7s
  * (`RenderLiving.java:120-132`; 90 for a player, which `RenderPlayer` does not override for a dead one).
@@ -151,12 +169,7 @@ function playDeathFlop(player: Player): void {
         player.playAnimation(DEATH_FLOP_ANIMATION);
     });
 
-    system.runTimeout(() => {
-        if (!player.isValid || !isDead(player)) return;
-        runCatching({ system: "death", operation: "puffDeathCorpse", target: player.name }, () => {
-            puffDeathCorpse(player);
-        });
-    }, DEATH_PUFF_DELAY_TICKS);
+    system.runTimeout(() => puffCorpseAfterFlop(player), DEATH_PUFF_DELAY_TICKS);
 }
 
 function standCorpseBackUp(player: Player): void {
@@ -179,7 +192,6 @@ export function enterDeathState(player: Player): void {
         showDeathScreen(player, DEATH_SCREEN_HANDLERS);
         playDeathFlop(player);
 
-        damageArmor(player);
         dropMainInventory(player);
         dropWornEquipment(player);
     } catch (e) {
@@ -234,8 +246,10 @@ export function respawnPlayer(player: Player): void {
         standCorpseBackUp(player);
         setMovementLocked(player, false);
 
-        const mode = typeof remembered === "string" ? (remembered as GameMode) : GameMode.Survival;
-        player.setGameMode(mode === GameMode.Spectator ? GameMode.Survival : mode);
+        const mode = typeof remembered === "string" && RESTORABLE_MODES.has(remembered)
+            ? (remembered as GameMode)
+            : GameMode.Survival;
+        player.setGameMode(mode);
 
         player.getComponent(EntityComponentTypes.Health)?.resetToMaxValue();
 
@@ -298,7 +312,9 @@ const DEATH_SCREEN_HANDLERS: DeathScreenHandlers = {
     onTitleMenu: (player) => respawnPlayer(player)
 };
 
-tickManager.register("deathState", 2, () => {
+const DEATH_STATE_INTERVAL_TICKS = 2;
+
+tickManager.register("deathState", DEATH_STATE_INTERVAL_TICKS, () => {
     for (const player of world.getAllPlayers()) {
         assertDeathState(player);
 
@@ -306,7 +322,7 @@ tickManager.register("deathState", 2, () => {
             showDeathScreen(player, DEATH_SCREEN_HANDLERS);
         }
     }
-});
+}, 0);
 
 eventBus.onPlayerSpawn((ev) => {
     if (!ev.initialSpawn) return;

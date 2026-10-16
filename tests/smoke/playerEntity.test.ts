@@ -103,19 +103,25 @@ describe("Player Client Entity - First-Person Animation Contract", () => {
         );
     });
 
-    it("keeps the mine sweep entry point wired so the attack swing can run", () => {
-        const animations = clientEntityDescription().animations;
+    it("keeps the controller aliases and the public variables the arm swing reads", () => {
+        const description = clientEntityDescription();
 
-        assert.equal(animations.root, "controller.animation.player.root");
-        assert.equal(animations.first_person_attack_controller, "controller.animation.player.first_person_attack");
-        assert.equal(animations.first_person_attack_rotation, "animation.player.first_person.attack_rotation");
-    });
-
-    it("exposes the attack and item-use variables to attachables", () => {
-        const variables = clientEntityDescription().scripts.variables;
+        assert.equal(description.animations.root, "controller.animation.player.root");
+        assert.equal(
+            description.animations.first_person_attack_controller,
+            "controller.animation.player.first_person_attack"
+        );
+        assert.equal(
+            description.animations.first_person_attack_rotation,
+            "animation.player.first_person.attack_rotation"
+        );
 
         for (const name of PUBLIC_VARIABLES) {
-            assert.equal(variables[name], "public", `${name} must stay declared as a public variable`);
+            assert.equal(
+                description.scripts.variables[name],
+                "public",
+                `${name} must stay declared as a public variable`
+            );
         }
     });
 

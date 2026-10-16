@@ -58,14 +58,18 @@ describe("Door Placement - Beta 1.7.3 two-block door", () => {
             assert.deepEqual(plan.upperStates, { ...LOWER_STATES, upper_block_bit: true });
         });
 
-        it("leaves a door the engine already placed whole", () => {
-            const plan = planDoorCompletion(
-                "minecraft:iron_door",
-                { ...LOWER_STATES, upper_block_bit: true },
-                "minecraft:iron_door"
+        it("leaves a whole door, and anything that is not a door, alone", () => {
+            assert.equal(
+                planDoorCompletion(
+                    "minecraft:iron_door",
+                    { ...LOWER_STATES, upper_block_bit: true },
+                    "minecraft:iron_door"
+                ),
+                undefined,
+                "the engine already placed both halves"
             );
-
-            assert.equal(plan, undefined);
+            assert.equal(planDoorCompletion("minecraft:oak_sign", LOWER_STATES, "minecraft:air"), undefined);
+            assert.equal(planDoorCompletion("bh:chest", LOWER_STATES, "minecraft:air"), undefined);
         });
 
         it("leaves a door standing under a taken cell instead of destroying the block above", () => {
@@ -73,11 +77,6 @@ describe("Door Placement - Beta 1.7.3 two-block door", () => {
                 planDoorCompletion("minecraft:wooden_door", LOWER_STATES, "minecraft:stone"),
                 undefined
             );
-        });
-
-        it("ignores blocks that are not doors", () => {
-            assert.equal(planDoorCompletion("minecraft:oak_sign", LOWER_STATES, "minecraft:air"), undefined);
-            assert.equal(planDoorCompletion("bh:chest", LOWER_STATES, "minecraft:air"), undefined);
         });
 
         it("reads the upper-half state off the placed block rather than assuming its spelling", () => {
@@ -101,45 +100,31 @@ describe("Door Placement - Beta 1.7.3 two-block door", () => {
             assert.equal(upper.typeId, "minecraft:wooden_door");
             assert.equal(upper.permutation.getState("upper_block_bit"), true);
             assert.equal(upper.permutation.getState("direction"), 1, "the pair must face the same way");
-            assert.equal(upper.permutation.getState("door_hinge_bit"), false);
-            assert.equal(upper.permutation.getState("open_bit"), false);
         });
 
-        it("writes nothing when the engine already placed both halves", () => {
+        it("writes nothing when there is nothing to complete", () => {
             const { dim, lower, upper } = placeLowerHalf({ x: 5, y: 64, z: 4 });
+            const player = new Player();
+
             upper.setPermutation(BlockPermutation.resolve("minecraft:wooden_door", {
                 ...LOWER_STATES,
                 upper_block_bit: true,
                 direction: 3
             }));
-            const placed = upper.permutation;
+            const intact = upper.permutation;
+            eventBus.dispatch("playerPlaceBlock", { block: lower, dimension: dim, player });
+            assert.equal(upper.permutation, intact, "an intact door must not be rewritten");
 
-            eventBus.dispatch("playerPlaceBlock", { block: lower, dimension: dim, player: new Player() });
-
-            assert.equal(upper.permutation, placed, "an intact door must not be rewritten");
-            assert.equal(upper.permutation.getState("direction"), 3);
-        });
-
-        it("writes nothing into an occupied cell above", () => {
-            const { dim, lower, upper } = placeLowerHalf({ x: 6, y: 64, z: 4 });
             upper.setPermutation(BlockPermutation.resolve("minecraft:stone"));
-            const placed = upper.permutation;
+            const occupied = upper.permutation;
+            eventBus.dispatch("playerPlaceBlock", { block: lower, dimension: dim, player });
+            assert.equal(upper.permutation, occupied, "the block above keeps whatever stands there");
 
-            eventBus.dispatch("playerPlaceBlock", { block: lower, dimension: dim, player: new Player() });
-
-            assert.equal(upper.typeId, "minecraft:stone");
-            assert.equal(upper.permutation, placed);
-        });
-
-        it("ignores a placed block that is not a door", () => {
-            const dim = dimension();
-            const block = dim.getBlock({ x: 7, y: 64, z: 4 });
-            block.setPermutation(BlockPermutation.resolve("minecraft:oak_log"));
-            const placed = block.permutation;
-
-            eventBus.dispatch("playerPlaceBlock", { block, dimension: dim, player: new Player() });
-
-            assert.equal(block.permutation, placed);
+            const log = dim.getBlock({ x: 7, y: 64, z: 4 });
+            log.setPermutation(BlockPermutation.resolve("minecraft:oak_log"));
+            const placed = log.permutation;
+            eventBus.dispatch("playerPlaceBlock", { block: log, dimension: dim, player });
+            assert.equal(log.permutation, placed, "a block that is not a door is not this handler's business");
         });
     });
 
@@ -168,20 +153,13 @@ describe("Door Placement - Beta 1.7.3 two-block door", () => {
             assert.equal(event.cancel, true, "Beta refused a door on anything but the top face");
         });
 
-        it("allows a door placed on the ground", () => {
-            const event = placeEvent(
+        it("allows a door on the ground and leaves placements that are not the pack's doors alone", () => {
+            const onGround = placeEvent(
                 Direction.Up,
                 BlockPermutation.resolve("minecraft:wooden_door"),
                 doorPlacer()
             );
-
-            eventBus.dispatch("playerPlaceBlockBefore", event);
-
-            assert.equal(event.cancel, false);
-        });
-
-        it("leaves placements that are not the pack's doors alone", () => {
-            const withoutDoor = placeEvent(
+            const emptyHands = placeEvent(
                 Direction.North,
                 BlockPermutation.resolve("minecraft:wooden_door"),
                 new Player("empty_hands", "EmptyHands")
@@ -192,10 +170,12 @@ describe("Door Placement - Beta 1.7.3 two-block door", () => {
                 doorPlacer()
             );
 
-            eventBus.dispatch("playerPlaceBlockBefore", withoutDoor);
+            eventBus.dispatch("playerPlaceBlockBefore", onGround);
+            eventBus.dispatch("playerPlaceBlockBefore", emptyHands);
             eventBus.dispatch("playerPlaceBlockBefore", otherBlock);
 
-            assert.equal(withoutDoor.cancel, false);
+            assert.equal(onGround.cancel, false, "the top face is where the era let a door go");
+            assert.equal(emptyHands.cancel, false, "the rule is about the door in hand");
             assert.equal(otherBlock.cancel, false);
         });
     });

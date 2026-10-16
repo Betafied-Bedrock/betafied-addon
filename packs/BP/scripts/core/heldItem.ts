@@ -1,12 +1,13 @@
 import {
     EntityComponentTypes,
-    EquipmentSlot,
-    GameMode
+    EquipmentSlot
 } from "@minecraft/server";
 import type { Player } from "@minecraft/server";
+import { getPrivilegeReason } from "./permissions.js";
 
 export function consumeHeldItem(player: Player, accepts: (typeId: string) => boolean): void {
-    if (player.getGameMode() === GameMode.Creative) return;
+    // Creative places without spending the item; the builder tag buys an inventory sweep, not a cost.
+    if (getPrivilegeReason(player) === "creative") return;
 
     const equippable = player.getComponent(EntityComponentTypes.Equippable);
     const held = equippable?.getEquipment(EquipmentSlot.Mainhand);

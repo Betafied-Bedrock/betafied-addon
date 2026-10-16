@@ -248,6 +248,14 @@ function packageWorldTemplate(tag, triple, outDir, sources) {
   const bpManifest = JSON.parse(fs.readFileSync(path.join(bpStaging, "manifest.json"), "utf8"));
   const rpManifest = JSON.parse(fs.readFileSync(path.join(rpStaging, "manifest.json"), "utf8"));
 
+  // A world template's header requires `base_game_version`, and it is what selects the vintage of
+  // vanilla data the world plays with. Taking it from the pack being shipped means the world can
+  // never load against older vanilla data than the packs were built for.
+  const baseGameVersion = bpManifest.header.min_engine_version;
+  if (!Array.isArray(baseGameVersion) || baseGameVersion.length !== 3 || !baseGameVersion.every(Number.isInteger)) {
+    fail("the behavior pack export has no min_engine_version triple to use as the template's base_game_version");
+  }
+
   const bpEntry = [{ pack_id: bpManifest.header.uuid, version: bpManifest.header.version }];
   const rpEntry = [{ pack_id: rpManifest.header.uuid, version: rpManifest.header.version }];
 
@@ -268,6 +276,7 @@ function packageWorldTemplate(tag, triple, outDir, sources) {
   }
   const updated = applyWorldTemplateManifest(JSON.parse(fs.readFileSync(templateManifestPath, "utf8")), triple, {
     name: `Betafied ${tag}`,
+    baseGameVersion,
   });
   const templateProblems = worldTemplateManifestProblems(updated);
   if (templateProblems.length > 0) {

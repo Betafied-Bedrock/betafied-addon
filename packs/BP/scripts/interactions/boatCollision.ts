@@ -2,18 +2,30 @@ import { world, ItemStack, Entity, Block, Vector3 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { OVERWORLD_KEY } from "../core/betaConstants.js";
+import { OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { normalizeXZ, scale } from "../core/vectorMath.js";
 
 const CONFIG = Object.freeze({
-    TICK_INTERVAL: 10,
+    // Beta read the boat's motion at the tick its move was blocked, so a shore it rammed was only ever
+    // seen from the tick before the stop. The pass therefore has to be short enough to catch the boat
+    // still travelling within the block it is about to hit: at the era's 0.4 blocks a tick, two ticks
+    // is 0.8, and the four cells this reads reach two blocks out.
+    TICK_INTERVAL: 2,
     BOATS_PER_TICK: 10,
+    // `EntityBoat.onUpdate` destroyed a boat only when the move itself was blocked at speed:
+    // `isCollidedHorizontally && var6 > 0.15D`, var6 being sqrt(motionX^2 + motionZ^2) in blocks a tick
+    // and read before that tick's decay. Contact below it decayed the motion and left the boat alone.
+    BREAK_SPEED: 0.15,
     NON_SOLID_WHITELIST: Object.freeze(["minecraft:air", "minecraft:water", "minecraft:soul_sand"])
 });
 
+// The era's condition is a horizontal collision with a solid block's box, so nothing a boat can travel
+// through may read as shoreline. `flowing_water` is its own block id on this engine and is what a
+// stream's surface cell carries, so a stream was breaking boats outright.
 function isSolidBlock(block: Block | undefined): boolean {
     const id = block?.typeId;
-    return Boolean(id && !CONFIG.NON_SOLID_WHITELIST.includes(id));
+    if (!id || CONFIG.NON_SOLID_WHITELIST.includes(id)) return false;
+    return !block.isLiquid;
 }
 
 function breakBoatWithParts(boat: Entity): void {
@@ -51,18 +63,21 @@ export function* boatLoopJob(): Generator<void, void, unknown> {
                 { x, z: z + 1 }, { x, z: z - 1 }
             ];
 
+            const vel: Vector3 = boat.getVelocity();
+
             let broken = false;
-            for (const offset of offsets) {
-                const block = overworld.getBlock({ x: offset.x, y, z: offset.z });
-                if (isSolidBlock(block)) {
-                    breakBoatWithParts(boat);
-                    broken = true;
-                    break;
+            if (Math.hypot(vel.x, vel.z) > CONFIG.BREAK_SPEED) {
+                for (const offset of offsets) {
+                    const block = overworld.getBlock({ x: offset.x, y, z: offset.z });
+                    if (isSolidBlock(block)) {
+                        breakBoatWithParts(boat);
+                        broken = true;
+                        break;
+                    }
                 }
             }
 
             if (!broken) {
-                const vel: Vector3 = boat.getVelocity();
                 if (vel && (Math.abs(vel.x) >= 0.01 || Math.abs(vel.z) >= 0.01)) {
                     const blockBelow = overworld.getBlock({
                         x: Math.floor(loc.x),
@@ -99,7 +114,11 @@ export function* boatLoopJob(): Generator<void, void, unknown> {
     }
 }
 
-export function processBoats(): void {
+/**
+ * Runs the boat pass to completion in one go, which is how a test drives it: the tick pass registers
+ * the generator and yields every few boats instead.
+ */
+export function boatCollisionJob(): void {
     const job = boatLoopJob();
     while (!job.next().done) {
         // Drain generator synchronously

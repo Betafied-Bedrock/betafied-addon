@@ -3,13 +3,11 @@ import type { Block, BlockPermutation, Dimension, Entity, Vector3 } from "@minec
 import { tickManager } from "../core/tickManager.js";
 import { eventBus } from "../core/eventBus.js";
 import { runCatching, reportError } from "../core/errorReporter.js";
-import { BH_FENCE_ID } from "../core/betaRegistry.js";
-
-function walkRuleApplies(mode: GameMode | undefined): boolean {
-    return mode !== GameMode.Creative && mode !== GameMode.Spectator;
-}
+import { BH_FENCE_ID } from "../policy/betaRegistry.js";
+import { eraRulesApply } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({
+    TICK_INTERVAL: 1,
     MOB_INTERVAL: 2,
     MOB_RADIUS: 24,
     DISTANCE_WALKED_MODIFIER: 0.6,
@@ -321,7 +319,7 @@ function sample(entity: Entity, nowTick: number, mode?: GameMode): void {
 }
 
 function walkRule(entity: Entity, nowTick: number, mode?: GameMode): void {
-    if (!walkRuleApplies(mode)) return;
+    if (!eraRulesApply(mode)) return;
 
     const id = entity.id;
     const location = entity.location;
@@ -443,4 +441,4 @@ eventBus.onPlayerPlaceBlock((event) => {
     forgetLandingsAt(event.block.location);
 });
 
-tickManager.register("cropTrampling", 1, cropTramplingJob);
+tickManager.register("cropTrampling", CONFIG.TICK_INTERVAL, cropTramplingJob, 0);

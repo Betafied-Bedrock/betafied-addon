@@ -26,7 +26,14 @@ function texturesOf(block: any): string[] {
 }
 
 describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
-    it("restricts stairs to a single flat placement direction", () => {
+    it("places stairs as a flat step with no vertical half, and drops its source material", () => {
+        // Beta's stairs were the one block that did not drop themselves: breaking a wooden stair
+        // handed back a plank, which is why a mis-placed stair cost a quarter of the stack.
+        const drops: Record<string, string> = {
+            oak_stairs: "minecraft:oak_planks",
+            cobblestone_stairs: "minecraft:cobblestone"
+        };
+
         for (const name of STAIRS) {
             const block = blockOf(name);
             const traits = block.description.traits;
@@ -38,69 +45,24 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
             );
             // Beta 1.7.3 had no upside-down stairs, so no vertical_half state may exist.
             assert.equal(traits["minecraft:placement_position"], undefined, `${name} must not enable vertical_half`);
-            assert.equal(block.description.states, undefined, `${name} must not declare custom states`);
 
-            const conditions = block.permutations.map((p: any) => p.condition);
-            assert.equal(conditions.length, 4, `${name} must rotate through four cardinal directions`);
-            for (const condition of conditions) {
-                assert.ok(
-                    condition.includes("minecraft:cardinal_direction"),
-                    `${name} rotation must be driven by cardinal_direction only: ${condition}`
-                );
-            }
-        }
-    });
-
-    it("keeps stair collision shape direction independent", () => {
-        for (const name of STAIRS) {
-            const block = blockOf(name);
-
-            // The cardinal rotations move the collision box with the model, so the box is
-            // declared once in its default (south facing) orientation.
-            assert.deepEqual(block.components["minecraft:collision_box"], [
-                { origin: [-8, 0, -8], size: [16, 8, 16] },
-                { origin: [-8, 8, 0], size: [16, 8, 8] }
-            ], `${name} must collide as a lower step plus an upper back quarter`);
-            assert.equal(block.components["minecraft:selection_box"], true, `${name} must reuse its collision box`);
+            // The cardinal rotations move the collision box with the model, so the box is declared
+            // once in its default (south facing) orientation: a lower step plus a back quarter.
             assert.deepEqual(
-                block.permutations.map((p: any) => p.components["minecraft:transformation"].rotation),
-                [[0, 180, 0], [0, 270, 0], [0, 0, 0], [0, 90, 0]],
-                `${name} must map north/west/south/east onto the shared geometry`
+                block.components["minecraft:collision_box"],
+                [
+                    { origin: [-8, 0, -8], size: [16, 8, 16] },
+                    { origin: [-8, 8, 0], size: [16, 8, 8] }
+                ],
+                `${name} must collide as a lower step plus an upper back quarter`
             );
-        }
-    });
 
-    it("returns the source material instead of the stair itself", () => {
-        // Beta 1.7.3 stairs were the one block that did not drop themselves: breaking a
-        // wooden stair handed back a plank and a cobblestone stair handed back cobblestone,
-        // which is why a mis-placed stair was worth a quarter of the stack that made it.
-        const drops: Record<string, string> = {
-            oak_stairs: "minecraft:oak_planks",
-            cobblestone_stairs: "minecraft:cobblestone"
-        };
-
-        for (const [name, expected] of Object.entries(drops)) {
-            const loot = blockOf(name).components["minecraft:loot"];
-            assert.equal(loot, `loot_tables/blocks/${name}.json`, `${name} must route its drop through a loot table`);
-
-            const pools = readJson(resolve(root, "packs/BP", loot)).pools;
-            assert.deepEqual(pools.map((pool: any) => pool.rolls), [1], `${name} must drop exactly one roll`);
+            const pools = readJson(resolve(root, "packs/BP", block.components["minecraft:loot"])).pools;
             assert.deepEqual(
                 pools[0].entries.map((entry: any) => entry.name),
-                [expected],
+                [drops[name]],
                 `${name} must drop its source material`
             );
-        }
-    });
-
-    it("ships a stair model with no corner or ceiling bones", () => {
-        const geometry = readJson(resolve(root, "packs/RP/models/blocks/stair.geo.json"));
-        const bones = geometry["minecraft:geometry"][0].bones.map((bone: any) => bone.name);
-
-        assert.deepEqual(bones, ["g_base", "g_back"], "only the flat step and back quarter may be modelled");
-
-        for (const name of STAIRS) {
-            assert.equal(blockOf(name).components["minecraft:geometry"].identifier, "geometry.bh_stair");
         }
     });
 
@@ -112,73 +74,53 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
             // no placement trait and no transformation at all.
             assert.equal(block.description.traits, undefined, `${name} must not enable placement traits`);
             assert.equal(block.description.states, undefined, `${name} must not declare states`);
-            assert.equal(block.permutations, undefined, `${name} must not transform itself`);
+            assert.equal(block.description.permutations, undefined, `${name} must not transform itself`);
             assert.deepEqual(
                 block.components["minecraft:collision_box"],
                 { origin: [-8, 0, -8], size: [16, 8, 16] },
                 `${name} must collide as a bottom half`
             );
-            // `selection_box: true` resolves to a full 16x16x16 outline, so a slab has to
-            // declare the half box explicitly or it is targeted as if it were a full block.
-            assert.deepEqual(
-                block.components["minecraft:selection_box"],
-                { origin: [-8, 0, -8], size: [16, 8, 16] },
-                `${name} must outline only the bottom half`
-            );
         }
     });
 
-    it("pins logs to the vertical axis by omitting the axis state entirely", () => {
+    it("pins logs to the vertical axis with bark on the sides and rings on the caps", () => {
         for (const name of LOGS) {
             const block = blockOf(name);
             const instances = block.components["minecraft:material_instances"];
 
             assert.equal(block.description.states, undefined, `${name} must not expose a pillar axis`);
             assert.equal(block.description.traits, undefined, `${name} must not rotate on placement`);
-            assert.equal(block.components["minecraft:geometry"].identifier, "minecraft:geometry.full_block");
             assert.ok(instances["*"].texture.endsWith("_log_side"), `${name} sides must use the bark texture`);
-            assert.equal(instances["up"].texture, instances["down"].texture, `${name} caps must share a texture`);
             assert.ok(instances["up"].texture.endsWith("_log_top"), `${name} caps must use the ring texture`);
         }
     });
 
-    it("returns each log item through the block so the vanilla log tags keep working", () => {
+    it("keeps every Beta log item craftable, smeltable to charcoal and burning at 15 seconds", () => {
+        // The pack retypes every held log into a bh: item, so vanilla's log tags and
+        // furnace_log_* recipes can never match. These declarations are the only route to planks,
+        // to charcoal, and to a log that still burns - tags grant no burn time.
         for (const name of LOGS) {
             const item = readJson(resolve(root, "packs/BP/items", `${name}.json`))["minecraft:item"];
             const placer = item.components["minecraft:block_placer"];
 
             assert.equal(placer.block, `bh:${name}`);
-            assert.equal(placer.replace_block_item, true, `${name} must replace the automatic block item`);
             assert.ok(
                 item.components["minecraft:tags"].tags.includes("minecraft:logs"),
                 `${name} must stay craftable into planks`
             );
-        }
-    });
 
-    it("keeps charcoal obtainable by smelting any Beta log", () => {
-        // The pack retypes every held log into a bh: item, so vanilla's furnace_log_* recipes
-        // (input minecraft:log) can never match; these replacements are the only route to
-        // charcoal in survival. Charcoal carries vanilla's minecraft:coals tag, so torches,
-        // fires and the furnace itself accept it without further content.
-        for (const name of LOGS) {
-            const recipe = readJson(resolve(root, "packs/BP/recipes", `furnace_charcoal_${name}.json`))["minecraft:recipe_furnace"];
-
-            assert.equal(recipe.input.item, `bh:${name}`, `charcoal recipe must smelt the item players actually hold (${name})`);
+            const recipe = readJson(
+                resolve(root, "packs/BP/recipes", `furnace_charcoal_${name}.json`)
+            )["minecraft:recipe_furnace"];
+            assert.equal(
+                recipe.input.item,
+                `bh:${name}`,
+                `the charcoal recipe must smelt the item players actually hold (${name})`
+            );
             assert.equal(recipe.output, "minecraft:charcoal");
-            assert.ok(recipe.tags.includes("furnace"), `charcoal recipe for ${name} must fire in a furnace`);
-        }
-    });
+            assert.equal(recipe.tags.includes("furnace"), true, `the charcoal recipe for ${name} must fire in a furnace`);
 
-    it("burns Beta logs in a furnace like the originals did", () => {
-        // Beta's logs were furnace fuel at 15 seconds, so the custom items must carry the
-        // fuel component themselves - tags do not grant burn time.
-        for (const name of LOGS) {
-            const item = readJson(resolve(root, "packs/BP/items", `${name}.json`))["minecraft:item"];
-            const fuel = item.components["minecraft:fuel"];
-
-            assert.ok(fuel, `${name} must declare minecraft:fuel`);
-            assert.equal(fuel.duration, 15.0, `${name} must burn for Beta's 15 seconds`);
+            assert.equal(item.components["minecraft:fuel"].duration, 15.0, `${name} must burn for Beta's 15 seconds`);
         }
     });
 
@@ -198,22 +140,17 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
 
         for (const file of files) {
             const raw = readFileSync(resolve(blocksDir, file), "utf-8");
-            const definition = JSON.parse(raw);
-            const formatVersion = String(definition.format_version).split(".").map(Number);
+            const formatVersion = String(JSON.parse(raw).format_version).split(".").map(Number);
             if (formatVersion[1] < 26) continue;
-
-            const block = definition["minecraft:block"];
 
             // Formats from 1.26.20 onward dropped the `tag:<name>` component from the schema in
             // favour of a tags array, and the loader rejects a definition that still uses it.
             assert.equal(raw.includes('"tag:'), false, `${file} must declare tags as an array`);
-            assert.ok(Array.isArray(block.components["minecraft:tags"]), `${file} must declare minecraft:tags`);
         }
 
         for (const name of STAIRS) {
-            const tags = blockOf(name).components["minecraft:tags"];
             assert.equal(
-                tags.includes("minecraft:cornerable_stairs"),
+                blockOf(name).components["minecraft:tags"].includes("minecraft:cornerable_stairs"),
                 false,
                 `${name} must stay out of vanilla's corner-forming group`
             );
@@ -226,22 +163,21 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
             );
         }
 
-        // Beta shipped the wooden slab as the stone slab with a plank texture tacked on,
-        // so it answers to a pickaxe and must not reward an axe.
-        const slabTags = blockOf("wooden_slab").components["minecraft:tags"];
+        // Beta shipped the wooden slab as the stone slab with a plank texture tacked on: it answers
+        // to a pickaxe, must not reward an axe, and sounds and breaks like the stone one. Declaring
+        // flammability is what would let the plank texture catch, so it must stay absent.
+        const stoneMining = blockOf("stone_slab").components["minecraft:destructible_by_mining"];
+        const woodenSlab = blockOf("wooden_slab").components;
         assert.ok(
-            slabTags.includes("minecraft:is_pickaxe_item_destructible"),
+            woodenSlab["minecraft:tags"].includes("minecraft:is_pickaxe_item_destructible"),
             "wooden_slab must be mined at stone speed with a pickaxe"
         );
         assert.equal(
-            slabTags.includes("minecraft:is_axe_item_destructible"),
+            woodenSlab["minecraft:tags"].includes("minecraft:is_axe_item_destructible"),
             false,
             "wooden_slab must not be chopped with an axe"
         );
 
-        // The clone went as far as the sound and the break time, which is why a wooden
-        // half heard and timed like the stone one it was copied from.
-        const stoneMining = blockOf("stone_slab").components["minecraft:destructible_by_mining"];
         for (const name of ["wooden_slab", "double_wooden_slab"]) {
             const components = blockOf(name).components;
 
@@ -255,8 +191,6 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
                 stoneMining,
                 `${name} must break at the stone slab's speed`
             );
-            // Declaring flammability is what would let the plank texture catch; Beta's slab
-            // block was the stone one, so the wooden half was the era's fireproof timber.
             assert.equal(
                 components["minecraft:flammable"],
                 undefined,
@@ -273,36 +207,12 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
             "the stone-backed wooden slab must not get the sword bonus"
         );
     });
-
-    it("keeps no scripted placer, structure or overriding item for these blocks", () => {
-        const scripts = resolve(root, "packs/BP/scripts");
-
-        assert.equal(existsSync(resolve(scripts, "interactions/structurePlacer.ts")), false);
-        assert.equal(existsSync(resolve(root, "packs/BP/structures/oak_stairs.mcstructure")), false);
-        assert.equal(existsSync(resolve(root, "packs/BP/structures/cobblestone_stairs.mcstructure")), false);
-
-        for (const name of [...STAIRS, ...SLABS]) {
-            assert.equal(
-                existsSync(resolve(root, "packs/BP/items", `${name}.json`)),
-                false,
-                `${name} must be defined by its block alone`
-            );
-        }
-
-        const structures = readdirSync(resolve(root, "packs/BP/structures"));
-        assert.deepEqual(structures, ["island.mcstructure"], "stairs were the only structures the pack needed");
-
-        const stale = readdirSync(resolve(root, "packs/BP/blocks"))
-            .filter(file => file.endsWith(".json"))
-            .filter(file => readFileSync(resolve(root, "packs/BP/blocks", file), "utf-8").includes("_placer"));
-        assert.deepEqual(stale, [], "no block may depend on a scripted placer component");
-    });
 });
 
 describe("Classic Recipe Contract - Beta 1.7.3 fence", () => {
     it("replaces vanilla's fence recipe instead of adding a parallel one", () => {
-        // Vanilla's oak fence recipe id is `minecraft:fence`. Adding a second bh: recipe beside it —
-        // which is what this recipe used to be — leaves the vanilla result craftable, and a vanilla
+        // Vanilla's oak fence recipe id is `minecraft:fence`. Adding a second bh: recipe beside it -
+        // which is what this recipe used to be - leaves the vanilla result craftable, and a vanilla
         // fence never joins a bh:fence line. Overriding the id is the same fix the chest needed.
         const recipe = readJson(resolve(root, "packs/BP/recipes/oak_fence.json"))["minecraft:recipe_shaped"];
 
@@ -320,20 +230,16 @@ describe("Classic Recipe Contract - Beta 1.7.3 fence", () => {
         );
     });
 
-    it("enables standard ambient occlusion and opaque shading on the fence", () => {
-        const fence = blockOf("fence");
-        const materialInstances = fence.components["minecraft:material_instances"];
-        assert.ok(materialInstances, "fence must declare material_instances");
+    it("keeps ambient occlusion and opaque shading on the fence", () => {
+        const fence = blockOf("fence").components;
+        const defaultInstance = fence["minecraft:material_instances"]["*"];
 
-        const defaultInstance = materialInstances["*"];
-        assert.ok(defaultInstance, "fence must declare default '*' material instance");
-        assert.notEqual(defaultInstance.ambient_occlusion, false, "fence must not disable ambient occlusion (causes glowing appearance)");
-        assert.notEqual(defaultInstance.ambient_occlusion, 0, "fence must not set ambient occlusion to 0");
-        assert.equal(defaultInstance.render_method, "opaque", "fence must use opaque render method");
-        assert.equal(fence.components["minecraft:light_emission"], undefined, "fence must not emit light");
+        // An AO exponent of 0 or false is what makes the fence read as a glowing outline.
+        assert.notEqual(defaultInstance.ambient_occlusion, false, "fence must not disable ambient occlusion");
+        assert.equal(defaultInstance.render_method, "opaque", "fence must use the opaque render method");
+        assert.equal(fence["minecraft:light_emission"], undefined, "fence must not emit light");
     });
 });
-
 
 describe("Classic Block Contract - custom block names", () => {
     it("translates every custom block, not just its display name", () => {

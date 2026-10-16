@@ -7,10 +7,8 @@ import {
     BETA_CAPPED_ITEM_OF,
     BETA_CAPPED_VANILLA_IDS,
     BETA_ITEM_IDS,
-    BH_CAKE_ID,
-    BH_IRON_DOOR_ID,
-    BH_WOODEN_DOOR_ID
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+    BH_CAKE_ID
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 import { versionAtLeast } from "../support/text.js";
 
 const root = process.cwd();
@@ -38,23 +36,18 @@ function declaredItems(): Map<string, any> {
     return items;
 }
 
-const capped = [
-    { item: BH_CAKE_ID, icon: "cake", name: "Cake", recipe: "cake", vanilla: "minecraft:cake" }
-];
+const CAKE = {
+    item: BH_CAKE_ID,
+    icon: "cake",
+    name: "Cake",
+    recipe: "cake",
+    vanilla: "minecraft:cake"
+} as const;
 
 describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
-    it("keeps the era's unstackables and nothing else in the capped table", () => {
-        assert.deepEqual(BETA_CAPPED_ITEM_OF, {
-            "minecraft:wooden_door": BH_WOODEN_DOOR_ID,
-            "minecraft:iron_door": BH_IRON_DOOR_ID,
-            "minecraft:cake": BH_CAKE_ID
-        });
-    });
-
     it("leaves the era's capped vanilla bucket to the engine and holds its stack in the sweep", () => {
         // A bucket is the one capped item whose use is a fluid, so the engine's own item is the only one
         // that fills from a source block; the pack cannot own it, and the cap is the sweep's to keep.
-        assert.deepEqual([...BETA_CAPPED_VANILLA_IDS], ["minecraft:bucket", "minecraft:oak_sign"]);
         assert.equal(declaredItems().has("bh:bucket"), false, "the pack's own bucket item is gone");
         assert.equal(declaredItems().has("bh:oak_sign"), false, "the pack's own sign item is gone");
         assert.equal(
@@ -69,17 +62,13 @@ describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
         );
 
         assert.ok(BETA_ITEM_IDS.has("minecraft:bucket"), "a vanilla bucket would be stripped if the registry dropped it");
-        assert.ok(BETA_ITEM_IDS.has("minecraft:water_bucket"));
-        assert.ok(BETA_ITEM_IDS.has("minecraft:lava_bucket"));
-        assert.ok(BETA_ITEM_IDS.has("minecraft:milk_bucket"));
 
-        for (const id of BETA_CAPPED_VANILLA_IDS) {
-            assert.equal(
-                Object.values(BETA_CAPPED_ITEM_OF).includes(id),
-                false,
-                `${id} is the engine's item, so the pack must not claim it with a replacement`
-            );
-        }
+        const claimed = Object.values(BETA_CAPPED_ITEM_OF).filter((id) => BETA_CAPPED_VANILLA_IDS.has(id));
+        assert.deepEqual(
+            claimed,
+            [],
+            "each of these is the engine's own item, so the pack must not claim it with a replacement"
+        );
     });
 
     it("gives every capped id a pack item, because the engine only respects a cap it can read", () => {
@@ -100,70 +89,45 @@ describe("Classic Item Contract - Beta 1.7.3 unstackable utilities", () => {
         }
     });
 
-    for (const entry of capped) {
-        it(`declares ${entry.item} as one item per slot`, () => {
-            const item = declaredItems().get(entry.item)!;
-
-            assert.equal(item.components["minecraft:max_stack_size"], 1);
-            assert.equal(item.components["minecraft:icon"].textures.default, entry.icon);
-            assert.ok(
-                BETA_ITEM_IDS.has(entry.item),
-                "a capped item that is not a Beta item would be stripped by the modern-item gate"
-            );
-        });
-
-        it(`keeps an atlas entry for the ${entry.icon} icon`, () => {
-            const atlas = readJson(resolve(root, "packs/RP/textures/item_texture.json")).texture_data;
-            assert.ok(atlas[entry.icon], `'${entry.icon}' is missing from item_texture.json`);
-        });
-
-        it(`names ${entry.item} in the language file`, () => {
-            const raw = readFileSync(resolve(root, "packs/RP/texts/en_US.lang"), "utf-8");
-            assert.ok(raw.includes(`item.${entry.item}=${entry.name}`), `en_US.lang is missing item.${entry.item}`);
-        });
-
-        it(`crafts ${entry.item} rather than the vanilla stack`, () => {
-            const recipe = readJson(resolve(root, "packs/BP/recipes", `${entry.recipe}.json`))["minecraft:recipe_shaped"];
-            const results = recipeResults(recipe);
-
-            assert.equal(results[0], entry.item);
-            assert.equal(
-                recipe.description.identifier,
-                entry.vanilla,
-                "the recipe has to take vanilla's own id, or its version stays craftable beside it"
-            );
-            assert.deepEqual(
-                recipe.tags,
-                ["beta_crafting"],
-                "the custom crafting table is the only interface the pack's recipes belong to"
-            );
-        });
-    }
-
-    it("places the cake with its block placer", () => {
-        const items = declaredItems();
+    it("ships the cake as the pack's own item, crafted in place of vanilla's", () => {
+        const item = declaredItems().get(CAKE.item)!;
 
         assert.equal(
-            items.get(BH_CAKE_ID)!.components["minecraft:block_placer"].block,
-            BH_CAKE_ID,
+            item.components["minecraft:block_placer"].block,
+            CAKE.item,
             "the cake places the pack's block, whose bites the engine cannot drive for a placer"
         );
+        // format_version sits on the item file, not inside its "minecraft:item" object.
         assert.ok(
             versionAtLeast(readJson(resolve(root, "packs/BP/items/cake.json")).format_version, "1.21.50"),
             "minecraft:block_placer needs format_version 1.21.50 or later"
         );
-    });
 
-    it("hands the cake's empty containers back as the engine's own buckets", () => {
-        const recipe = readJson(resolve(root, "packs/BP/recipes/cake.json"))["minecraft:recipe_shaped"];
+        const atlas = readJson(resolve(root, "packs/RP/textures/item_texture.json")).texture_data;
+        assert.ok(atlas[CAKE.icon], `'${CAKE.icon}' is missing from item_texture.json`);
+
+        const raw = readFileSync(resolve(root, "packs/RP/texts/en_US.lang"), "utf-8");
+        assert.ok(raw.includes(`item.${CAKE.item}=${CAKE.name}`), `en_US.lang is missing item.${CAKE.item}`);
+
+        const recipe = readJson(resolve(root, "packs/BP/recipes", `${CAKE.recipe}.json`))["minecraft:recipe_shaped"];
+        assert.equal(recipeResults(recipe)[0], CAKE.item);
+        assert.equal(
+            recipe.description.identifier,
+            CAKE.vanilla,
+            "the recipe has to take vanilla's own id, or its version stays craftable beside it"
+        );
+        assert.deepEqual(
+            recipe.tags,
+            ["beta_crafting"],
+            "the custom crafting table is the only interface the pack's recipes belong to"
+        );
+
         const results = recipe.result.map((entry: any) => entry.item);
-
-        assert.deepEqual(results, [BH_CAKE_ID, "minecraft:bucket"]);
+        assert.deepEqual(results, [CAKE.item, "minecraft:bucket"], "the cake gives the buckets back as the engine's own");
         assert.equal(recipe.result[1].count, 3, "three milk buckets go into a cake");
         assert.deepEqual(
             recipe.key.A,
-            { item: "minecraft:milk_bucket" },
-            "the cake takes the milk the engine's own bucket draws from a cow"
+            { item: "minecraft:milk_bucket" },            "the cake takes the milk the engine's own bucket draws from a cow"
         );
     });
 

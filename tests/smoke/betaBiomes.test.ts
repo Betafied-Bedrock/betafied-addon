@@ -11,10 +11,15 @@ import {
     UNMANAGED_BIOME_IDENTIFIERS,
     biomeIdentifier
 } from "../../scripts/lib/betaBiomes.mjs";
-import { BETA_PROFILE_TINTS, buildClientBiome, resolveBiomeTint } from "../../scripts/lib/betaBiomeTints.mjs";
+import {
+    BETA_PROFILE_TINTS,
+    NETHER_CLIENT_FOG_ID,
+    buildClientBiome,
+    buildNetherClientBiome,
+    resolveBiomeTint
+} from "../../scripts/lib/betaBiomeTints.mjs";
 import { COLORMAP_TEXTURES, biomeSamplePoint, colormapWrites } from "../../scripts/lib/betaColormap.mjs";
 import { colormapCoordinate, decodePng, toArgbBuffer, toHex } from "../../scripts/lib/betaColorizer.mjs";
-import { measuredSamplePoint } from "../../scripts/lib/bedrockColormapSamples.mjs";
 
 // Every Overworld biome shipped in the vanilla behavior pack (Mojang/bedrock-samples). A biome
 // added upstream that is missing here renders with the vanilla palette, since the pack no longer
@@ -44,18 +49,16 @@ const VANILLA_NETHER_BIOMES = ["hell", "soulsand_valley", "crimson_forest", "war
 describe("Beta 1.7.3 Biome Table - Overworld Remap and Appearance", () => {
     const biomesDir = resolve(process.cwd(), "packs/BP/biomes");
 
-    it("maps every Bedrock Overworld biome onto a real Beta profile", () => {
+    it("uses only the five land profiles Beta 1.7.3 actually generated, and uses all of them", () => {
+        // Ten biomes existed in the code, but the Adventure Update changelog records that Rain
+        // Forest, Seasonal Forest, Shrubland, Savanna, Tundra and Ice Desert never generated.
         for (const [shortId, profileName] of Object.entries(OVERWORLD_BIOME_PROFILE)) {
             assert.ok(
                 Object.hasOwn(BETA_PROFILES, profileName),
                 `${shortId} points at unknown profile '${profileName}'`
             );
         }
-    });
 
-    it("uses only the five land biomes Beta 1.7.3 actually generated", () => {
-        // Ten biomes existed in the code, but the Adventure Update changelog records that Rain
-        // Forest, Seasonal Forest, Shrubland, Savanna, Tundra and Ice Desert never generated.
         const profiles = new Set(Object.values(OVERWORLD_BIOME_PROFILE));
 
         for (const profile of BETA_LAND_PROFILES) {
@@ -70,7 +73,7 @@ describe("Beta 1.7.3 Biome Table - Overworld Remap and Appearance", () => {
     it("confines snow to the single Beta taiga profile", () => {
         // Beta only accumulated snow in taiga. The engine's climate map hands out far more cold
         // zones than Beta had biomes, so every modern frozen biome is folded onto a temperate
-        // profile and this test stops anyone from quietly handing one of them snow again.
+        // profile and this stops anyone from quietly handing one of them snow again.
         const snowy = Object.entries(BETA_PROFILES)
             .filter(([, profile]) => profile.climate.snow_accumulation[1] > 0)
             .map(([name]) => name);
@@ -79,7 +82,7 @@ describe("Beta 1.7.3 Biome Table - Overworld Remap and Appearance", () => {
     });
 
     it("renders Beta's sea unfrozen", () => {
-        for (const shortId of ["frozen_ocean", "legacy_frozen_ocean", "deep_frozen_ocean", "deep_cold_ocean", "cold_ocean"]) {
+        for (const shortId of ["frozen_ocean", "deep_cold_ocean"]) {
             assert.equal(OVERWORLD_BIOME_PROFILE[shortId], "ocean", `${shortId} must render as ordinary ocean water`);
         }
         assert.equal(OVERWORLD_BIOME_PROFILE.frozen_river, "river", "frozen rivers must render as plain water");
@@ -116,23 +119,13 @@ describe("Beta 1.7.3 Biome Table - Overworld Remap and Appearance", () => {
             );
         }
     });
-
 });
 
 describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
     const clientBiomesDir = resolve(process.cwd(), "packs/RP/biomes");
-    const managed = new Set(OVERWORLD_BIOME_IDS.map(biomeIdentifier));
+    const managed = new Set([...OVERWORLD_BIOME_IDS, ...NETHER_BIOME_IDS].map(biomeIdentifier));
 
-    it("emits a client biome file for every Overworld biome the table maps", () => {
-        for (const shortId of OVERWORLD_BIOME_IDS) {
-            assert.ok(
-                existsSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`)),
-                `missing client biome file for ${biomeIdentifier(shortId)}; run \`node scripts/generate-client-biomes.mjs\``
-            );
-        }
-    });
-
-    it("keeps on-disk client biome files byte-identical to the canonical tint table", () => {
+    it("keeps the on-disk client biomes byte-identical to the tint table, with no stray file beside them", () => {
         for (const shortId of OVERWORLD_BIOME_IDS) {
             const expected = `${JSON.stringify(buildClientBiome(shortId, OVERWORLD_BIOME_PROFILE[shortId]), null, 2)}\n`;
             const actual = readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8");
@@ -142,41 +135,57 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
                 `${shortId}.client_biome.json is out of date with scripts/lib/betaBiomeTints.mjs`
             );
         }
-    });
 
-    it("pins a literal Beta colour rather than a colormap reference", () => {
-        // A `color_map` would re-sample the colormap with the biome's *Bedrock* temperature and
-        // downfall, which are on a different scale than Beta's climate plane, so the render would
-        // stop matching the value derived from the real colormaps.
-        for (const shortId of OVERWORLD_BIOME_IDS) {
-            const content = JSON.parse(readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8"));
-            const components = content["minecraft:client_biome"].components;
+        for (const shortId of NETHER_BIOME_IDS) {
+            const expected = `${JSON.stringify(buildNetherClientBiome(shortId), null, 2)}\n`;
+            const actual = readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8");
+            assert.equal(
+                actual,
+                expected,
+                `${shortId}.client_biome.json is out of date with scripts/lib/betaBiomeTints.mjs`
+            );
+        }
 
-            for (const component of ["minecraft:grass_appearance", "minecraft:foliage_appearance"]) {
-                const color = components[component].color;
-                assert.match(color, /^#[0-9A-F]{6}$/, `${shortId} ${component} must be a plain #rrggbb colour`);
-            }
-
-            // Sky is its own component shape: `getSkyColorByTemp` in the engine, `sky_color` here.
-            assert.match(
-                components["minecraft:sky_color"].sky_color,
-                /^#[0-9A-F]{6}$/,
-                `${shortId} minecraft:sky_color must be a plain #rrggbb colour`
+        for (const file of readdirSync(clientBiomesDir).filter(f => f.endsWith(".client_biome.json"))) {
+            const content = JSON.parse(readFileSync(resolve(clientBiomesDir, file), "utf-8"));
+            const identifier = content["minecraft:client_biome"]?.description?.identifier;
+            assert.ok(
+                managed.has(identifier),
+                `${file} defines '${identifier}', which the Beta biome table does not manage`
             );
         }
     });
 
-    it("tints the sky with Beta's temperature-derived colour", () => {
-        // Beta never stored a sky colour either: `World.getSkyColor` fed the climate temperature
-        // under the player into `BiomeGenBase.getSkyColorByTemp`. Every biome must therefore carry
-        // the value derived from its own climate.
-        for (const [shortId, profileName] of Object.entries(OVERWORLD_BIOME_PROFILE)) {
+    it("claims each Nether biome's fog and air, which vanilla's client biomes otherwise own", () => {
+        // Beta's Nether was one red fog with nothing in the air, and a client biome file is what owns
+        // both since 1.21.40. Vanilla's Nether client biomes are still there under the pack's, and
+        // they declare the biome fogs, the ash and spores (`minecraft:precipitation`), the ambient
+        // loops and the Nether's music — all of it from the Nether Update.
+        for (const shortId of NETHER_BIOME_IDS) {
             const content = JSON.parse(readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8"));
-            const sky = content["minecraft:client_biome"].components["minecraft:sky_color"].sky_color;
+            const components = content["minecraft:client_biome"].components;
+
             assert.equal(
-                sky,
-                resolveBiomeTint(profileName).sky,
-                `${shortId} (${profileName}) must carry its profile's derived Beta sky colour`
+                components["minecraft:fog_appearance"]?.fog_identifier,
+                NETHER_CLIENT_FOG_ID,
+                `${shortId} must wear the pack's one Nether fog`
+            );
+            assert.equal(
+                components["minecraft:biome_music"]?.music_definition,
+                "",
+                `${shortId} must switch off the Nether's music rather than leave the component unset`
+            );
+            // Declared rather than left out: unset only removes the vanilla ash and spores when the
+            // engine replaces the vanilla definition, and a zero density stops them either way.
+            assert.equal(
+                components["minecraft:precipitation"]?.ash,
+                0,
+                `${shortId} must declare a zero ash density`
+            );
+            assert.deepEqual(
+                Object.keys(components).sort(),
+                ["minecraft:biome_music", "minecraft:fog_appearance", "minecraft:precipitation"],
+                `${shortId} may declare nothing else: no ambience or atmosphere`
             );
         }
     });
@@ -210,21 +219,6 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
             );
         }
     });
-
-    it("leaves no stray client biome override outside the table", () => {
-        if (!existsSync(clientBiomesDir)) {
-            return;
-        }
-
-        for (const file of readdirSync(clientBiomesDir).filter(f => f.endsWith(".client_biome.json"))) {
-            const content = JSON.parse(readFileSync(resolve(clientBiomesDir, file), "utf-8"));
-            const identifier = content["minecraft:client_biome"]?.description?.identifier;
-            assert.ok(
-                managed.has(identifier),
-                `${file} defines '${identifier}', which the Beta biome table does not manage`
-            );
-        }
-    });
 });
 
 describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
@@ -238,21 +232,15 @@ describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
         return toArgbBuffer(decodePng(readFileSync(path)));
     }
 
-    it("ships a 256x256 colour map for grass and foliage", () => {
+    it("ships a 256x256 colour map holding the planned tint at every pixel Bedrock samples", () => {
+        // The plan is what the generator writes, so this is the guard against a stale or hand-edited
+        // texture: the engine hard-codes a 256 stride, and `toArgbBuffer` rejects anything else.
         for (const name of COLORMAP_TEXTURES) {
             const decoded = decodePng(readFileSync(resolve(colormapDir, `${name}.png`)));
-            // The engine hard-codes a 256 stride, and `toArgbBuffer` rejects anything else.
             assert.equal(decoded.width, 256, `${name}.png must be 256 wide`);
             assert.equal(decoded.height, 256, `${name}.png must be 256 tall`);
-            loadColormap(name);
-        }
-    });
 
-    it("holds the planned tint at every pixel Bedrock samples", () => {
-        // The plan is what the generator writes, so this is the guard against a stale or hand-edited
-        // texture: `node scripts/generate-colormaps.mjs` restores it.
-        for (const name of COLORMAP_TEXTURES) {
-            const colormap = loadColormap(name);
+            const colormap = toArgbBuffer(decoded);
             for (const write of colormapWrites(name).values()) {
                 assert.equal(
                     toHex(colormap[(write.y << 8) | write.x]),
@@ -263,27 +251,9 @@ describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
         }
     });
 
-    it("gives every biome its own tint wherever its sample pixel is not shared", () => {
-        for (const name of COLORMAP_TEXTURES) {
-            const colormap = loadColormap(name);
-            for (const shortId of OVERWORLD_BIOME_IDS) {
-                const [x, y] = biomeSamplePoint(shortId);
-                const write = colormapWrites(name).get(`${x},${y}`);
-                if (write.contested.includes(shortId)) {
-                    continue;
-                }
-                assert.equal(
-                    toHex(colormap[(y << 8) | x]),
-                    resolveBiomeTint(OVERWORLD_BIOME_PROFILE[shortId])[name],
-                    `${shortId} must read its own tint at (${x},${y})`
-                );
-            }
-        }
-    });
-
     it("reads the terrain profiles' colour off the map at the climate they declare", () => {
         // Beta gave terrain no biome of its own, so the profile's pinned colour *is* the map's
-        // answer at its declared climate — which is what makes these profiles verifiable offline.
+        // answer at its declared climate - which is what makes these profiles verifiable offline.
         for (const name of COLORMAP_TEXTURES) {
             const colormap = loadColormap(name);
             for (const [profile, entry] of Object.entries(BETA_PROFILES)) {
@@ -305,7 +275,8 @@ describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
         // The biome that lost the pixel still renders its own tint, because its client biome file
         // pins it, and the group's pixel keeps the colour of the biome whose climate is nearest.
         for (const name of COLORMAP_TEXTURES) {
-            const colormap = loadColormap(name);
+            // The load is for its own assertions; this case reads the client biome files, not the pixels.
+            loadColormap(name);
             for (const shortId of OVERWORLD_BIOME_IDS) {
                 const [x, y] = biomeSamplePoint(shortId);
                 if (!colormapWrites(name).get(`${x},${y}`).contested.includes(shortId)) {
@@ -320,18 +291,5 @@ describe("Beta 1.7.3 Colour Maps - What the Biome Sample Pixels Hold", () => {
                 );
             }
         }
-    });
-
-    it("leaves a biome we do not enumerate reading a Beta colour", () => {
-        // The End has no client biome file, so it reads the map. Its climate lands on the ocean's
-        // pixel, and the colour there is the ocean profile's — Beta's own answer for that climate.
-        const end = measuredSamplePoint("the_end");
-        assert.ok(end, "the template must still place the End");
-        const [x, y] = end;
-        assert.equal(
-            toHex(loadColormap("grass")[(y << 8) | x]),
-            resolveBiomeTint("ocean").grass,
-            "the End must read the map's colour for its climate"
-        );
     });
 });

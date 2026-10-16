@@ -1,7 +1,7 @@
 [
     {
         "flipbook_texture": "textures/blocks/fire_0",
-        "atlas_tile": "soul_fire_0",
+        "atlas_tile": "fire_0",
         "frames": [
             16,
             17,
@@ -40,7 +40,7 @@
     },
     {
         "flipbook_texture": "textures/blocks/fire_1",
-        "atlas_tile": "soul_fire_1",
+        "atlas_tile": "fire_1",
         "frames": [
             0,
             1,

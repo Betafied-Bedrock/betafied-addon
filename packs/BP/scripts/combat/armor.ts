@@ -3,14 +3,14 @@ import {
     Player,
     ItemComponentTypes,
     EntityComponentTypes,
-    GameMode,
     world
 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { runCatching } from "../core/errorReporter.js";
 import { ARMOR_SLOTS } from "../core/equipmentSlots.js";
-import { isBetaItem, isVanillaId } from "../core/betaRegistry.js";
+import { isBetaItem, isVanillaId } from "../policy/betaRegistry.js";
+import { getPrivilegeReason } from "../core/permissions.js";
 
 // Beta 1.7.3 base armor points are slot-indexed rather than material-indexed.
 const ARMOR_POINTS_BY_SLOT: Readonly<Record<string, number>> = Object.freeze({
@@ -35,6 +35,16 @@ const BYPASS_SOURCES = Object.freeze(new Set([
     EntityDamageCause.selfDestruct,
     "suicide"
 ]));
+
+const ARMOR_DISPLAY_INTERVAL_TICKS = 5;
+
+/**
+ * Above `player/death.ts`'s death verdict, which registers this same before-event at priority 100 and
+ * cancels it. The bus stops before every lower handler once an event is cancelled, so armor policy has
+ * to see the killing blow before that verdict or the plate survives the death that broke it. The number
+ * is stated here rather than imported: a feature may not read another feature's internals.
+ */
+const LETHAL_HIT_PRIORITY = 110;
 
 export function damageArmor(player: Player): void {
     const equip = player.getComponent(EntityComponentTypes.Equippable);
@@ -141,6 +151,13 @@ export function getEffectiveArmorPoints(player: Player): number {
 const lastSentArmorPoints = new Map<string, number>();
 const fractionalDamageCarryovers = new Map<string, number>();
 
+/**
+ * The tick each player's killing blow was worn from the before-event. A hit only ever arrives once, so
+ * a hit that reaches both handlers — which is what happens wherever the death verdict is not registered
+ * to cancel the before-event — must not wear the plate twice.
+ */
+const lethalWears = new Map<string, number>();
+
 export function getPlayerDamageCarryover(playerId: string): number {
     return fractionalDamageCarryovers.get(playerId) ?? 0;
 }
@@ -160,9 +177,9 @@ export function clearPlayerDamageCarryover(playerId: string): void {
 export function updatePlayerArmorDisplay(player: Player, force = false): void {
     if (!player.isValid) return;
 
-    const isCreative = typeof player.getGameMode === "function" &&
-        (player.getGameMode() === GameMode.Creative || player.getGameMode() === GameMode.Spectator);
-    const current = isCreative ? 0 : Math.min(20, Math.max(0, Math.round(getEffectiveArmorPoints(player))));
+    const reason = getPrivilegeReason(player);
+    const hiddenDisplay = reason === "creative" || reason === "spectator";
+    const current = hiddenDisplay ? 0 : Math.min(20, Math.max(0, Math.round(getEffectiveArmorPoints(player))));
     const last = lastSentArmorPoints.get(player.id);
 
     if (force || last === undefined || last !== current) {
@@ -181,7 +198,7 @@ eventBus.onEntityHurt((ev) => {
     if (!(player instanceof Player)) return;
     if (!player.isValid) return;
     if (damage <= 0) return;
-    if (typeof player.getGameMode === "function" && player.getGameMode() === GameMode.Creative) return;
+    if (getPrivilegeReason(player) === "creative") return;
     if (BYPASS_SOURCES.has(damageSource.cause)) return;
 
     const points = getEffectiveArmorPoints(player);
@@ -199,9 +216,31 @@ eventBus.onEntityHurt((ev) => {
         }
     }
 
-    damageArmor(player);
+    // The killing blow is the one hit the after-event never reports, because the death verdict cancels
+    // it before this handler is reached; it is worn on the before-event instead. Where nothing cancels,
+    // both handlers run for that one hit and this latches the duplicate away. An entry from an earlier
+    // tick is a hit that ended without an after-event and never suppresses a later one.
+    const lethalWearTick = lethalWears.get(player.id);
+    const wornByBeforeEvent = lethalWearTick !== undefined && lethalWearTick === tickManager.getCurrentTick();
+    if (wornByBeforeEvent) lethalWears.delete(player.id);
+
+    if (!wornByBeforeEvent) damageArmor(player);
     updatePlayerArmorDisplay(player);
 });
+
+eventBus.onEntityHurtBefore((ev) => {
+    const player = ev.hurtEntity;
+    if (!(player instanceof Player)) return;
+    if (!player.isValid) return;
+    if (getPrivilegeReason(player) === "creative") return;
+    if (BYPASS_SOURCES.has(ev.damageSource.cause)) return;
+
+    const health = player.getComponent(EntityComponentTypes.Health);
+    if (!health || health.currentValue > 0) return;
+
+    damageArmor(player);
+    lethalWears.set(player.id, tickManager.getCurrentTick());
+}, LETHAL_HIT_PRIORITY);
 
 eventBus.onPlayerSpawn((ev) => {
     if (ev.player) {
@@ -212,11 +251,12 @@ eventBus.onPlayerSpawn((ev) => {
 eventBus.onPlayerLeave((ev) => {
     lastSentArmorPoints.delete(ev.playerId);
     clearPlayerDamageCarryover(ev.playerId);
+    lethalWears.delete(ev.playerId);
 });
 
-tickManager.register("armorDisplay", 5, () => {
+tickManager.register("armorDisplay", ARMOR_DISPLAY_INTERVAL_TICKS, () => {
     for (const player of world.getAllPlayers()) {
         updatePlayerArmorDisplay(player);
     }
-});
+}, 0);
 

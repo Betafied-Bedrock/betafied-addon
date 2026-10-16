@@ -1,5 +1,5 @@
 import { world, system, Block, Player, Vector3 } from "@minecraft/server";
-import { eventBus } from "../core/eventBus.js";
+import { eventBus, InteractPriority } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
 import { JobRunner } from "../core/jobRunner.js";
 
@@ -26,7 +26,7 @@ const LIGHT_SOURCES = Object.freeze(new Set([
 
 const NIGHTMARE_MOBS = Object.freeze(["minecraft:zombie", "minecraft:skeleton"] as const);
 
-export interface BedInteraction {
+interface BedInteraction {
     count: number;
     playerId: string;
     dimensionId: string;
@@ -38,7 +38,10 @@ export interface BedInteraction {
 }
 
 export const nightmareJobRunner = new JobRunner();
-export const bedInteractions = new Map<string, BedInteraction>();
+
+// The module's own sighting state: a bed click is armed, watched and released here and nowhere else,
+// so a caller cannot hand this module a sighting it did not take.
+const bedInteractions = new Map<string, BedInteraction>();
 
 function isNight(): boolean {
     const time = world.getTimeOfDay();
@@ -85,8 +88,15 @@ export function tryTriggerNightmare(bedKey: string): void {
                 return;
             }
             spawnNightmare(player, bedBlock);
-        } catch {
-            // Block query safety
+        } catch (err) {
+            // The bed's chunk can be unloaded by the time this delayed read runs, which makes the
+            // block lookup throw. The sighting is then simply skipped, and the reason has to reach
+            // the log or a bed that never fires looks like a broken trigger.
+            reportError({
+                system: "nightmares",
+                operation: "readBedBlock",
+                target: player.name
+            }, err);
         }
     }, CONFIG.SPAWN_DELAY);
 }
@@ -118,7 +128,10 @@ export function* lightCheckGenerator(dimensionId: string, bedLoc: Vector3, bedKe
                         return;
                     }
                 } catch {
-                    // Chunk edge boundary during spatial scan
+                    // A cell past the loaded chunk rim makes the read throw, and the scan is meant to run
+                    // past that rim: the cell reads as no light source, which is what `continue` does.
+                    // Reporting each one would drown the log in a 26x11x26 sweep, so this stays silent
+                    // by design rather than by omission.
                 }
 
                 checked++;
@@ -154,7 +167,7 @@ function getSpawnOffset(bedBlock: Block): Vector3 {
                 return { x: offset.x + 0.5, y: offset.y, z: offset.z + 0.5 };
             }
         } catch {
-            // Block query safety
+            // A candidate cell in an unloaded chunk makes getBlock throw; the next side is tried.
         }
     }
 
@@ -178,7 +191,7 @@ function spawnNightmare(player: Player, block: Block): void {
     }
 }
 
-export function handleBedInteraction(player: Player, block: Block): void {
+export function noteBedInteraction(player: Player, block: Block): void {
     if (!block || !block.typeId.includes("bed")) return;
 
     const bedKey = `${block.dimension.id}:${block.location.x},${block.location.y},${block.location.z}`;
@@ -209,7 +222,7 @@ export function handleBedInteraction(player: Player, block: Block): void {
     } else {
         current.count += 1;
         if (current.jobId !== undefined) {
-            nightmareJobRunner.cancel(current.jobId);
+            nightmareJobRunner.clear(current.jobId);
         }
         bedInteractions.delete(bedKey);
     }
@@ -219,16 +232,18 @@ export function handlePlayerLeave(event: { playerId: string }): void {
     for (const [key, record] of bedInteractions) {
         if (record.playerId === event.playerId) {
             if (record.jobId !== undefined) {
-                nightmareJobRunner.cancel(record.jobId);
+                nightmareJobRunner.clear(record.jobId);
             }
             bedInteractions.delete(key);
         }
     }
 }
 
+// A bed click is observed rather than claimed, so the sighting has to be taken before any rule cancels
+// the click away from this handler.
 eventBus.onPlayerInteractWithBlock((event) => {
-    handleBedInteraction(event.player, event.block);
-});
+    noteBedInteraction(event.player, event.block);
+}, InteractPriority.RULE);
 
 eventBus.onPlayerLeave((event) => {
     handlePlayerLeave(event);

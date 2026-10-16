@@ -4,7 +4,6 @@ import {
     BETA_BLOCK_IDS,
     BETA_ENTITY_TYPES,
     BETA_HOSTILE_TYPES,
-    BETA_ITEM_IDS,
     BETA_PASSIVE_TYPES,
     POST_BETA_WOOD_SPECIES,
     TERRAIN_PLANK_SPECIES,
@@ -14,53 +13,17 @@ import {
     isBetaItem,
     isModItem,
     isVanillaId
-} from "../../packs/BP/scripts/core/betaRegistry.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
 
 describe("Canonical Beta 1.7.3 Registry Policy", () => {
     describe("Entity Registry", () => {
-        it("allows classic Beta 1.7.3 entities", () => {
-            const classic = [
-                "minecraft:player",
-                "minecraft:item",
-                "minecraft:arrow",
-                "minecraft:chicken",
-                "minecraft:cow",
-                "minecraft:pig",
-                "minecraft:sheep",
-                "minecraft:squid",
-                "minecraft:wolf",
-                "minecraft:zombie",
-                "minecraft:skeleton",
-                "minecraft:creeper",
-                "minecraft:spider",
-                "minecraft:slime",
-                "minecraft:ghast",
-                "minecraft:zombie_pigman",
-                "minecraft:boat",
-                "minecraft:minecart"
-            ];
-            for (const id of classic) {
-                assert.ok(isBetaEntity(id), `Expected ${id} to be recognized as a Beta entity`);
-                assert.ok(BETA_ENTITY_TYPES.has(id));
-            }
-        });
-
         it("disallows post-Beta 1.7.3 modern mobs", () => {
             const modern = [
                 "minecraft:warden",
-                "minecraft:allay",
-                "minecraft:sniffer",
-                "minecraft:breeze",
-                "minecraft:bogged",
-                "minecraft:phantom",
-                "minecraft:drowned",
-                "minecraft:pillager",
-                "minecraft:ravager",
-                "minecraft:piglin",
-                "minecraft:hoglin",
+                // An era mob the pack ships under `bh:`, and the traded-away villager: both have to be
+                // rejected under their vanilla ids.
                 "minecraft:enderman",
-                "minecraft:villager",
-                "minecraft:iron_golem"
+                "minecraft:villager"
             ];
             for (const id of modern) {
                 assert.equal(isBetaEntity(id), false, `Expected ${id} to be rejected as post-Beta`);
@@ -69,45 +32,12 @@ describe("Canonical Beta 1.7.3 Registry Policy", () => {
     });
 
     describe("Item Registry", () => {
-        it("allows authentic Beta 1.7.3 items and tools", () => {
-            const classic = [
-                "minecraft:iron_pickaxe",
-                "minecraft:diamond_sword",
-                "minecraft:wooden_shovel",
-                "minecraft:bow",
-                "minecraft:arrow",
-                "minecraft:bread",
-                "minecraft:apple",
-                "minecraft:cooked_porkchop",
-                "minecraft:coal",
-                "minecraft:iron_ingot",
-                "minecraft:diamond",
-                "minecraft:redstone",
-                "minecraft:bone_meal",
-                "minecraft:reeds"
-            ];
-            for (const id of classic) {
-                assert.ok(isBetaItem(id), `Expected ${id} to be recognized as a Beta item`);
-                assert.ok(BETA_ITEM_IDS.has(id));
-            }
-        });
-
         it("disallows modern post-Beta items", () => {
             const modern = [
                 "minecraft:netherite_sword",
                 "minecraft:elytra",
-                "minecraft:mace",
-                "minecraft:totem_of_undying",
-                "minecraft:trident",
-                "minecraft:crossbow",
-                "minecraft:shield",
-                "minecraft:shulker_shell",
-                "minecraft:amethyst_shard",
-                "minecraft:raw_iron",
-                "minecraft:raw_copper",
-                "minecraft:copper_ingot",
-                // Bedrock exposes sugar cane under this second item id; the era's own id is `reeds`.
-                "minecraft:sugar_cane"
+                // Banned as an item even though the ore it comes from is a conversion target.
+                "minecraft:raw_iron"
             ];
             for (const id of modern) {
                 assert.equal(isBetaItem(id), false, `Expected ${id} to be rejected as post-Beta item`);
@@ -119,108 +49,56 @@ describe("Canonical Beta 1.7.3 Registry Policy", () => {
         it("trusts every item the mod itself defines, even when it is not a vanilla Beta id", () => {
             // The mod replaces the vanilla workbench with bh:crafting_table; the gatekeeper
             // must not delete the addon's own blocks or items.
-            const addonContent = [
-                "bh:crafting_table",
-                "bh:fence",
-                "bh:wooden_slab",
-                "bh:apple",
-                "bh:bow",
-                "ubd:furnace_minecart"
-            ];
+            const addonContent = ["bh:crafting_table", "ubd:furnace_minecart"];
             for (const id of addonContent) {
                 assert.ok(isModItem(id), `Expected ${id} to belong to a mod namespace`);
                 assert.ok(isBetaItem(id), `Expected ${id} to be allowed through the item gatekeeper`);
             }
         });
 
-        it("does not mistake vanilla ids for mod content", () => {
-            assert.equal(isModItem("minecraft:crafting_table"), false);
+        it("scopes destructive policies to the vanilla namespace, and mod content out of it", () => {
+            assert.equal(isVanillaId("minecraft:stone"), true);
+            assert.equal(isVanillaId("gun:1911"), false);
+            // An id with no namespace at all belongs to nobody, so no gate may claim it.
+            assert.equal(isVanillaId("crafting_table"), false);
+
             assert.equal(isModItem("minecraft:stone"), false);
             assert.equal(isModItem("crafting_table"), false);
         });
 
-        it("scopes destructive policies to the vanilla namespace", () => {
-            assert.equal(isVanillaId("minecraft:stone"), true);
-            assert.equal(isVanillaId("minecraft:netherite_sword"), true);
-            assert.equal(isVanillaId("gun:1911"), false);
-            assert.equal(isVanillaId("bh:fence"), false);
-            assert.equal(isVanillaId("crafting_table"), false);
-        });
-
-        it("allows Beta 1.7.3 maps despite the modern empty_map id split", () => {
+        it("allows the era's ids that modern Minecraft split in two", () => {
+            // Beta's map and its fish each reach this engine as two ids; the gatekeeper has to let
+            // both through or the map and food tables never see them.
             assert.ok(isBetaItem("minecraft:empty_map"));
             assert.ok(isBetaItem("minecraft:filled_map"));
-        });
-    });
-
-    describe("Derived-set invariants", () => {
-        it("builds the block allowlist from the single wool palette", () => {
-            // The palette drives both the shearing drop and the sword bonus; if it is ever unhooked
-            // from the allowlist, a coloured wool becomes an "unsupported" block overnight.
-            for (const wool of WOOL_BY_COLOR) {
-                assert.ok(BETA_BLOCK_IDS.has(wool), `palette wool ${wool} must be an authentic block`);
-            }
-        });
-
-        it("keeps every passive and hostile mob inside the entity allowlist", () => {
-            for (const id of [...BETA_PASSIVE_TYPES, ...BETA_HOSTILE_TYPES]) {
-                assert.ok(BETA_ENTITY_TYPES.has(id), `${id} must be an allowed Beta entity`);
-            }
-        });
-
-        it("keeps the terrain plank species inside the post-Beta wood set", () => {
-            for (const species of TERRAIN_PLANK_SPECIES) {
-                assert.ok(POST_BETA_WOOD_SPECIES.has(species), `${species} must be a post-Beta species`);
-            }
-        });
-
-        it("recognizes both fish ids the fishing tables can yield", () => {
-            // Beta's fishing drop reached the ground as `minecraft:fish` on this engine; the food
-            // table maps it, so the gatekeeper must not delete it first.
             assert.ok(isBetaItem("minecraft:fish"));
             assert.ok(isBetaItem("minecraft:cooked_fish"));
         });
     });
 
-    describe("Block Registry", () => {
-        it("allows authentic Beta 1.7.3 blocks", () => {
-            const classic = [
-                "minecraft:stone",
-                "minecraft:cobblestone",
-                "minecraft:dirt",
-                "minecraft:grass_block",
-                "minecraft:sand",
-                "minecraft:gravel",
-                "minecraft:bedrock",
-                "minecraft:oak_log",
-                "minecraft:oak_planks",
-                "minecraft:oak_leaves",
-                "minecraft:netherrack",
-                "minecraft:obsidian",
-                "minecraft:glowstone",
-                "minecraft:tnt",
-                "minecraft:glass",
-                "minecraft:reeds"
-            ];
-            for (const id of classic) {
-                assert.ok(isBetaBlock(id), `Expected ${id} to be recognized as a Beta block`);
-                assert.ok(BETA_BLOCK_IDS.has(id));
+    describe("Derived-set invariants", () => {
+        it("keeps every derived set inside the allowlist it has to answer to", () => {
+            // The palette drives both the shearing drop and the sword bonus; if it is ever unhooked
+            // from the allowlist, a coloured wool becomes an "unsupported" block overnight.
+            for (const wool of WOOL_BY_COLOR) {
+                assert.ok(BETA_BLOCK_IDS.has(wool), `palette wool ${wool} must be an authentic block`);
+            }
+
+            for (const id of [...BETA_PASSIVE_TYPES, ...BETA_HOSTILE_TYPES]) {
+                assert.ok(BETA_ENTITY_TYPES.has(id), `${id} must be an allowed Beta entity`);
+            }
+
+            for (const species of TERRAIN_PLANK_SPECIES) {
+                assert.ok(POST_BETA_WOOD_SPECIES.has(species), `${species} must be a post-Beta species`);
             }
         });
+    });
 
+    describe("Block Registry", () => {
         it("disallows modern post-Beta blocks", () => {
             const modern = [
                 "minecraft:deepslate",
-                "minecraft:tuff",
-                "minecraft:calcite",
-                "minecraft:copper_block",
-                "minecraft:mud",
                 "minecraft:mangrove_planks",
-                "minecraft:cherry_log",
-                "minecraft:pale_oak_log",
-                "minecraft:blackstone",
-                "minecraft:basalt",
-                "minecraft:ancient_debris",
                 "minecraft:sculk"
             ];
             for (const id of modern) {

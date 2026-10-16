@@ -23,6 +23,11 @@
  * Source colormaps: b1.7.3 `misc/grasscolor.png` (25237 bytes) and `misc/foliagecolor.png` (17693
  * bytes), both 256x256 RGBA. They are Mojang assets, so they are not committed; re-run the
  * derivation if the source is ever replaced.
+ *
+ * The five Nether biomes are emitted from here too, although the era gave them no tint to derive: a
+ * client biome file is also what owns a biome's fog, its ambience and its airborne particles, and
+ * leaving vanilla's Nether client biomes in place is what hung the Nether Update's ash, spores,
+ * ambient loops and music over the pack's Nether.
  */
 import { biomeIdentifier } from "./betaBiomes.mjs";
 
@@ -71,6 +76,36 @@ export function buildClientBiome(shortId, profileName) {
                 "minecraft:grass_appearance": { color: tint.grass },
                 "minecraft:foliage_appearance": { color: tint.foliage },
                 "minecraft:sky_color": { sky_color: tint.sky }
+            }
+        }
+    };
+}
+
+/**
+ * The pack's one Nether fog, and the id `packs/RP/biomes_client.json` maps every Nether biome to.
+ * Beta had a single hardcoded Nether colour rather than a per-biome one, so all five share it.
+ */
+export const NETHER_CLIENT_FOG_ID = "mgg:fog_hell";
+
+/**
+ * A pack's client biome file replaces the vanilla definition for its biome, so a component the era
+ * did not have is left out: no `minecraft:ambient_sounds` (the biome loops and additions; the mood
+ * falls back to the era's `ambient.cave`) and no `minecraft:atmosphere_identifier` or lighting
+ * identifier. The two components declared anyway are the ones a merge rather than a replacement
+ * would otherwise let through: a precipitation density of zero for the Nether Update's ash and
+ * spores, and an empty music definition, which is the documented way to switch a biome's music off.
+ * The Nether's ambient loops are blanked a second time in `packs/RP/sounds/sound_definitions.json`,
+ * so they stay silent even if the vanilla `minecraft:ambient_sounds` component is the one that wins.
+ */
+export function buildNetherClientBiome(shortId) {
+    return {
+        format_version: CLIENT_BIOME_FORMAT_VERSION,
+        "minecraft:client_biome": {
+            description: { identifier: biomeIdentifier(shortId) },
+            components: {
+                "minecraft:fog_appearance": { fog_identifier: NETHER_CLIENT_FOG_ID },
+                "minecraft:precipitation": { ash: 0 },
+                "minecraft:biome_music": { music_definition: "" }
             }
         }
     };

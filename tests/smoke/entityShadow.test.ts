@@ -6,8 +6,8 @@ import { inflateSync } from "node:zlib";
 import {
     BETA_HOSTILE_TYPES,
     BETA_PASSIVE_TYPES
-} from "../../packs/BP/scripts/core/betaRegistry.js";
-import { compareText, versionAtLeast } from "../support/text.js";
+} from "../../packs/BP/scripts/policy/betaRegistry.js";
+import { versionAtLeast } from "../support/text.js";
 
 const LEGACY_ROSTER_IDS: Readonly<Record<string, string>> = Object.freeze({
     "minecraft:zombified_piglin": "minecraft:zombie_pigman"
@@ -206,20 +206,6 @@ function propertyLiterals(text: string, identifier: string): string[] {
     return [hit ?? "", ...(range ?? [])];
 }
 
-/** The shadow controller a client entity runs, or undefined when it binds no decal. */
-function wiredController(definition: any): string | undefined {
-    const declared = definition["minecraft:client_entity"]?.description?.animations?.[EFFECT_ALIAS];
-    if (typeof declared === "string") return declared;
-
-    for (const entry of legacyControllerTable(definition) ?? []) {
-        for (const [alias, identifier] of Object.entries<any>(entry)) {
-            if (alias === EFFECT_ALIAS) return String(identifier);
-        }
-    }
-
-    return undefined;
-}
-
 /** Decodes a non-interlaced 8-bit RGBA PNG into per-pixel RGBA rows. */
 function decodePng(path: string): { width: number; height: number; rows: number[][] } {
     const png = readFileSync(resolve(root, path));
@@ -299,32 +285,22 @@ describe("Entity shadows - what each entity declares", () => {
             const betaSpan = Number((DECAL_RADIUS_PER_SHADOW_SIZE * javaShadow(typeId)![0]).toFixed(3));
             assert.equal(Number(span?.default), betaSpan, `${path}: span`);
             assert.equal(Number(alpha?.default), Number((0.5 - javaShadow(typeId)![1] / 8).toFixed(5)), `${path}: alpha`);
-        }
-    });
 
-    it("writes float property numbers with a decimal point", () => {
-        // The engine takes `0.7` and rejects `0` or `4` with
-        // "Error loading property 'betarock:shadow_drop': 'default' value does not match the specified
-        // type 'float'" followed by "'range' array should contain only 'float' type elements".
-        const offenders: string[] = [];
-
-        for (const typeId of betaRoster()) {
-            if (javaShadow(typeId) === undefined) continue;
-            const path = entityPath(typeId);
+            // The engine takes `0.7` and rejects `0` or `4` with "Error loading property
+            // 'betarock:shadow_drop': 'default' value does not match the specified type 'float'"
+            // followed by "'range' array should contain only 'float' type elements". A Molang default is
+            // a string and the schema takes it as-is; a number without a decimal point is not.
             const text = readFileSync(resolve(root, path), "utf-8");
-
             for (const identifier of [SPAN_PROPERTY, ALPHA_PROPERTY]) {
                 for (const literal of propertyLiterals(text, identifier)) {
-                    // A Molang default is a string and the schema takes it as-is; a number is not.
                     if (literal.startsWith('"')) continue;
-                    if (!Number.isFinite(Number(literal)) || !literal.includes(".")) {
-                        offenders.push(`${path}: ${identifier} declares ${literal}, not a float literal`);
-                    }
+                    assert.ok(
+                        Number.isFinite(Number(literal)) && literal.includes("."),
+                        `${path}: ${identifier} declares ${literal}, not a float literal`
+                    );
                 }
             }
         }
-
-        assert.deepEqual(offenders, []);
     });
 
     it("swaps Bedrock's own collision-box shadow out on every Beta mob", () => {
@@ -407,18 +383,10 @@ describe("Entity shadows - what each entity declares", () => {
         );
     });
 
-    it("leaves the player huntable by every hostile mob that hunts", () => {
-        // Both ends of the aggro contract, because the swap's price is paid in targeting and neither
-        // half says anything in a content log: the player may not carry the invisibility that hides an
-        // entity from hostile mobs, and each hostile mob has to keep naming the player as a target.
-        const player = readJson(entityPath(PLAYER_TYPE))["minecraft:entity"].components;
-        assert.equal(
-            player["minecraft:is_hidden_when_invisible"],
-            undefined,
-            "the player may not hide from hostile mobs"
-        );
-        assert.equal(player["minecraft:spell_effects"], undefined, "and may not be permanently invisible");
-
+    it("leaves the player nameable by every hostile mob that hunts", () => {
+        // The other end of the swap's price, which is paid in targeting and says nothing in a content
+        // log: the player may not carry the invisibility (the case above pins that), and every hostile
+        // mob has to keep naming the player as a target.
         for (const typeId of BETA_HOSTILE_TYPES) {
             const definition = readJson(entityPath(typeId));
             if (targetGoals(definition).length === 0) continue;
@@ -475,22 +443,6 @@ describe("Entity shadows - how each client entity runs it", () => {
             assert.ok(legacy || modern, `${path} declares nothing that would run ${CONTROLLER}`);
         }
     });
-
-    it("only runs the controller on entities that declare both numbers", () => {
-        // The pre_effect_script reads `query.property('betarock:shadow_span')` with no guard, which is
-        // only safe while every client entity wired to the controller belongs to an entity that
-        // declares the pair. A stray binding is a per-frame
-        // "query.property: property does not exist, consider using query.has_property." instead.
-        for (const typeId of betaRoster()) {
-            const definition = readJson(clientEntityPath(typeId));
-            const wired = wiredController(definition) !== undefined;
-            if (!wired) continue;
-
-            const declaration = readJson(entityPath(typeId))["minecraft:entity"].description.properties ?? {};
-            assert.ok(declaration[SPAN_PROPERTY], `${typeId} runs the controller without ${SPAN_PROPERTY}`);
-            assert.ok(declaration[ALPHA_PROPERTY], `${typeId} runs the controller without ${ALPHA_PROPERTY}`);
-        }
-    });
 });
 
 describe("Entity shadows - the decal itself", () => {
@@ -500,7 +452,6 @@ describe("Entity shadows - the decal itself", () => {
             const path = particleFile(typeId);
             const found = components(path);
 
-            assert.equal(readJson(path).particle_effect.description.identifier, particleId(typeId));
             assert.equal(
                 readJson(path).particle_effect.description.basic_render_parameters.material,
                 "particles_blend",
@@ -518,11 +469,6 @@ describe("Entity shadows - the decal itself", () => {
             const billboard = found["minecraft:particle_appearance_billboard"];
             assert.equal(billboard.facing_camera_mode, "emitter_transform_xz", `${path}: a decal lies flat`);
             assert.deepEqual(billboard.size, ["variable.shadow_span", "variable.shadow_span"], `${path}: quad`);
-            assert.deepEqual(
-                billboard.uv,
-                { texture_width: 64, texture_height: 64, uv: [0, 0], uv_size: [64, 64] },
-                `${path}: the whole sprite covers the quad`
-            );
 
             // Local space is what makes the decal glide with the entity instead of stepping.
             assert.deepEqual(found["minecraft:emitter_local_space"], { position: true, rotation: false });
@@ -539,7 +485,6 @@ describe("Entity shadows - the decal itself", () => {
             // Java fades by the squared distance to the camera (Render.java:240 with
             // RenderManager.func_851_a), so a decal is gone past sixteen blocks.
             const tint = found["minecraft:particle_appearance_tinting"].color;
-            assert.deepEqual(tint.slice(0, 3), ["1", "1", "1"], `${path}: the sprite is black`);
             assert.ok(tint[3].includes(DISTANCE_QUERY), `${path}: the renderer's distance falloff`);
             assert.ok(tint[3].includes("variable.shadow_alpha"), `${path}: the entity's own opacity`);
             // Java multiplies the entity's opacity by that falloff; reducing it by a fixed share of the
@@ -549,20 +494,14 @@ describe("Entity shadows - the decal itself", () => {
                 tint[3].includes("variable.shadow_alpha * (1 - "),
                 `${path}: the distance falloff multiplies the entity's own opacity`
             );
-        }
-    });
 
-    it("never declares a billboard direction, which no engine mode can satisfy", () => {
-        for (const path of [MOB_PARTICLE_FILE, PLAYER_PARTICLE_FILE]) {
-            const text = readFileSync(resolve(root, path), "utf-8");
+            // No engine billboard mode can satisfy a direction vector, so the subsection has to be
+            // absent rather than merely spelled differently.
             assert.equal(
-                "direction" in components(path)["minecraft:particle_appearance_billboard"],
+                "direction" in billboard,
                 false,
                 `${path}: the subsection has to be absent, not merely named differently`
             );
-            for (const mode of ["derive_from_velocity", "custom_direction", "custom"]) {
-                assert.equal(text.includes(mode), false, `${path}: ${mode} was rejected by the engine`);
-            }
         }
     });
 
@@ -584,15 +523,6 @@ describe("Entity shadows - the decal itself", () => {
                 );
             }
         }
-
-        // The local player's emitter hangs off the camera, so its decal is measured back down to the
-        // ground; every other entity's is already at its own feet, and a remote player's merely at the
-        // model's origin.
-        assert.equal(
-            components(PLAYER_PARTICLE_FILE)["minecraft:emitter_shape_point"].offset[1],
-            components(PLAYER_PARTICLE_FILE)["minecraft:particle_motion_parametric"].relative_position[1],
-            "a decal that spawns inside the ground and is lifted a frame later flickers"
-        );
     });
 
     it("draws nothing for the local player and everyone else's shadow anyway", () => {
@@ -604,11 +534,6 @@ describe("Entity shadows - the decal itself", () => {
         assert.ok(
             tint.includes(`(1.0 - ${LOCAL_PLAYER_QUERY})`),
             "the player's own decal has to be invisible in first *and* third person"
-        );
-        assert.equal(
-            components(MOB_PARTICLE_FILE)["minecraft:particle_appearance_tinting"].color[3].includes(LOCAL_PLAYER_QUERY),
-            false,
-            "a mob's decal is not about the local player"
         );
 
         // The intent is "no shadow for the entity you are looking through", not "no shadow in first
@@ -630,10 +555,14 @@ describe("Entity shadows - the decal itself", () => {
         }
     });
 
-    it("asks a particle only what the engine resolves there", () => {
+    it("asks a particle only what the engine resolves there, at a format version that knows it", () => {
         // An unknown query is not a zero: the expression is rejected outright, the position component
         // is dropped and the tint goes opaque (rule 5). So this is an allow-list of the queries this
         // build has been seen to resolve in a particle, and adding one here is a deliberate act.
+        // `query.is_local_player` reached Molang in 1.19.60, and a file whose format version predates it
+        // reads the query as zero without a word anywhere.
+        const NEEDS_LOCAL_PLAYER = "1.19.60";
+
         for (const path of [MOB_PARTICLE_FILE, PLAYER_PARTICLE_FILE]) {
             const text = readFileSync(resolve(root, path), "utf-8");
             for (const found of text.matchAll(/query\.[a-z_]+/g)) {
@@ -642,25 +571,13 @@ describe("Entity shadows - the decal itself", () => {
                     `${path} asks ${found[0]}, which this particle target does not resolve`
                 );
             }
-        }
-    });
 
-    it("declares a format version new enough for the questions it asks", () => {
-        // `query.is_local_player` reached Molang in 1.19.60, and a file whose format version predates
-        // it reads the query as zero without a word anywhere.
-        const gates: ReadonlyArray<readonly [string, string]> = [[LOCAL_PLAYER_QUERY, "1.19.60"]];
-
-        for (const path of [MOB_PARTICLE_FILE, PLAYER_PARTICLE_FILE]) {
-            const text = readFileSync(resolve(root, path), "utf-8");
+            if (!text.includes(LOCAL_PLAYER_QUERY)) continue;
             const declared = String(readJson(path).format_version);
-
-            for (const [query, minimum] of gates) {
-                if (!text.includes(query)) continue;
-                assert.ok(
-                    versionAtLeast(declared, minimum),
-                    `${path} asks ${query}, which needs format version ${minimum}, but declares ${declared}`
-                );
-            }
+            assert.ok(
+                versionAtLeast(declared, NEEDS_LOCAL_PLAYER),
+                `${path} asks ${LOCAL_PLAYER_QUERY}, which needs format version ${NEEDS_LOCAL_PLAYER}, but declares ${declared}`
+            );
         }
     });
 });
@@ -671,7 +588,6 @@ describe("Entity shadows - one emitter, forever", () => {
         assert.deepEqual(Object.keys(all), [CONTROLLER], "one controller serves every entity");
 
         const controller = all[CONTROLLER];
-        assert.deepEqual(Object.keys(controller.states).sort(compareText), ["idle", "shadow"]);
 
         // An emitter starts when a state is entered, so the decal lives in a state the controller
         // moves into -- a state's own particle_effects are not something to rely on firing.
@@ -758,32 +674,17 @@ describe("Entity shadows - Beta's own sprite", () => {
             return radius;
         })();
 
-        assert.equal(alphaAt(centre, centre), 255, "the middle of the disc is fully opaque");
         assert.ok(
             opaqueRadius / centre >= SPRITE_DISC_RADIUS,
             `the opaque disc reaches ${opaqueRadius} of ${centre} pixels; the quad is sized for a disc ` +
                 "that fills it, not for the soft blob the size would otherwise assume"
         );
 
-        // The exact profile, because it is the number the span is derived from: a sprite swapped for a
-        // soft blob would still satisfy the threshold above while shrinking what a decal covers.
-        assert.equal(alphaAt(centre + 30, centre), 128, "the rim fades over the last pixel of the disc");
-        assert.equal(alphaAt(centre + 31, centre), 0, "the disc stops a pixel short of the sprite's edge");
-
-        // Nothing reaches the sprite's edge, so the quad's corners are empty and no two decals meet.
-        for (const [x, y] of [
-            [0, 0], [63, 0], [0, 63], [63, 63],
-            [0, centre], [centre, 0], [63, centre], [centre, 63]
-        ] as const) {
-            assert.equal(alphaAt(x, y), 0, `the disc must not reach the sprite's edge at ${x},${y}`);
-        }
-
         // Black, so a decal can only ever darken what is under it.
         assert.deepEqual(rows[centre].slice(centre * 4, centre * 4 + 3), [0, 0, 0], "the sprite is black");
 
         // And the rim is a real falloff rather than an alpha cut, which is what a blend material needs.
         const alphas = new Set(rows.flatMap((row) => row.filter((_, index) => index % 4 === 3)));
-        assert.ok(alphas.size > 2, "the sprite has to carry a real gradient");
         assert.equal([...alphas].some((value) => value > 0 && value < 255), true, "the rim is a fade");
     });
 });

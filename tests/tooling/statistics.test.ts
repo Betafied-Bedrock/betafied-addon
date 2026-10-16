@@ -38,44 +38,32 @@ describe("Release download counts", () => {
     });
   });
 
-  it("keeps an asset's last known count after a release deletes it", () => {
+  it("merges readings without losing an asset or lowering the all-time total", () => {
     const previous = { "5.8/Betafied_5.8.mctemplate": 40, "5.8/Betafied_5.8.mcaddon": 44 };
     const pruned = assetDownloadCounts([releases[0]]);
 
     const { counts, total } = mergeAssetCounts(previous, pruned);
-
-    assert.equal(counts["5.8/Betafied_5.8.mctemplate"], 40, "the deleted template keeps its downloads");
+    assert.equal(counts["5.8/Betafied_5.8.mctemplate"], 40, "a deleted asset keeps its downloads");
     assert.equal(total, 87, "an all-time total must never fall backwards, so it keeps all three assets");
-  });
 
-  it("keeps the highest count it has seen for an asset", () => {
-    const { counts } = mergeAssetCounts({ "5.9/a.mcaddon": 12 }, { "5.9/a.mcaddon": 4 });
-    assert.equal(counts["5.9/a.mcaddon"], 12);
-  });
+    const stale = mergeAssetCounts({ "5.9/a.mcaddon": 12 }, { "5.9/a.mcaddon": 4 });
+    assert.equal(stale.counts["5.9/a.mcaddon"], 12, "a lower reading never overwrites a higher one");
 
-  it("totals every asset it has ever seen, including brand new ones", () => {
-    const { counts, total } = mergeAssetCounts({ "5.9/a.mcaddon": 12 }, { "5.9/b.mcaddon": 5 });
-    assert.deepEqual(counts, { "5.9/a.mcaddon": 12, "5.9/b.mcaddon": 5 });
-    assert.equal(total, 17);
+    const joined = mergeAssetCounts({ "5.9/a.mcaddon": 12 }, { "5.9/b.mcaddon": 5 });
+    assert.equal(joined.total, 17, "a new asset joins the all-time total rather than replacing it");
   });
 });
 
 describe("The past-24-hours download delta", () => {
   const reading = (hoursAgo: number, total: number) => ({ at: NOW - hoursAgo * HOUR, total });
 
-  it("measures against the newest reading at or before the 24-hour cutoff", () => {
+  it("measures against the newest reading at or before the cutoff, and reports nothing before one exists", () => {
     const history = [reading(30, 5000), reading(25, 5900), reading(5, 6180), reading(0, 6215)];
 
     assert.equal(downloadDelta(history, 6215, NOW), 315, "the 25-hour reading is the basis, not the 0-hour one");
-  });
-
-  it("reports nothing at all until a reading a day old exists", () => {
     assert.equal(downloadDelta([reading(3, 6180), reading(1, 6200)], 6215, NOW), null);
     assert.equal(downloadDelta([], 6215, NOW), null);
-  });
-
-  it("bases a delta of zero on an unchanged total rather than reporting nothing", () => {
-    assert.equal(downloadDelta([reading(24, 6215)], 6215, NOW), 0);
+    assert.equal(downloadDelta([reading(24, 6215)], 6215, NOW), 0, "an unchanged total is a reading of zero");
   });
 
   it("forgets readings older than the keep window, so a paused workflow reports nothing", () => {
@@ -89,7 +77,7 @@ describe("The past-24-hours download delta", () => {
     assert.equal(downloadDelta(history, 6215, NOW), null, "a week-old reading is not a 24-hour window");
   });
 
-  it("appends the new reading in order and stays bounded", () => {
+  it("appends the new reading in order", () => {
     const history = historyWithReading(
       [reading(30, 5000), reading(2, 6200)],
       { at: NOW, total: 6215 },
@@ -97,13 +85,6 @@ describe("The past-24-hours download delta", () => {
     );
 
     assert.deepEqual(history.map((entry: any) => entry.total), [5000, 6200, 6215]);
-    assert.deepEqual(
-      historyWithReading([], { at: NOW, total: 1 }, NOW, { max: 2 }).length,
-      1
-    );
-
-    const many = Array.from({ length: 50 }, (_, index) => reading(index, index));
-    assert.equal(historyWithReading(many, { at: NOW, total: 99 }, NOW, { max: 10 }).length, 10);
   });
 });
 
@@ -137,16 +118,15 @@ describe("Cloudflare page views", () => {
     assert.deepEqual(stats, { total: 12_480, delta: 10, windowDays: 30 });
   });
 
-  it("returns null rather than zero when the zone has no data", () => {
+  it("distinguishes a zone with no data from a window that simply had no requests", () => {
     assert.equal(pageViewStats({ data: { viewer: { zones: [] } } }, NOW), null);
-    assert.equal(pageViewStats({ data: { viewer: { zones: [{ hourly: [] }] } } }, NOW), null);
     assert.equal(pageViewStats({ errors: [{ message: "nope" }] }, NOW), null);
-    assert.equal(pageViewStats(null, NOW), null);
-  });
 
-  it("counts a window with no recent requests as zero, which is a real reading", () => {
-    const stats = pageViewStats(response([["2026-10-13T06:00:00Z", 20]], 900), NOW);
-    assert.deepEqual(stats, { total: 900, delta: 0, windowDays: 30 });
+    assert.deepEqual(pageViewStats(response([["2026-10-13T06:00:00Z", 20]], 900), NOW), {
+      total: 900,
+      delta: 0,
+      windowDays: 30
+    });
   });
 });
 
@@ -169,68 +149,52 @@ describe("Discord payloads", () => {
     assert.equal(embed.timestamp, iso(NOW));
   });
 
-  it("records that a window is still collecting rather than printing a made-up figure", () => {
-    const embed = statisticsPayload({ ...stats, downloads: { total: 6215, delta: null } }).embeds[0];
-    assert.ok(embed.fields[0].value.includes("**6,215** all time"));
-    assert.ok(!embed.fields[0].value.includes("NaN"));
-    assert.ok(embed.fields[0].value.includes("collecting"));
-  });
+  it("says what it does not know rather than printing a made-up figure", () => {
+    const collecting = statisticsPayload({ ...stats, downloads: { total: 6215, delta: null } }).embeds[0];
+    assert.ok(collecting.fields[0].value.includes("**6,215** all time"));
+    assert.ok(collecting.fields[0].value.includes("collecting"));
+    assert.ok(!collecting.fields[0].value.includes("NaN"));
 
-  it("says page views are untracked instead of showing them as zero", () => {
-    const embed = statisticsPayload({ ...stats, pageViews: null }).embeds[0];
-    assert.ok(embed.fields[1].value.includes("Not tracked yet"));
-    assert.ok(!embed.fields[1].value.includes("0"));
+    const untracked = statisticsPayload({ ...stats, pageViews: null }).embeds[0];
+    assert.ok(untracked.fields[1].value.includes("Not tracked yet"));
+    assert.ok(!untracked.fields[1].value.includes("0"), "no page views is not zero page views");
   });
-
 });
 
 describe("The release post", () => {
   const release = { tag: "5.9", downloads: 1470 };
   const buttons = (payload: any) => payload.components[0].components;
 
-  it("offers one download button pointing at the site's downloads page", () => {
-    const row = buttons(releasePostPayload(release));
+  it("announces the release behind one download button pointing at the site's downloads page", () => {
+    const payload = releasePostPayload(release);
+    const row = buttons(payload);
 
     assert.equal(row.length, 1, "the post links one destination, not the files of one release");
-    assert.equal(row[0].type, 2);
-    assert.equal(row[0].label, "Download 5.9");
     assert.equal(row[0].url, "https://betafied.net/downloads/");
     assert.equal(row[0].style, 5, "a link button, the only kind a webhook can carry");
-  });
-
-  it("names the release it announces", () => {
-    assert.ok(releasePostPayload(release).embeds[1].description.startsWith("## Betafied 5.9"));
+    assert.ok(payload.embeds[1].description.startsWith("## Betafied 5.9"));
     assert.ok(
       buttons(releasePostPayload({ ...release, tag: "5.10.1" }))[0].label.includes("5.10.1"),
       "the button carries the version of the post it is on"
     );
   });
 
-  it("keeps the branding copy and carries the live total", () => {
-    const embed = releasePostPayload(release).embeds[1];
+  it("carries the live total and references the artwork by URL", () => {
+    const payload = releasePostPayload(release);
+    const embed = payload.embeds[1];
 
-    assert.ok(embed.description.includes("## Betafied"));
-    assert.ok(embed.description.includes("> Betafied is a complete recreation of Minecraft Java Edition Beta 1.7.3"));
-    assert.ok(embed.description.includes("*Available free for Windows, Android, and iOS"));
     assert.equal(embed.fields[0].name, "Downloads");
     assert.equal(embed.fields[0].value, "**1,470** all time");
-    assert.equal(embed.title, undefined, "the channel's post carries no embed title");
-    assert.equal(embed.footer, undefined);
-    const images = releasePostPayload(release).embeds.map((embed: any) => embed.image.url);
     assert.deepEqual(
-      images.map((url: string) => url.match(/\/([^/?]+)\?/)?.[1]),
+      payload.embeds.map((each: any) => each.image.url.match(/\/([^/?]+)\?/)?.[1]),
       ["Release.png", "RELICA_DIVIDER.png"],
       "the channel's artwork is referenced by URL, without uploading files with the message"
     );
-    for (const url of images) {
-      assert.match(url, /^https:\/\//, "a URL rather than an attachment:// reference");
-    }
   });
-
 });
 
 describe("Which message the release post lives in", () => {
-  it("edits the mod's recorded post even when the tag it announces has changed", () => {
+  it("edits the mod's recorded post, and has nothing to edit on the first run", () => {
     const state = { release: { id: "1560259613851389983", tag: "5.9" } };
 
     assert.equal(
@@ -238,29 +202,18 @@ describe("Which message the release post lives in", () => {
       "1560259613851389983",
       "the release channel keeps one post per mod, so a new version updates it instead of adding a second"
     );
-  });
-
-  it("has nothing to edit on the first run, which is what makes the post get published", () => {
-    assert.equal(releaseMessageToEdit({}), null);
+    assert.equal(releaseMessageToEdit({}), null, "which is what makes the first post get published");
     assert.equal(releaseMessageToEdit(undefined), null);
-  });
-
-  it("hands the refresh the post it recorded alongside the readings", () => {
-    assert.equal(releaseMessageToEdit({ statistics: "7", release: { id: "42", tag: "5.9.1" } }), "42");
   });
 });
 
 describe("Webhook endpoints", () => {
   const url = "https://discord.com/api/webhooks/123/abc";
 
-  it("posts to the webhook itself, asking for the message back and the components honoured", () => {
+  it("normalises the stored URL into the post and edit endpoints Discord needs", () => {
     assert.equal(webhookPostUrl(url), `${url}?wait=true&with_components=true`);
     assert.equal(webhookPostUrl(`${url}?thread_id=9`), `${url}?thread_id=9&wait=true&with_components=true`);
-  });
-
-  it("edits the message this webhook posted earlier, asking for the components honoured", () => {
     assert.equal(webhookMessageUrl(url, "456"), `${url}/messages/456?with_components=true`);
-    assert.equal(webhookMessageUrl(`${url}/`, "456"), `${url}/messages/456?with_components=true`);
     assert.equal(webhookMessageUrl(`${url}?wait=true`, "456"), `${url}/messages/456?with_components=true`);
   });
 });

@@ -12,12 +12,12 @@
     ],
     "key": {
       "#": {
-        "item": "minecraft:reeds"
+        "item": "minecraft:sugar_cane"
       }
     },
     "unlock": [
       {
-        "item": "minecraft:reeds"
+        "item": "minecraft:sugar_cane"
       }
     ],
     "result": {

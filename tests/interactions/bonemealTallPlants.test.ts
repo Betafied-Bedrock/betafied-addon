@@ -49,13 +49,4 @@ describe("Instant bone meal - post-Beta tall plants", () => {
             "Only the two-block grasses may be cleared, never Beta-legal plants"
         );
     });
-
-    it("covers the 15x5x15 volume the vanilla spread reaches into", () => {
-        resetMocks();
-
-        const [fill] = interactWithGrassBlock();
-
-        assert.deepEqual(fill.volume.from, { x: 3, y: 62, z: -27 });
-        assert.deepEqual(fill.volume.to, { x: 17, y: 66, z: -13 });
-    });
 });

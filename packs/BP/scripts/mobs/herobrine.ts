@@ -15,6 +15,7 @@ const ENTITY_ID = "bh:herobrine";
 
 const CONFIG = Object.freeze({
     SWEEP_INTERVAL_TICKS: 20,
+    MAINTAIN_INTERVAL_TICKS: 10,
     MIN_REST_TICKS: 576000,
     INITIAL_GAP_MIN_TICKS: 24000,
     INITIAL_GAP_MAX_TICKS: 72000,
@@ -101,6 +102,9 @@ function isFooting(dimension: Dimension, x: number, y: number, z: number): boole
         if (!ground.isSolid || ground.isLiquid) return false;
         return feet.isAir && head.isAir;
     } catch {
+        // A cell outside the loaded chunk makes the read throw, and "no footing here" is the honest
+        // answer for one: the picker moves on to its next candidate, so this is a normal outcome of
+        // the search rather than a failure to report.
         return false;
     }
 }
@@ -329,4 +333,4 @@ system.beforeEvents.startup.subscribe(({ customCommandRegistry }) => {
 });
 
 tickManager.register("herobrine:sweep", CONFIG.SWEEP_INTERVAL_TICKS, rollSweep, 120);
-tickManager.register("herobrine:maintain", 10, maintainSighting, 130);
+tickManager.register("herobrine:maintain", CONFIG.MAINTAIN_INTERVAL_TICKS, maintainSighting, 130);

@@ -42,7 +42,7 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
         assert.equal(tint.bindings[1].target_property_name, "#visible");
     });
 
-    it("mounts the tint on the screen content panel, not the unsized root panel", () => {
+    it("mounts the tint on the sized content panel and leaves every engine channel it replaced alone", () => {
         // root_panel declares no size in vanilla, so a "100%" image laid out as one of its children
         // resolves against nothing and falls back to the texture's native 32x32.
         const onContent = (hud.hud_content?.modifications ?? []).some((modification: any) =>
@@ -61,15 +61,19 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
             "the actionbar factory workaround is dead once the tint reads the title binding"
         );
         assert.equal(hud.underwater_overlay_factory, undefined);
-    });
 
-    it("leaves the engine actionbar element alone", () => {
         // Repainting hud_actionbar_text itself is what stretched the tint over every actionbar
         // message, so the pack must not touch it now that it no longer needs the channel.
         assert.equal(hud.hud_actionbar_text, undefined);
+
+        assert.notEqual(
+            hud.vignette_renderer?.ignored,
+            true,
+            "ignoring vignette_renderer disables the engine's own underwater, hurt and void overlays"
+        );
     });
 
-    it("hides every pack sentinel from the player's screen", () => {
+    it("hides both pack sentinels from the title frame, and clears the tint with a real, distinct string", () => {
         // The armor icons share this channel, so both sentinels have to stay invisible.
         const condition = hud["hud_title_text/title_frame"].bindings[1].source_property_name;
         assert.ok(
@@ -77,6 +81,14 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
             "the tint sentinel must not be rendered as a title"
         );
         assert.ok(condition.includes("'_a'"), "the armor sentinel must stay hidden too");
+
+        // An empty title stops drawing but leaves #hud_title_text_string holding the old sentinel,
+        // which is what kept the tint on screen until some other title overwrote the channel.
+        assert.notEqual(CLEAR_SENTINEL, "");
+        assert.equal(CLEAR_SENTINEL.slice(0, 2), UNDERWATER_SENTINEL.slice(0, 2),
+            "the clear sentinel must share the hidden prefix so the title frame never shows it");
+        assert.notEqual(CLEAR_SENTINEL, UNDERWATER_SENTINEL,
+            "the clear sentinel must not match the tint gate");
     });
 
     it("zooms the tint to cover the screen instead of stretching it", () => {
@@ -90,7 +102,6 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
         // the window for that uniform draw to still reach every edge. Anything at/under 100% would
         // letterbox and leave the screen uncovered.
         for (const edge of tint.size) {
-            assert.equal(typeof edge, "string");
             assert.ok(Number(edge.replace("%", "")) > 100,
                 "an oversized frame is what turns keep_ratio's fit into a cover");
         }
@@ -98,23 +109,5 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
 
         const texturePath = tint.texture.replace("textures/", "packs/RP/textures/") + ".png";
         assert.ok(existsSync(resolve(root, texturePath)), `missing texture ${texturePath}`);
-    });
-
-    it("clears the tint with a real, hidden title string rather than an empty one", () => {
-        // An empty title stops drawing but leaves #hud_title_text_string holding the old sentinel,
-        // which is what kept the tint on screen until some other title overwrote the channel.
-        assert.notEqual(CLEAR_SENTINEL, "");
-        assert.equal(CLEAR_SENTINEL.slice(0, 2), UNDERWATER_SENTINEL.slice(0, 2),
-            "the clear sentinel must share the hidden prefix so the title frame never shows it");
-        assert.notEqual(CLEAR_SENTINEL, UNDERWATER_SENTINEL,
-            "the clear sentinel must not match the tint gate");
-    });
-
-    it("leaves the engine vignette enabled so damage and void still read", () => {
-        assert.notEqual(
-            hud.vignette_renderer?.ignored,
-            true,
-            "ignoring vignette_renderer disables the engine's own underwater, hurt and void overlays"
-        );
     });
 });

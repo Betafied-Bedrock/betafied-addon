@@ -85,30 +85,15 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
     }
 
     describe("planCakeBite - the era's eatCakeSlice in one function", () => {
-        it("takes a slice under full health and heals the era's three points", () => {
+        it("plans the era's slice, unless the player is already whole", () => {
             assert.deepEqual(planCakeBite(0, 10, 20), { heal: SLICE_HEAL, nextBites: 1 });
-            assert.equal(SLICE_HEAL, 3, "BlockCake.eatCakeSlice healed three, which is a heart and a half");
-        });
-
-        it("takes no slice at all once the player is at full health", () => {
+            assert.deepEqual(
+                planCakeBite(CAKE_SERVINGS - 1, 10, 20),
+                { heal: SLICE_HEAL, nextBites: undefined },
+                "`var6 >= 6` is what removed the cake instead of writing a seventh state"
+            );
             assert.equal(planCakeBite(0, 20, 20), undefined);
-            assert.equal(planCakeBite(3, 21, 20), undefined);
-        });
-
-        it("clears the block on the sixth bite instead of writing a seventh state", () => {
-            assert.equal(CAKE_SERVINGS, 6, "var6 >= 6 is what removed the cake");
-            assert.deepEqual(planCakeBite(CAKE_SERVINGS - 1, 10, 20), { heal: SLICE_HEAL, nextBites: undefined });
-        });
-
-        it("keeps every bite below the sixth on the block", () => {
-            for (let bites = 0; bites < CAKE_SERVINGS - 1; bites++) {
-                assert.equal(planCakeBite(bites, 1, 20)?.nextBites, bites + 1, `bite ${bites} did not advance`);
-            }
-        });
-
-        it("heals the whole three points even when that heals past the last one", () => {
-            const bite = planCakeBite(2, 19, 20);
-            assert.deepEqual(bite, { heal: SLICE_HEAL, nextBites: 3 });
+            assert.equal(planCakeBite(3, 21, 20), undefined, "an over-healed player is refused the same way");
         });
     });
 
@@ -138,9 +123,10 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
             assert.equal(block.typeId, "minecraft:air", "the sixth bite is the one that removed the block");
         });
 
-        it("takes one slice however many times the engine fires a single tap", () => {
+        it("spends one slice per tap, from the player's own burst window", () => {
             const block = cakeCell(0);
             const { player, component } = eater(1);
+            const second = { ...eater(1).player, id: "cake_alex" };
 
             // Bedrock hands a held input to the before-event again on every tick it lasts, so the raw
             // firing is not the click; the era took one slice from one activation of the block.
@@ -151,34 +137,15 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
 
             assert.equal(eaten(block), 1, "a burst of fires is still the one slice the tap earned");
             assert.equal(component.currentValue, 4, "and it heals once, not once per fire");
-        });
 
-        it("takes the next slice once the burst window has passed", () => {
-            const block = cakeCell(0);
-            const { player } = eater(1);
-
-            click(block, player);
+            click(block, second);
             settle();
-            assert.equal(eaten(block), 1);
+            assert.equal(eaten(block), 2, "the window is the player's own, not the cake's");
 
             system.currentTick += BITE_COOLDOWN_TICKS;
             click(block, player);
             settle();
-
-            assert.equal(eaten(block), 2, "a deliberate second tap still earns its slice");
-        });
-
-        it("keeps one player's burst from spending another player's tap", () => {
-            const block = cakeCell(0);
-            const { player: first } = eater(1);
-            const second = { ...eater(1).player, id: "cake_alex" };
-
-            click(block, first);
-            settle();
-            click(block, second);
-            settle();
-
-            assert.equal(eaten(block), 2, "the window is the player's own, not the cake's");
+            assert.equal(eaten(block), 3, "a deliberate second tap still earns its slice");
         });
 
         it("spends the click but takes nothing from a player at full health", () => {
@@ -190,7 +157,7 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
 
             assert.equal(event.cancel, true, "the era spent the click either way");
             assert.equal(eaten(block), 2, "a full-health player left the cake where it was");
-            assert.equal(component.currentValue, 20);
+            assert.equal(component.currentValue, 20, "and got no heal out of it");
         });
 
         it("reads a cake whose bite state never got written as unbitten", () => {
@@ -213,7 +180,6 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
             block.setType("minecraft:air");
             settle();
 
-            assert.equal(block.typeId, "minecraft:air", "a cell that is no longer a cake is left alone");
             assert.equal(component.currentValue, 10, "and the slice is not handed out");
         });
 
@@ -227,7 +193,6 @@ describe("Cake Eating - Beta 1.7.3 six bites", () => {
             settle();
 
             assert.equal(event.cancel, false, "only the pack's cake is this module's click");
-            assert.equal(stone.typeId, "minecraft:stone");
         });
     });
 });

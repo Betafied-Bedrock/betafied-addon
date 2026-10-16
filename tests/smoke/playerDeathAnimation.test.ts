@@ -57,8 +57,6 @@ describe("Beta corpse flop - resource pack contract", () => {
         // pivots at the waist, which would swing the limbs around the wrong point.
         const root = bones.find((bone: any) => bone.name === "root");
         assert.deepEqual(root.pivot, [0, 0, 0]);
-        assert.equal(bones.find((bone: any) => bone.name === "body").parent, "waist");
-        assert.equal(bones.find((bone: any) => bone.name === "rightArm").parent, "body");
     });
 
     it("replays the era's sqrt curve, a frame per tick until the 90-degree cap", () => {

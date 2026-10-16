@@ -1,13 +1,15 @@
 import {
     ItemStack,
     Player,
-    GameMode,
     EntityComponentTypes,
     system
 } from "@minecraft/server";
 import type { Container } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
-import { BH_BOW_ID } from "../core/betaRegistry.js";
+import { reportError } from "../core/errorReporter.js";
+import { tickManager } from "../core/tickManager.js";
+import { BH_BOW_ID } from "../policy/betaRegistry.js";
+import { getPrivilegeReason } from "../core/permissions.js";
 
 const CONFIG = Object.freeze({
     FIRE_COOLDOWN: 2,
@@ -15,7 +17,11 @@ const CONFIG = Object.freeze({
 });
 
 const lastFireTime = new Map<string, number>();
-const holdIntervals = new Map<string, number>();
+
+/** The tick manager owns the hold loop's schedule; this id is what starts and stops it. */
+function holdTaskId(playerId: string): string {
+    return `machineGunBow:hold:${playerId}`;
+}
 
 function takeArrowFrom(inv: Container): boolean {
     const size = inv.size;
@@ -34,17 +40,38 @@ function takeArrowFrom(inv: Container): boolean {
     return false;
 }
 
-function fireArrow(player: Player): boolean {
+/** The hold loop outlives the event that started it, so the held item is re-read from the engine. */
+function holdingBetaBow(player: Player): boolean {
+    const inv = player.getComponent(EntityComponentTypes.Inventory)?.container;
+    return inv?.getItem(player.selectedSlotIndex)?.typeId === BH_BOW_ID;
+}
+
+// A spent cooldown, an empty quiver and a mob's own projectile are ordinary outcomes of holding the
+// bow and go unreported; only a failure the player never asked for is reported.
+function fireArrow(player: Player): void {
     const now = system.currentTick;
     const lastFire = lastFireTime.get(player.id) ?? 0;
 
-    if (now - lastFire < CONFIG.FIRE_COOLDOWN) return false;
-    lastFireTime.set(player.id, now);
+    if (now - lastFire < CONFIG.FIRE_COOLDOWN) return;
 
     const inv = player.getComponent(EntityComponentTypes.Inventory)?.container;
-    if (!inv) return false;
+    if (!inv) {
+        // Stamped as well, so a broken container cannot turn the hold loop into a log flood.
+        lastFireTime.set(player.id, now);
+        reportError(
+            { system: "machineGunBow", operation: "fireArrow", target: player.name },
+            "player has no inventory container"
+        );
+        return;
+    }
 
-    if (player.getGameMode() !== GameMode.Creative && !takeArrowFrom(inv)) return false;
+    // Creative fires without spending arrows; the builder tag buys an inventory sweep, not a cost.
+    const freeArrows = getPrivilegeReason(player) === "creative";
+    if (!freeArrows && !takeArrowFrom(inv)) return;
+
+    // Stamped on the firing path only: a shot the guards refused must not spend the cooldown the
+    // next legal shot needs.
+    lastFireTime.set(player.id, now);
 
     const dir = player.getViewDirection();
     const head = player.getHeadLocation();
@@ -66,18 +93,13 @@ function fireArrow(player: Player): boolean {
             volume: 0.5,
             pitch: 1.0 + Math.random() * 0.3
         });
-        return true;
-    } catch {
-        return false;
+    } catch (e) {
+        reportError({ system: "machineGunBow", operation: "spawnArrow", target: player.name }, e);
     }
 }
 
 function stopHoldFiring(playerId: string): void {
-    const interval = holdIntervals.get(playerId);
-    if (interval !== undefined) {
-        system.clearRun(interval);
-        holdIntervals.delete(playerId);
-    }
+    tickManager.unregister(holdTaskId(playerId));
 }
 
 eventBus.onItemUseAfter((ev) => {
@@ -98,27 +120,20 @@ eventBus.onItemStartUse((ev) => {
 
     stopHoldFiring(player.id);
 
-    const intervalId = system.runInterval(() => {
+    tickManager.register(holdTaskId(player.id), CONFIG.HOLD_FIRE_RATE, () => {
         try {
-            if (!player.isValid) {
-                stopHoldFiring(player.id);
-                return;
-            }
-
-            const invComp = player.getComponent(EntityComponentTypes.Inventory);
-            const currentItem = invComp?.container?.getItem(player.selectedSlotIndex);
-            if (currentItem?.typeId !== BH_BOW_ID) {
+            if (!player.isValid || !holdingBetaBow(player)) {
                 stopHoldFiring(player.id);
                 return;
             }
 
             fireArrow(player);
-        } catch {
+        } catch (e) {
+            // The loop stops on the way out, so the reason it stopped is worth a report.
+            reportError({ system: "machineGunBow", operation: "holdFire", target: player.name }, e);
             stopHoldFiring(player.id);
         }
-    }, CONFIG.HOLD_FIRE_RATE);
-
-    holdIntervals.set(player.id, intervalId);
+    }, 0);
 });
 
 eventBus.onItemStopUse((ev) => {

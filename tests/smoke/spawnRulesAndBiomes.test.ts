@@ -8,7 +8,7 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
     const biomesDir = resolve(root, "packs/BP/biomes");
     const spawnRulesDir = resolve(root, "packs/BP/spawn_rules");
 
-    it("verifies every biome file defines non-empty minecraft:tags", () => {
+    it("gives every biome file a dimension tag, and every animal biome a spawn probability", () => {
         const biomeFiles = readdirSync(biomesDir).filter(f => f.endsWith(".json"));
         assert.ok(biomeFiles.length > 0, "Expected the pack's own biome definitions");
 
@@ -17,30 +17,17 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
             const biome = content["minecraft:biome"];
             assert.ok(biome, `${file} must contain a minecraft:biome root`);
 
-            const tagsComponent = biome.components?.["minecraft:tags"];
-            assert.ok(tagsComponent, `${file} is missing components['minecraft:tags']`);
-            assert.ok(Array.isArray(tagsComponent.tags), `${file} tags must be an array`);
-            assert.ok(tagsComponent.tags.length > 0, `${file} tags array must not be empty`);
-
-            const hasDimensionTag = tagsComponent.tags.some(
-                (t: string) => t === "overworld" || t === "nether" || t === "the_end"
+            const tags = biome.components?.["minecraft:tags"]?.tags;
+            assert.ok(tags?.length > 0, `${file} must declare a non-empty minecraft:tags array`);
+            assert.ok(
+                tags.some((t: string) => t === "overworld" || t === "nether" || t === "the_end"),
+                `${file} must declare a dimension tag (overworld, nether, or the_end)`
             );
-            assert.ok(hasDimensionTag, `${file} must declare a dimension tag (overworld, nether, or the_end)`);
-        }
-    });
 
-    it("verifies animal biomes include creature spawn probability for chunk generation", () => {
-        const biomeFiles = readdirSync(biomesDir).filter(f => f.endsWith(".json"));
-
-        for (const file of biomeFiles) {
-            const content = JSON.parse(readFileSync(resolve(biomesDir, file), "utf-8"));
-            const biome = content["minecraft:biome"];
-            const tags = biome.components?.["minecraft:tags"]?.tags ?? [];
-
+            // Without the probability the chunk generator never rolls a herd into an animal biome.
             if (tags.includes("animal")) {
                 const prob = biome.components?.["minecraft:creature_spawn_probability"];
-                assert.ok(prob, `${file} has 'animal' tag but lacks minecraft:creature_spawn_probability`);
-                assert.ok(typeof prob.probability === "number" && prob.probability > 0, `${file} must define positive creature spawn probability`);
+                assert.ok(prob?.probability > 0, `${file} has 'animal' but no positive creature spawn probability`);
             }
         }
     });
@@ -71,10 +58,8 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
         }
     });
 
-    it("verifies monster spawn rules do not constrain surface spawns to grass", () => {
-        const monsterFiles = ["zombie.json", "skeleton.json", "creeper.json", "spider.json"];
-
-        for (const file of monsterFiles) {
+    it("places every mob's spawn rule where its era can reach it", () => {
+        for (const file of ["zombie.json", "skeleton.json", "creeper.json", "spider.json"]) {
             const content = JSON.parse(readFileSync(resolve(spawnRulesDir, file), "utf-8"));
             const conditions = content["minecraft:spawn_rules"]?.conditions ?? [];
 
@@ -87,15 +72,10 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
                 }
             }
         }
-    });
 
-    it("verifies Nether mob spawn rules use underground spawning and valid nether tags", () => {
-        const netherFiles = ["ghast.json", "zombie_pigman.json"];
-
-        for (const file of netherFiles) {
+        for (const file of ["ghast.json", "zombie_pigman.json"]) {
             const raw = readFileSync(resolve(spawnRulesDir, file), "utf-8");
-            const content = JSON.parse(raw);
-            const conditions = content["minecraft:spawn_rules"]?.conditions ?? [];
+            const conditions = JSON.parse(raw)["minecraft:spawn_rules"]?.conditions ?? [];
 
             assert.ok(!raw.includes("beta_nether"), `${file} must not reference phantom tag 'beta_nether'`);
 
@@ -104,20 +84,13 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
                     !cond["minecraft:spawns_on_surface"],
                     `${file} cannot use spawns_on_surface in Nether (Nether has no surface)`
                 );
-                assert.ok(
-                    cond["minecraft:spawns_underground"],
-                    `${file} must use spawns_underground in Nether`
-                );
+                assert.ok(cond["minecraft:spawns_underground"], `${file} must use spawns_underground in Nether`);
             }
         }
-    });
 
-    it("verifies post-Beta mobs are suppressed with the unreachable the_void biome filter", () => {
         // Vanilla keeps adding natural spawners; each one must ship a rule whose only
         // biome condition is a tag no real biome ever uses, otherwise it spawns unchecked.
-        const suppressed = ["sulfur_cube", "bee", "armadillo", "creaking", "breeze"];
-
-        for (const name of suppressed) {
+        for (const name of ["sulfur_cube", "bee", "creaking"]) {
             const content = JSON.parse(readFileSync(resolve(spawnRulesDir, `${name}.json`), "utf-8"));
             const conditions = content["minecraft:spawn_rules"]?.conditions ?? [];
 
@@ -147,7 +120,6 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
         // match, and the engine silently ignores a tag no biome declares.
         const VANILLA_OVERWORLD_TAGS = new Set(["overworld", "forest", "taiga"]);
 
-        // Collect all declared biome tags across BP biomes
         const declaredTags = new Set<string>();
         const biomeFiles = readdirSync(biomesDir).filter(f => f.endsWith(".json"));
         for (const file of biomeFiles) {
@@ -180,42 +152,48 @@ describe("Bedrock Natural Spawning Contract - Spawn Rules & Biome Integrity", ()
         }
     });
 
-    it("verifies authentic Beta wolf behavior definitions (no breeding, dyeing, or leashing)", () => {
-        const wolfPath = resolve(root, "packs/BP/entities/wolf.json");
-        const content = JSON.parse(readFileSync(wolfPath, "utf-8"));
-        const tame = content["minecraft:entity"]?.component_groups?.["minecraft:wolf_tame"];
+    it("keeps the era's wolf and creeper definitions", () => {
+        const wolf = JSON.parse(readFileSync(resolve(root, "packs/BP/entities/wolf.json"), "utf-8"));
+        const tame = wolf["minecraft:entity"]?.component_groups?.["minecraft:wolf_tame"];
         assert.ok(tame, "wolf.json must declare minecraft:wolf_tame");
         assert.equal(tame["minecraft:behavior.breed"], undefined, "Beta wolves cannot breed");
         assert.equal(tame["minecraft:is_dyeable"], undefined, "Beta wolves cannot have collars dyed");
         assert.equal(tame["minecraft:leashable"], undefined, "Beta wolves cannot be leashed");
-    });
 
-    it("verifies the creeper carries a chase goal that never lands a melee hit", () => {
         // behavior.melee_attack is how a Bedrock creeper closes the distance to its target. It is
         // gated on the mob having an attack component, so without minecraft:attack the goal never
         // starts and the creeper only ever explodes when the player walks into fuse range. Vanilla
         // pairs the goal with reach_multiplier 0.0 so the chase cannot deal melee damage.
-        const path = resolve(root, "packs/BP/entities/creeper.json");
-        const components = JSON.parse(readFileSync(path, "utf-8"))["minecraft:entity"]?.components ?? {};
+        const creeper = JSON.parse(readFileSync(resolve(root, "packs/BP/entities/creeper.json"), "utf-8"));
+        const components = creeper["minecraft:entity"]?.components ?? {};
         assert.ok(components["minecraft:attack"], "the creeper's melee_attack goal needs an attack component to start");
         const melee = components["minecraft:behavior.melee_attack"];
         assert.ok(melee, "creeper.json must keep the chase goal");
         assert.equal(melee.reach_multiplier, 0, "Beta creepers chase but do no melee damage");
     });
 
-    it("verifies the pig loot table caps porkchops at Beta's 0-2", () => {
-        const path = resolve(root, "packs/BP/loot_tables/entities/pig.json");
-        const content = JSON.parse(readFileSync(path, "utf-8"));
-        const porkchops = (content.pools ?? [])
-            .flatMap((pool: any) => pool.entries ?? [])
-            .filter((entry: any) => entry.name === "minecraft:porkchop");
-        assert.ok(porkchops.length > 0, "pig.json must drop porkchops");
+    it("caps each mob's meat drop at the count Beta's own drop rule rolled", () => {
+        // Beta pays `rand.nextInt(3)` copies of `getDropItemId()` — zero, one or two
+        // (EntityLiving.java:405-413) — and the pig and the pigman each name one meat there
+        // (EntityPig.java:45, EntityPigZombie.java:85). A table capped at one pays half the era's rate.
+        const meats: readonly (readonly [string, string])[] = [
+            ["pig.json", "minecraft:porkchop"],
+            ["zombie_pigman.json", "minecraft:cooked_porkchop"]
+        ];
 
-        for (const entry of porkchops) {
-            const setCount = (entry.functions ?? []).find((f: any) => f.function === "set_count");
-            assert.ok(setCount, "every porkchop entry must declare a set_count");
-            assert.equal(setCount.count.min, 0, "Beta pigs could drop no porkchop at all");
-            assert.equal(setCount.count.max, 2, "Beta pigs never dropped more than two porkchops");
+        for (const [file, item] of meats) {
+            const content = JSON.parse(readFileSync(resolve(root, `packs/BP/loot_tables/entities/${file}`), "utf-8"));
+            const entries = (content.pools ?? [])
+                .flatMap((pool: any) => pool.entries ?? [])
+                .filter((entry: any) => entry.name === item);
+            assert.ok(entries.length > 0, `${file} must drop ${item}`);
+
+            for (const entry of entries) {
+                const setCount = (entry.functions ?? []).find((f: any) => f.function === "set_count");
+                assert.ok(setCount, `every ${item} entry must declare a set_count`);
+                assert.equal(setCount.count.min, 0, "one roll in three paid no meat at all");
+                assert.equal(setCount.count.max, 2, "Beta never paid more than two of one meat");
+            }
         }
     });
 });

@@ -2,8 +2,8 @@ import {
     Direction,
     PlayerInteractWithBlockBeforeEvent
 } from "@minecraft/server";
-import { eventBus } from "../core/eventBus.js";
-import { BETA_WOOD_SPECIES } from "../core/betaRegistry.js";
+import { eventBus, InteractPriority } from "../core/eventBus.js";
+import { BETA_WOOD_SPECIES } from "../policy/betaRegistry.js";
 
 const CEILING_RESTRICTED = Object.freeze(new Set([
     "minecraft:stone_button",
@@ -48,4 +48,4 @@ function validateBlockInteraction(event: PlayerInteractWithBlockBeforeEvent): vo
     }
 }
 
-eventBus.onPlayerInteractWithBlock(validateBlockInteraction);
+eventBus.onPlayerInteractWithBlock(validateBlockInteraction, InteractPriority.RULE);

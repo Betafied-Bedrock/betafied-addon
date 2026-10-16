@@ -1,8 +1,8 @@
-import { world, system, Entity, Player, ItemStack, EntityComponentTypes, Dimension } from "@minecraft/server";
+import { world, system, Entity, Player, ItemStack, EntityComponentTypes, Dimension, Vector3 } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { WOOL_BY_COLOR } from "../core/betaRegistry.js";
+import { WOOL_BY_COLOR } from "../policy/betaRegistry.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 40,
@@ -33,10 +33,12 @@ export const PASSIVE_MOBS = Object.freeze(new Set([
 export const WOOL_DROP_MIN = 1;
 export const WOOL_DROP_MAX = 3;
 
-export const hurtCooldowns = new Map<string, number>();
-export const jumpCooldowns = new Map<string, number>();
+// The cooldown maps are this module's own bookkeeping: every read and write is below, so neither
+// has an importer and neither needs to be part of the module's surface.
+const hurtCooldowns = new Map<string, number>();
+const jumpCooldowns = new Map<string, number>();
 
-export function handleSheepPunch(sheep: Entity): void {
+export function shearPunchedSheep(sheep: Entity): void {
     if (!sheep.isValid) return;
 
     const health = sheep.getComponent(EntityComponentTypes.Health);
@@ -63,13 +65,16 @@ eventBus.onEntityHurt((ev) => {
         ev.damageSource.damagingEntity instanceof Player &&
         !hurtEntity.hasComponent("minecraft:is_sheared")
     ) {
-        handleSheepPunch(hurtEntity);
+        shearPunchedSheep(hurtEntity);
     }
 });
 
-export function evaluateHopConditions(entity: Entity, dimension: Dimension): boolean {
-    const loc = entity.location;
-
+/**
+ * The water question — the one probe whose answer is final either way. `undefined` says the question
+ * does not apply to this cell (no water to stand in, or a cell that could not be read) and leaves the
+ * decision to the probe that follows.
+ */
+function hopsFromWater(dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const currentBlock = dimension.getBlock({
             x: Math.floor(loc.x),
@@ -80,9 +85,19 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             return Math.random() < CONFIG.WATER_HOP_CHANCE;
         }
     } catch {
-        // Block coordinate unloaded or out of dimension bounds
+        // This runs per animal per pass, and a cell outside the loaded range is the ordinary case at the
+        // edge of a group: the water test simply has no answer for that cell and the hop falls through
+        // to the checks below, so reporting it would log normal wandering as an error.
     }
 
+    return undefined;
+}
+
+/**
+ * Whether the cell the animal is facing is solid, fenced or walled. The era's animal hops on a winning
+ * roll and simply carries on asking on a losing one, so only a win is this probe's answer.
+ */
+function hopsFromObstacle(entity: Entity, dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const viewDir = entity.getViewDirection();
         const checkX = Math.floor(loc.x + viewDir.x * 0.9);
@@ -97,11 +112,21 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
             if (Math.random() < CONFIG.OBSTACLE_HOP_CHANCE) {
                 return true;
             }
+            // A losing roll here is not an answer: the crowd question is still the animal's to ask.
         }
     } catch {
-        // Spatial query out of bounds
+        // Same read, same expected throw: an unloaded obstacle cell is a cell with no obstacle in it,
+        // so the animal keeps its chance of a plain wander hop rather than losing the whole decision.
     }
 
+    return undefined;
+}
+
+/**
+ * Whether the passive animals standing around this one are close enough to decide a hop. As with the
+ * obstacle, a losing roll leaves the question to the plain wander chance below it.
+ */
+function hopsFromCrowd(entity: Entity, dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const nearby = dimension.getEntities({
             location: loc,
@@ -119,9 +144,36 @@ export function evaluateHopConditions(entity: Entity, dimension: Dimension): boo
         if (passiveNeighbors > 0 && Math.random() < CONFIG.CROWD_HOP_CHANCE) {
             return true;
         }
-    } catch {
-        // Transient entity query failure
+    } catch (err) {
+        // Unlike the cell reads above, a failed crowd query on a live animal is not an expected
+        // condition: the neighbour count is what decides a crowd hop, so losing it silently turns
+        // the animal's behaviour into a coin flip nobody can diagnose.
+        if (entity.isValid) {
+            reportError({ system: "betaAnimalAI", operation: "countCrowdNeighbours", target: entity.id }, err);
+        }
     }
+
+    return undefined;
+}
+
+/**
+ * The order the era's animal asks its questions in: the water it stands in, then the cell it faces,
+ * then the crowd around it, and last a plain wander chance. Each probe answers `undefined` for a
+ * question that does not apply here, which is why the answers are compared rather than chained with
+ * `||`: the water answer is final either way, so a water animal that rolls low does not then get to
+ * roll again for the obstacle it is facing.
+ */
+export function evaluateHopConditions(entity: Entity, dimension: Dimension): boolean {
+    const loc = entity.location;
+
+    const inWater = hopsFromWater(dimension, loc);
+    if (inWater !== undefined) return inWater;
+
+    const facingObstacle = hopsFromObstacle(entity, dimension, loc);
+    if (facingObstacle !== undefined) return facingObstacle;
+
+    const inCrowd = hopsFromCrowd(entity, dimension, loc);
+    if (inCrowd !== undefined) return inCrowd;
 
     return Math.random() < CONFIG.WANDER_HOP_CHANCE;
 }
@@ -143,8 +195,12 @@ export function applyRandomHop(entity: Entity): void {
                     y: CONFIG.JUMP_IMPULSE_Y,
                     z: viewDir.z * CONFIG.FORWARD_IMPULSE
                 });
-            } catch {
-                // Entity despawned during staggered impulse timeout
+            } catch (err) {
+                // A despawn between the validity check and the read is how a staggered impulse normally
+                // ends, so only a failure on an entity that is still live is worth reporting.
+                if (entity.isValid) {
+                    reportError({ system: "betaAnimalAI", operation: "applyHopImpulse", target: entity.id }, err);
+                }
             }
         }, i * 12);
     }
@@ -161,7 +217,12 @@ function tryAnimalHop(entity: Entity, dimension: Dimension, currentTick: number)
     try {
         const vel = entity.getVelocity();
         if (Math.abs(vel.y) > 0.15) return;
-    } catch {
+    } catch (err) {
+        // The animal most often despawns between the cooldown checks and this read; a throw while it
+        // is still valid is a real fault, and both cases skip the hop exactly as before.
+        if (entity.isValid) {
+            reportError({ system: "betaAnimalAI", operation: "readHopVelocity", target: entity.id }, err);
+        }
         return;
     }
 

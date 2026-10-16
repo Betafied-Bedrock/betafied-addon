@@ -9,8 +9,10 @@ import {
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { BETA_HOSTILE_TYPES, BH_CAKE_ID, BH_CRAFTING_TABLE_ID } from "../core/betaRegistry.js";
+import { BETA_HOSTILE_TYPES, BH_CAKE_ID, BH_CRAFTING_TABLE_ID } from "../policy/betaRegistry.js";
 
+
+const ACHIEVEMENT_SWEEP_INTERVAL_TICKS = 100;
 
 const ACH = Object.freeze({
     TAKING_INVENTORY: "inv",
@@ -114,7 +116,7 @@ class AchievementSystem {
             }
         });
 
-        tickManager.register("achievements:checkPlayers", 100, () => this.checkAllPlayers(), 45);
+        tickManager.register("achievements:checkPlayers", ACHIEVEMENT_SWEEP_INTERVAL_TICKS, () => this.checkAllPlayers(), 45);
 
         eventBus.onEntityDie((ev) => {
             const damager = ev.damageSource.damagingEntity;
@@ -170,7 +172,9 @@ class AchievementSystem {
                 this.grant(player, ACH.ON_A_RAIL);
             }
         } catch {
-            // entityRidingOn can throw if vehicle entity became invalid
+            // entityRidingOn throws once the mount is gone, which is an ordinary dismount rather than a
+            // failure of this sweep: this pass runs every 100 ticks per player, so reporting the race
+            // would log normal play as an error.
         }
     }
 

@@ -2,6 +2,75 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.10.1 — 2026-10-16
+
+5.10.1 fixes the Nether wearing the Overworld's blue fog.
+
+### Nether
+
+- Fixed the Nether's red fog losing to the Overworld's blue one: a fog pushed with `/fog` outranks the fog a biome names, and the Overworld's entry was left on the stack after a portal crossing.
+- Changed the classic fog sweep to push the era's fog for the dimension the player is in (`classic_water:default_fog` in the Overworld, `mgg:fog_hell` in the Nether), clearing that stack entry with `fog @s remove` first.
+
+## 5.10 — 2026-10-16
+
+5.10 keeps lit Nether portals standing, returns the era's ambience to the Nether, and stops the pack hiding the blocks it cannot remove.
+
+### Nether
+
+- Fixed lit Nether portals breaking with their obsidian frames still standing: portal, fire and farmland were read as modern terrain and erased by the sweep.
+- Added client biome files for the five Nether biomes, so each carries Beta's one fog and none of the Nether Update's ash, spores or music.
+- Blanked the Nether's biome ambience in the pack's sound definitions, leaving the era's own cave sounds.
+- Changed the sweep's ring from one chunk to two, so a ruined portal's loot chest goes with the portal rather than waiting to be found.
+- Removed the loot chests generated structures leave in the Nether.
+- Changed the fine pass to write one whole block type per band instead of a block at a time, cutting the world reads and writes a swept chunk costs.
+
+### Blocks
+
+- Fixed dead bushes, cobwebs, monster spawners, repeaters and stone slabs dropping nothing, because the drop boundary did not know the legacy Bedrock spellings the sweep preserves.
+- Fixed the Fast-graphics leaf tiles filling their cut-outs with black instead of the era's flat leaf tone, which read as black gaps in the canopy.
+
+### Appearance
+
+- Removed the masking that hid post-Beta blocks: 105 atlas tiles and 16 block definitions resolve to their real art again.
+- Changed the two fire flipbook entries to animate the fire tiles they are named for, instead of painting vanilla's fire frames onto soul fire.
+
+### Mobs
+
+- Changed zombie pigmen to drop up to two cooked porkchops, the count Beta's own drop rule rolled.
+- Removed the wolf's modern coat variants, leaving the era's one skin set.
+
+### Building
+
+- Fixed the build ceiling refusing clicks it does not own, which blocked cake, slabs, chests and bonemeal at height.
+
+## 5.9.2 — 2026-10-15
+
+5.9.2 fixes boats breaking against any shore they came near, and the sugar cane, sugar and paper the pack was destroying or failing to craft. It also makes the packaged world template import again.
+
+### Boats
+
+- Fixed boats breaking whenever a solid block stood beside them, which destroyed boats moored at a dock, resting on a shore and drifting in a stream.
+- Changed the break to the era's own condition: a boat is destroyed by a blocked move above 0.15 blocks a tick, as `EntityBoat.onUpdate` did.
+- Changed the collision read to skip liquids, so flowing water no longer counts as a bank.
+- Changed the boat sweep from every 10 ticks to every 2, so a ramming boat is still moving when the pass sees it.
+
+### Sugar cane
+
+- Fixed broken sugar cane dropping nothing, because the cane was renamed to the reed block's id, which is not an item.
+- Fixed a conversion the game refuses destroying the drop it was meant to convert.
+- Changed the sugar and paper recipes to name the cane item, so both craft again.
+- Kept stacks of `minecraft:reeds` as they are, since the game still ships that block.
+
+### World template
+
+- Fixed the packaged world template being refused on import because its manifest carried no `base_game_version`.
+- Changed the template's base game version to come from the behavior pack being shipped, so a world never loads against older vanilla data than the packs were built for.
+
+### Tooling
+
+- Fixed each release posting a second Discord release post, instead of relabelling the one the mod already has.
+- Added the release notes to the changelog channel, posted ahead of the release post.
+
 ## 5.9.1 — 2026-10-15
 
 5.9.1 removes the chunk scrubber and the biome and feature overrides for the Overworld, which the world template now supplies. It adds the Discord statistics card and hardens the world template packaging.

@@ -1,3 +1,11 @@
+/**
+ * Which module owns which era table, so a rule has one home instead of three: this file owns the era's
+ * id sets (the blocks, items and entities 1.7.3 had, plus the pack's own ids); `normalizer.ts` owns the
+ * translations between eras (what a post-Beta id becomes at each boundary, and no id set of its own);
+ * `compatibilityPolicy.ts` owns policy across addons (foreign entities and blocks the pack leaves alone,
+ * and the bulk and fine terrain tables). A rule spanning two belongs to the table the boundary reads,
+ * with the other importing it; `BETA_POLICY_GAPS.md` records the decisions still open across the split.
+ */
 export const BH_FENCE_ID = "bh:fence";
 export const BH_CHEST_ID = "bh:chest";
 export const BH_BOW_ID = "bh:bow";
@@ -141,7 +149,10 @@ export const BETA_ITEM_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:coal", "minecraft:charcoal", "minecraft:diamond", "minecraft:iron_ingot", "minecraft:gold_ingot",
     "minecraft:stick", "minecraft:bowl", "minecraft:string", "minecraft:feather", "minecraft:gunpowder",
     "minecraft:wheat_seeds", "minecraft:wheat", "minecraft:flint", "minecraft:leather", "minecraft:brick",
-    "minecraft:clay_ball", "minecraft:reeds", "minecraft:paper", "minecraft:book", "minecraft:slime_ball",
+    // Cane is one plant under two ids on this engine: `minecraft:reeds` is the block (see
+    // BETA_BLOCK_IDS) and `minecraft:sugar_cane` is the item a broken cane pays. Naming the item after
+    // the block asked the engine for an id it does not hold, and the drop went with it.
+    "minecraft:clay_ball", "minecraft:sugar_cane", "minecraft:paper", "minecraft:book", "minecraft:slime_ball",
     "minecraft:egg", "minecraft:glowstone_dust", "minecraft:bone", "minecraft:sugar", "minecraft:redstone",
     "minecraft:lapis_lazuli", "minecraft:ink_sac", "minecraft:cocoa_beans", "minecraft:bone_meal",
     "minecraft:red_dye", "minecraft:green_dye", "minecraft:purple_dye", "minecraft:cyan_dye",
@@ -253,7 +264,18 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     // is a broken piston. Both heads belong to the era even though neither has an item form.
     "minecraft:piston_arm_collision", "minecraft:sticky_piston_arm_collision",
     "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door",
-    "minecraft:standing_sign", "minecraft:wall_sign"
+    "minecraft:standing_sign", "minecraft:wall_sign",
+    // Six era blocks whose engine id is the legacy Bedrock spelling of the id the era used, and both
+    // spellings resolve on this build. Listing the engine's spelling here is what keeps the two
+    // boundaries agreeing: the scrubber preserves the block, and the drop boundary keeps the item the
+    // block pays. A private list in either pass is how the block came to survive while its drop did not.
+    "minecraft:deadbush", "minecraft:web", "minecraft:mob_spawner",
+    "minecraft:unpowered_repeater", "minecraft:powered_repeater", "minecraft:stone_block_slab",
+    // Three era blocks with no item form and no other owner in the pack, so a missing entry is
+    // silent: only the world pass notices. The portal (block 90), fire (51) and farmland (60) were
+    // all read as modern terrain and erased by the sweep — a lit portal died with its obsidian frame
+    // still standing, which is what players reported as a portal that keeps breaking.
+    "minecraft:portal", "minecraft:fire", "minecraft:farmland"
 ]));
 
 export function isBetaEntity(typeId: string): boolean {

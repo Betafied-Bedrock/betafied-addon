@@ -1,7 +1,7 @@
 import { system } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
-import { NETHER_ID } from "../core/betaConstants.js";
+import { NETHER_ID } from "../policy/betaConstants.js";
 
 eventBus.onPlayerBreakBlock((event) => {
     try {

@@ -1,5 +1,6 @@
 import { Block, system } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
+import type { Cell } from "./cell.js";
 import { reportError } from "../core/errorReporter.js";
 
 const WOODEN_DOOR_ID = "minecraft:wooden_door";
@@ -8,12 +9,6 @@ const OPEN_BIT = "open_bit";
 const UPPER_BIT = "upper_block_bit";
 
 const lastToggledTicks = new Map<string, number>();
-
-export interface Cell {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
-}
 
 export interface DoorTogglePlan {
     readonly lowerCell: Cell;

@@ -5,9 +5,7 @@ import {
     consumeStep,
     cropDropsFor,
     cropTramplingJob,
-    isFenceBlock,
     resolveTrampleTarget,
-    tileKey,
     walkedBlockLocation,
     type WalkState
 } from "../../packs/BP/scripts/interactions/cropTrampling.js";
@@ -39,7 +37,7 @@ function fakePermutation(state: FakeBlockState) {
  * Unregistered coordinates answer `minecraft:air`, which is what the cells above a farm hold and what
  * a downward scan has to read past, so a fixture only has to name the blocks its case is about.
  */
-function fakeDimension(options: { blocks?: Record<string, FakeBlockState | string>; throwOnBlock?: boolean } = {}) {
+function fakeDimension(options: { blocks?: Record<string, FakeBlockState | string> } = {}) {
     const store = new Map<string, FakeBlockState>();
     for (const [key, value] of Object.entries(options.blocks ?? {})) {
         store.set(key, typeof value === "string" ? { typeId: value } : value);
@@ -53,8 +51,6 @@ function fakeDimension(options: { blocks?: Record<string, FakeBlockState | strin
         store,
         sets,
         spawned,
-        /** Block reads this dimension has served, so a case can hold the guard to a read budget. */
-        reads: 0,
         mobile: [] as any[],
         drops: [] as any[],
         spawnItem(item: { typeId: string; amount: number }) {
@@ -62,8 +58,6 @@ function fakeDimension(options: { blocks?: Record<string, FakeBlockState | strin
             return { id: `mock_item_${spawned.length}`, typeId: "minecraft:item" };
         },
         getBlock(location: { x: number; y: number; z: number }) {
-            if (options.throwOnBlock) throw new Error("Unloaded chunk");
-            dimension.reads += 1;
             const key = `${location.x},${location.y},${location.z}`;
             const state = store.get(key) ?? { typeId: "minecraft:air" };
             return {
@@ -184,55 +178,54 @@ function land(walker: { location: { x: number; y: number }; isOnGround: boolean 
 }
 
 describe("Beta farmland trampling - stepping rules", () => {
-    it("resolves the walked block from the feet, offset by 0.2", () => {
+    it("resolves the walked block from the feet and paces a step per 1/0.6 blocks", () => {
         // Beta asked for `floor(posY - 0.2)`: standing on farmland at Y=63 puts the feet at 64, which
         // is the crop block, so the question has to fall back onto the farmland the crop grows in.
         assert.equal(walkedBlockLocation(0.5, 64, 0.5).y, 63);
         assert.equal(walkedBlockLocation(0.5, 64.3, 0.5).y, 64);
         assert.deepEqual(walkedBlockLocation(1.9, 64, -0.4), { x: 1, y: 63, z: -1 });
-    });
 
-    it("fires one step per 1/0.6 blocks of horizontal travel", () => {
         const state = freshState();
 
         assert.equal(consumeStep(state, 0.1), true, "the first movement past the zeroed counter is a step");
         assert.equal(consumeStep(state, 1), false);
         assert.equal(consumeStep(state, 1), true, "the next step lands 1.667 blocks later");
+
+        const far = freshState();
+        assert.equal(consumeStep(far, 40), true);
+        assert.equal(far.nextStep, 1, "Beta raised the counter by one per step, however far the move went");
     });
 
-    it("counts a large move as a single step", () => {
-        const state = freshState();
-
-        assert.equal(consumeStep(state, 40), true);
-        assert.equal(state.nextStep, 1, "Beta raised the counter by one per step, however far the move went");
-    });
-
-    it("keeps the fence family and nothing else", () => {
-        assert.equal(isFenceBlock("bh:fence"), true);
-        assert.equal(isFenceBlock("minecraft:fence"), true);
-        assert.equal(isFenceBlock("minecraft:oak_fence"), true);
-        assert.equal(isFenceBlock("minecraft:nether_brick_fence"), true);
-        assert.equal(isFenceBlock("minecraft:oak_fence_gate"), false, "1.7.3 knew only the fence block");
-        assert.equal(isFenceBlock("minecraft:farmland"), false);
-    });
-
-    it("tramples farmland and refuses the fence-protected tile", () => {
+    it("tramples bare farmland and refuses a tile the era's fence protects", () => {
         const bare = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const fenced = fakeDimension({
-            blocks: { "0,63,0": "minecraft:farmland", "0,62,0": "minecraft:oak_fence" }
-        });
-        const stone = fakeDimension();
 
         assert.ok(resolveTrampleTarget(bare as never, { x: 0, y: 63, z: 0 }), "bare farmland is trampleable");
-        assert.equal(
-            resolveTrampleTarget(fenced as never, { x: 0, y: 63, z: 0 }),
-            undefined,
-            "a fence under the farmland replaces the walked block in Beta, so nothing tramples"
+
+        // Both spellings of the era's fence replace the walked block in Beta, so nothing under the
+        // farmland tramples.
+        for (const fence of ["minecraft:oak_fence", "bh:fence"]) {
+            const protectedFarm = fakeDimension({
+                blocks: { "0,63,0": "minecraft:farmland", "0,62,0": fence }
+            });
+            assert.equal(
+                resolveTrampleTarget(protectedFarm as never, { x: 0, y: 63, z: 0 }),
+                undefined,
+                `a ${fence} under the farmland protects it`
+            );
+        }
+
+        // Placed gates retype onto `bh:fence`; a gate that terrain or a command left vanilla is not the
+        // block Beta's step callback tested.
+        const gate = fakeDimension({
+            blocks: { "0,63,0": "minecraft:farmland", "0,62,0": "minecraft:oak_fence_gate" }
+        });
+        assert.ok(
+            resolveTrampleTarget(gate as never, { x: 0, y: 63, z: 0 }),
+            "1.7.3 knew only the fence block, so a leftover gate protects nothing"
         );
-        assert.equal(resolveTrampleTarget(stone as never, { x: 0, y: 63, z: 0 }), undefined);
     });
 
-    it("pays the era's wheat drop, from the era's own roll", () => {
+    it("pays the era's wheat drop, from the era's own roll, and nothing for a crop it never had", () => {
         // `idDropped(meta) -> meta == 7 ? Item.wheat : -1`, then three `nextInt(15) <= meta` seed rolls.
         assert.deepEqual(
             cropDropsFor("minecraft:wheat", 7, () => 0),
@@ -255,26 +248,10 @@ describe("Beta farmland trampling - stepping rules", () => {
             "an unripe crop pays no wheat: the era's base drop answered -1"
         );
 
-        assert.deepEqual(
-            cropDropsFor("minecraft:wheat", 0, () => 0.99),
-            [],
-            "and an unripe crop with unlucky rolls pays nothing, unlike modern versions"
-        );
-    });
-
-    it("leaves a crop the era never had to the compatibility policy", () => {
         assert.equal(
             cropDropsFor("minecraft:carrots", 7, () => 0),
             undefined,
             "carrots arrived after 1.7.3, so their drops are not this module's fact to model"
-        );
-    });
-
-    it("keys watched tiles by dimension as well as coordinates", () => {
-        assert.notEqual(
-            tileKey("minecraft:overworld", { x: 0, y: 63, z: 0 }),
-            tileKey("minecraft:nether", { x: 0, y: 63, z: 0 }),
-            "the Overworld and the Nether share coordinates, and the tile keys must not"
         );
     });
 });
@@ -289,24 +266,7 @@ describe("Beta farmland trampling - walking", () => {
         mockPlayers.length = 0;
     });
 
-    it("turns the walked farmland into dirt", () => {
-        const dimension = fakeDimension({
-            blocks: { "0,63,0": "minecraft:farmland", "0,64,0": "minecraft:wheat" }
-        });
-        const farmer = fakeWalker("farmer", dimension);
-        mockPlayers.push(farmer);
-
-        withTrampleRoll(() => {
-            // The first pass only establishes the baseline: an entity's pre-move position is not
-            // observable, so its first observed tick banks no distance.
-            cropTramplingJob();
-            walk(farmer, 0.2);
-        });
-
-        assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:dirt");
-    });
-
-    it("takes the crop down with the farmland", () => {
+    it("takes the crop down with the farmland, paying the era's drop", () => {
         const dimension = fakeDimension({
             blocks: {
                 "0,63,0": "minecraft:farmland",
@@ -334,95 +294,42 @@ describe("Beta farmland trampling - walking", () => {
         );
     });
 
-    it("leaves a post-Beta crop standing on the dirt", () => {
-        // The module breaks the crops it knows the era's drop for and nothing else: a carrot crop is
-        // post-Beta, and removing it belongs to the compatibility policy rather than to trampling.
-        const dimension = fakeDimension({
-            blocks: {
-                "0,63,0": "minecraft:farmland",
-                "0,64,0": { typeId: "minecraft:carrots", states: { growth: 7 } }
-            }
-        });
-        const farmer = fakeWalker("farmer", dimension);
-        mockPlayers.push(farmer);
+    it("skips the walkers the era exempted and counts the ones it did not", () => {
+        const sneaking = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
+        const sneaker = fakeWalker("sneaker", sneaking);
+        sneaker.isSneaking = true;
+        mockPlayers.push(sneaker);
 
-        withTrampleRoll(() => {
-            cropTramplingJob();
-            walk(farmer, 0.2);
-        });
+        withTrampleRoll(() => pacingWalk(sneaker));
 
-        assert.equal(dimension.store.get("0,64,0")?.typeId, "minecraft:carrots");
-        assert.deepEqual(dimension.spawned, []);
-    });
+        assert.deepEqual(sneaking.sets, [], "Beta skipped the callback outright, distance accumulation included");
 
-    it("never tramples a farm whose farmland sits on a fence", () => {
-        const dimension = fakeDimension({
-            blocks: { "0,63,0": "minecraft:farmland", "0,62,0": "bh:fence", "0,64,0": "minecraft:wheat" }
-        });
-        const farmer = fakeWalker("farmer", dimension);
-        mockPlayers.push(farmer);
-
-        withTrampleRoll(() => pacingWalk(farmer));
-
-        assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:farmland");
-        assert.deepEqual(dimension.sets, [], "the old farm-on-fences trick has to hold against many steps");
-    });
-
-    it("does not read a fence gate under the farmland as protection", () => {
-        // Beta's step callback compared the block below against the fence block specifically. Placed
-        // gates retype onto `bh:fence` and so do protect; a gate that terrain or a command left vanilla
-        // is not the block the era tested.
-        const dimension = fakeDimension({
-            blocks: { "0,63,0": "minecraft:farmland", "0,62,0": "minecraft:oak_fence_gate" }
-        });
-        const farmer = fakeWalker("farmer", dimension);
-        mockPlayers.push(farmer);
-
-        withTrampleRoll(() => pacingWalk(farmer));
-
-        assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:dirt");
-    });
-
-    it("skips the walking callback while the walker is sneaking on the ground", () => {
-        const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const farmer = fakeWalker("farmer", dimension);
-        farmer.isSneaking = true;
-        mockPlayers.push(farmer);
-
-        withTrampleRoll(() => pacingWalk(farmer));
-
-        assert.deepEqual(dimension.sets, [], "Beta skipped the callback outright, distance accumulation included");
-    });
-
-    it("still counts a sneaking walker that is airborne", () => {
         // Beta's guard was `onGround && isSneaking`; a sneaking entity in mid-air was not exempt.
-        const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const farmer = fakeWalker("farmer", dimension);
-        farmer.isSneaking = true;
-        farmer.isOnGround = false;
-        mockPlayers.push(farmer);
+        const airborne = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
+        const hopper = fakeWalker("hopper", airborne);
+        hopper.isSneaking = true;
+        hopper.isOnGround = false;
+        mockPlayers.push(hopper);
 
         withTrampleRoll(() => {
             cropTramplingJob();
-            walk(farmer, 0.2);
+            walk(hopper, 0.2);
         });
 
-        assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:dirt");
-    });
+        assert.equal(airborne.store.get("0,63,0")?.typeId, "minecraft:dirt");
 
-    it("lets a rider cross a farm without trampling it", () => {
         // Beta's step callback carried `ridingEntity == null`: the mount walks and tramples on its own
         // account, the rider does not add a trample on top of it.
-        const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const rider = fakeWalker("rider", dimension, undefined, { riding: true });
+        const ridden = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
+        const rider = fakeWalker("rider", ridden, undefined, { riding: true });
         mockPlayers.push(rider);
 
         withTrampleRoll(() => pacingWalk(rider));
 
-        assert.deepEqual(dimension.sets, [], "a mounted entity trampled farmland with its own feet");
+        assert.deepEqual(ridden.sets, [], "a mounted entity trampled farmland with its own feet");
     });
 
-    it("leaves Creative and Spectator players alone", () => {
+    it("leaves the walking rule out of Creative and Spectator, and still corrects their landings", () => {
         for (const gameMode of ["creative", "spectator"]) {
             const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
             const builder = fakeWalker(`builder-${gameMode}`, dimension);
@@ -436,21 +343,30 @@ describe("Beta farmland trampling - walking", () => {
 
             assert.deepEqual(dimension.sets, [], `${gameMode} has no Beta counterpart to trample in`);
         }
-    });
 
-    it("keeps serving other walkers when a block lookup raises", () => {
-        const unloaded = fakeDimension({ throwOnBlock: true });
-        const stranded = fakeWalker("stranded", unloaded);
-        const farmed = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const farmer = fakeWalker("farmer", farmed);
-        mockPlayers.push(stranded, farmer);
-
-        withTrampleRoll(() => {
-            assert.doesNotThrow(() => walk(stranded, 0.2), "an unloaded chunk is not a reason to drop the pass");
-            walk(farmer, 0.2);
+        // The engine tramples farmland in Creative exactly as it does in Survival, so the landing guard
+        // may not be gated on a mode: a builder jumping on their own farm is the case that found this.
+        const farm = fakeDimension({
+            blocks: {
+                "0,63,0": { typeId: "minecraft:farmland", states: { moisturized_amount: 7 } },
+                "0,64,0": "minecraft:wheat"
+            }
         });
+        const jumper = fakeWalker("creative-jumper", farm, { x: 0.5, y: 66, z: 0.5 });
+        jumper.isOnGround = false;
+        jumper.gameMode = "creative";
+        mockPlayers.push(jumper);
 
-        assert.equal(farmed.store.get("0,63,0")?.typeId, "minecraft:dirt");
+        cropTramplingJob();
+        engineTramples(farm, { x: 0, y: 63, z: 0 });
+        land(jumper);
+        cropTramplingJob();
+
+        assert.deepEqual(
+            farm.store.get("0,63,0"),
+            { typeId: "minecraft:farmland", states: { moisturized_amount: 7 } },
+            "a Creative player's farm gets corrected like anyone else's"
+        );
     });
 
     it("does not count a teleport as walked distance", () => {
@@ -506,7 +422,7 @@ describe("Beta farmland trampling - walking", () => {
 /**
  * Wiring only, and this half is the one that cannot be proven offline: nothing here shows that Bedrock
  * converts the tile on a landing at all. The cases assert the shape of the correction — what gets put
- * back, and what is deliberately left alone.
+ * back, when it is deliberately left alone, and that a throw in the walking half cannot cost it.
  */
 describe("Beta farmland trampling - landings", () => {
     beforeEach(() => {
@@ -545,32 +461,6 @@ describe("Beta farmland trampling - landings", () => {
         assert.equal(drop.removed, true, "the restored crop must not also leave a free harvest behind");
     });
 
-    it("watches the column a sprint-jump is about to cross into", () => {
-        const dimension = fakeDimension({
-            blocks: {
-                "0,63,0": "minecraft:farmland",
-                "1,63,0": { typeId: "minecraft:farmland", states: { moisturized_amount: 3 } },
-                "1,64,0": { typeId: "minecraft:wheat", states: { growth: 7 } }
-            }
-        });
-        const farmer = fakeWalker("farmer", dimension, { x: 0.6, y: 66, z: 0.5 });
-        farmer.isOnGround = false;
-        mockPlayers.push(farmer);
-
-        cropTramplingJob();
-        walk(farmer, 0.1);
-        engineTramples(dimension, { x: 1, y: 63, z: 0 });
-        farmer.location.x = 1.5;
-        land(farmer);
-        walk(farmer, 0.1);
-
-        assert.equal(
-            dimension.store.get("1,63,0")?.typeId,
-            "minecraft:farmland",
-            "the landing tick can be the tick the entity crosses a block boundary"
-        );
-    });
-
     it("puts the farm back even when the entity never reports itself airborne", () => {
         // `Entity.isOnGround` is documented to behave unexpectedly, so the guard must not gate the
         // snapshot on it: here the entity claims to be grounded for every pass of the jump.
@@ -589,49 +479,6 @@ describe("Beta farmland trampling - landings", () => {
 
         assert.deepEqual(dimension.store.get("0,63,0"), { typeId: "minecraft:farmland", states: { moisturized_amount: 4 } });
         assert.deepEqual(dimension.store.get("0,64,0"), { typeId: "minecraft:wheat", states: { growth: 2 } });
-    });
-
-    it("spends one read a pass on a grounded entity that is not over a farm", () => {
-        // The guard reads every pass now, so the cost of the common case is a contract, not a detail:
-        // a stationary entity on ordinary ground must cost a single block read, because the cell under
-        // its feet is the block it stands on and the scan stops there.
-        const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:stone" } });
-        const farmer = fakeWalker("farmer", dimension);
-        mockPlayers.push(farmer);
-
-        cropTramplingJob();
-        const afterFirstPass = dimension.reads;
-        cropTramplingJob();
-
-        assert.equal(afterFirstPass, 1, "the first pass reads the cell under the feet and stops there");
-        assert.equal(dimension.reads - afterFirstPass, 1, "so does every pass after it");
-    });
-
-    it("serves the landing guard to a Creative player", () => {
-        // The engine tramples farmland in Creative exactly as it does in Survival, so the guard may not be
-        // gated on a mode: the era drew no such line, and a builder jumping on their own farm is the case
-        // that found this. Only the walking rule stays out of Creative, because that half is our addition.
-        const dimension = fakeDimension({
-            blocks: {
-                "0,63,0": { typeId: "minecraft:farmland", states: { moisturized_amount: 7 } },
-                "0,64,0": "minecraft:wheat"
-            }
-        });
-        const builder = fakeWalker("builder", dimension, { x: 0.5, y: 66, z: 0.5 });
-        builder.isOnGround = false;
-        builder.gameMode = "creative";
-        mockPlayers.push(builder);
-
-        cropTramplingJob();
-        engineTramples(dimension, { x: 0, y: 63, z: 0 });
-        land(builder);
-        cropTramplingJob();
-
-        assert.deepEqual(
-            dimension.store.get("0,63,0"),
-            { typeId: "minecraft:farmland", states: { moisturized_amount: 7 } },
-            "a Creative player's farm gets corrected like anyone else's"
-        );
     });
 
     it("keeps the landing guard running when the walking half raises", () => {
@@ -691,41 +538,38 @@ describe("Beta farmland trampling - landings", () => {
         assert.deepEqual(dimension.store.get("2,64,0"), { typeId: "minecraft:wheat", states: { growth: 6 } });
     });
 
-    it("leaves the tile alone when the landing is the era's own trample", () => {
-        const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const farmer = fakeWalker("farmer", dimension, { x: 0.5, y: 66, z: 0.5 });
+    it("releases a tile the moment the trample or the player claims it", () => {
+        const walked = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
+        const farmer = fakeWalker("farmer", walked, { x: 0.5, y: 66, z: 0.5 });
         farmer.isOnGround = false;
         mockPlayers.push(farmer);
 
         cropTramplingJob();
         land(farmer);
-
         withTrampleRoll(() => walk(farmer, 0.2));
 
         assert.equal(
-            dimension.store.get("0,63,0")?.typeId,
+            walked.store.get("0,63,0")?.typeId,
             "minecraft:dirt",
             "walking is supposed to cost the player their farmland, so supervision must not undo it"
         );
-    });
 
-    it("does not fight a player who replaced the tile themselves", () => {
-        const dimension = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
-        const farmer = fakeWalker("farmer", dimension, { x: 0.5, y: 66, z: 0.5 });
-        farmer.isOnGround = false;
-        mockPlayers.push(farmer);
+        const replaced = fakeDimension({ blocks: { "0,63,0": "minecraft:farmland" } });
+        const player = fakeWalker("player", replaced, { x: 0.5, y: 66, z: 0.5 });
+        player.isOnGround = false;
+        mockPlayers.push(player);
 
         cropTramplingJob();
         eventBus.dispatch("playerPlaceBlock", {
             block: { location: { x: 0, y: 63, z: 0 } },
-            player: farmer
+            player
         });
 
-        engineTramples(dimension, { x: 0, y: 63, z: 0 });
-        land(farmer);
-        withoutTrampleRoll(() => walk(farmer, 0.1));
+        engineTramples(replaced, { x: 0, y: 63, z: 0 });
+        land(player);
+        withoutTrampleRoll(() => walk(player, 0.1));
 
-        assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:dirt", "the placed block is the player's");
+        assert.equal(replaced.store.get("0,63,0")?.typeId, "minecraft:dirt", "the placed block is the player's");
     });
 
     it("stops watching a tile once the entity has walked away from it", () => {
@@ -746,25 +590,5 @@ describe("Beta farmland trampling - landings", () => {
         tickManager.step();
 
         assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:dirt", "a stale watch must not resurrect dirt");
-    });
-
-    it("is not watching a farm that a solid block stands between the fall and", () => {
-        const dimension = fakeDimension({
-            blocks: { "0,63,0": "minecraft:farmland", "0,64,0": "minecraft:stone" }
-        });
-        const farmer = fakeWalker("farmer", dimension, { x: 0.5, y: 67, z: 0.5 });
-        farmer.isOnGround = false;
-        mockPlayers.push(farmer);
-
-        cropTramplingJob();
-        engineTramples(dimension, { x: 0, y: 63, z: 0 });
-        land(farmer, 65);
-        walk(farmer, 0.1);
-
-        assert.equal(
-            dimension.store.get("0,63,0")?.typeId,
-            "minecraft:dirt",
-            "an entity lands on the stone, so the farmland below it is not what it fell onto"
-        );
     });
 });

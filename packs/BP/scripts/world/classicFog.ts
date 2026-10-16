@@ -2,15 +2,27 @@ import { world } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { OVERWORLD_ID } from "../core/betaConstants.js";
+import { NETHER_ID, OVERWORLD_ID } from "../policy/betaConstants.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 20,
     PLAYERS_PER_TICK: 5,
-    FOG_ID: "beta"
+    STACK_ID: "beta"
 });
 
-const hasFog = new Set<string>();
+/**
+ * The era had one fog per dimension, and a fog pushed with `/fog` outranks the one a biome names.
+ * The stack belongs to the player rather than to the dimension, so the pack has to own it: a push
+ * made for the Overworld and merely left un-popped is the Overworld's blue haze sitting over the
+ * Nether's red one.
+ */
+const ERA_FOG_BY_DIMENSION: Readonly<Record<string, string>> = Object.freeze({
+    [OVERWORLD_ID]: "classic_water:default_fog",
+    [NETHER_ID]: "mgg:fog_hell"
+});
+
+// The fog this sweep last put on a player's stack, so a settled player is not re-pushed every pass.
+const pushedFog = new Map<string, string>();
 
 export function* fogJob(): Generator<void, void, unknown> {
     const playerIds = world.getAllPlayers().map(p => p.id);
@@ -20,27 +32,30 @@ export function* fogJob(): Generator<void, void, unknown> {
         const player = world.getAllPlayers().find(p => p.id === playerId);
         if (!player || !player.isValid) continue;
 
-        try {
-            const name = player.name;
-            const dim = player.dimension.id;
+        const name = player.name;
 
-            if (dim === OVERWORLD_ID) {
-                if (!hasFog.has(name)) {
-                    // Script API lacks native fog controls; /fog command is required.
-                    player.runCommand(`fog @s push classic_water:default_fog ${CONFIG.FOG_ID}`);
-                    hasFog.add(name);
-                }
-            } else {
-                if (hasFog.has(name)) {
-                    player.runCommand(`fog @s pop ${CONFIG.FOG_ID}`);
-                    hasFog.delete(name);
+        try {
+            const wanted: string | undefined = ERA_FOG_BY_DIMENSION[player.dimension.id];
+            const current = pushedFog.get(name);
+
+            if (current !== wanted) {
+                // The record is dropped before the commands run: a clear the engine refuses must not
+                // leave this sweep believing an unwanted fog is on screen, and the push lands on top
+                // of anything the clear could not take off.
+                pushedFog.delete(name);
+
+                // Script API lacks native fog controls; /fog command is required.
+                if (current !== undefined) player.runCommand(`fog @s remove ${CONFIG.STACK_ID}`);
+                if (wanted !== undefined) {
+                    player.runCommand(`fog @s push ${wanted} ${CONFIG.STACK_ID}`);
+                    pushedFog.set(name, wanted);
                 }
             }
         } catch (e) {
             reportError({
                 system: "classicFog",
                 operation: "syncPlayerFog",
-                target: player.name
+                target: name
             }, e);
         }
 
@@ -54,5 +69,5 @@ export function* fogJob(): Generator<void, void, unknown> {
 tickManager.register("classicFog", CONFIG.CHECK_INTERVAL, fogJob, 12);
 
 eventBus.onPlayerLeave((event) => {
-    hasFog.delete(event.playerName);
+    pushedFog.delete(event.playerName);
 });

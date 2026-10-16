@@ -1,8 +1,8 @@
 import { BlockVolume, system } from "@minecraft/server";
 import type { Dimension, Vector3 } from "@minecraft/server";
-import { eventBus } from "../core/eventBus.js";
+import { eventBus, InteractPriority } from "../core/eventBus.js";
 import { reportError } from "../core/errorReporter.js";
-import { POST_BETA_TALL_PLANTS } from "../core/compatibilityPolicy.js";
+import { POST_BETA_TALL_PLANTS } from "../policy/compatibilityPolicy.js";
 
 const BLOCKED_TARGETS = Object.freeze(new Set([
     "minecraft:brown_mushroom",
@@ -76,4 +76,4 @@ eventBus.onPlayerInteractWithBlock((event) => {
             target: event.block.typeId
         }, e);
     }
-});
+}, InteractPriority.RULE);
