@@ -541,6 +541,17 @@ migration repairs a missing property by writing it and an entity whose definitio
 leaves `resetProperty` throwing on every pass that sees it -- a declarative roster for the property
 rules is the better fix if anyone wants the pair gone.
 
+**Where the decal finds the ground:** a decal is a local-space particle, so it simulates in the
+entity's frame — `particle_motion_collision` has no terrain to resolve against and falls straight
+through the world — and a particle's Molang context rejects every world query, `query.above_top_solid`
+and `query.heightmap` included, so the surface can be neither read where the decal is drawn nor moved
+where it is drawn. It is published instead: `entityShadow.ts` sweeps the Beta mobs near players every
+second tick and writes `betarock:shadow_ground` only when the surface under a mob changes. A grounded
+entity's own feet are that surface, the only reading exact on a half block, so the raycast is spent
+only on mobs the engine reports in the air. The decal turns the published height into
+`ground - query.position(1)` on every frame, which keeps the motion at render rate while the property
+itself only syncs when a block boundary is crossed.
+
 **Still open, and now load-bearing for the rest of the roster:**
 
 - Every other Beta mob keeps the swap, so an invisible mob is equally invisible to hostile mob AI.

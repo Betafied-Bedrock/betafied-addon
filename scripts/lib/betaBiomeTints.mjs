@@ -64,6 +64,10 @@ export function resolveBiomeTint(profileName) {
  * generator writes into the shipped colormap at this biome's sample pixel, so the two mechanisms
  * agree by construction, and a pinned literal cannot be moved by a future change to the engine's
  * colormap addressing.
+ *
+ * `minecraft:fog_appearance` is what claims the biome's fog on game versions where the client biome
+ * file owns it, which is the layer the era's biome-dependent fog colour needs; the values are the
+ * era's, derived below rather than chosen.
  */
 export function buildClientBiome(shortId, profileName) {
     const tint = resolveBiomeTint(profileName);
@@ -73,6 +77,7 @@ export function buildClientBiome(shortId, profileName) {
         "minecraft:client_biome": {
             description: { identifier: biomeIdentifier(shortId) },
             components: {
+                "minecraft:fog_appearance": { fog_identifier: OVERWORLD_CLIENT_FOG_ID },
                 "minecraft:grass_appearance": { color: tint.grass },
                 "minecraft:foliage_appearance": { color: tint.foliage },
                 "minecraft:sky_color": { sky_color: tint.sky }
@@ -81,9 +86,69 @@ export function buildClientBiome(shortId, profileName) {
     };
 }
 
+/** b1.7.3 `WorldProvider.getFogColor` at full day, where both of its day scales are exactly 1. */
+const ERA_FOG_PROVIDER = Object.freeze([0.7529412, 0.84705883, 1.0]);
+
+/** b1.7.3 `EntityRenderer.updateFogColor`: the weight the biome sky colour carried at Far. */
+const ERA_SKY_FOG_WEIGHT = 1 - Math.pow(1 / 4, 0.25);
+
+function parseTint(hex) {
+    return [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255);
+}
+
+function toHex(channels) {
+    return `#${channels
+        .map(channel => Math.round(Math.min(1, Math.max(0, channel)) * 255).toString(16).toUpperCase().padStart(2, "0"))
+        .join("")}`;
+}
+
+/**
+ * Mean over the profiles, each once: the era's biome spread lands inside one 8-bit step, so the mix
+ * is applied per profile and averaged rather than pretending the biomes differ. A sky tint change in
+ * the table above moves this colour, which is the point of deriving it here.
+ */
+function eraOverworldFogColor() {
+    const mixed = Object.values(BETA_PROFILE_TINTS).map(({ sky }) =>
+        ERA_FOG_PROVIDER.map((provider, index) => {
+            const biome = parseTint(sky)[index];
+            return provider + (biome - provider) * ERA_SKY_FOG_WEIGHT;
+        })
+    );
+
+    return toHex(mixed[0].map((_, index) => mixed.reduce((sum, channels) => sum + channels[index], 0) / mixed.length));
+}
+
+/**
+ * The era's Overworld air fog, derived from the sky tints above rather than picked.
+ *
+ * Beta ran one linear air fog per dimension: `GL_FOG_START = farPlaneDistance * 0.25` and
+ * `GL_FOG_END = farPlaneDistance`, where `farPlaneDistance` was the terrain cull radius in blocks
+ * (b1.7.3 `EntityRenderer.setupFog`). Bedrock's `render` type multiplies by the player's own render
+ * distance, so the era's pair survives as ratios: a quarter of the way out, ending at the cull.
+ *
+ * The colour was recomputed every frame — `WorldProvider.getFogColor`'s `#C0D8FF` at full day, mixed
+ * toward the biome's own sky colour by `1 - (1 / (4 - renderDistanceIndex))^0.25` (0.293 at the era's
+ * Far setting), then darkened by rain, thunder and the camera's sky light. Bedrock reads `fog_color`
+ * as a constant, so this is the clear-noon value that curve starts from, mixed over the profiles'
+ * mean sky colour with the same 0.293 weight. A per-biome file each would say the same thing ten
+ * times: the era's own biome spread lands inside one 8-bit step, which is why one fog serves all.
+ */
+export const OVERWORLD_CLIENT_FOG_ID = "classic_water:default_fog";
+
+export const OVERWORLD_AIR_FOG = Object.freeze({
+    fog_start: 0.25,
+    fog_end: 1.0,
+    fog_color: eraOverworldFogColor(),
+    render_distance_type: "render"
+});
+
 /**
  * The pack's one Nether fog, and the id `packs/RP/biomes_client.json` maps every Nether biome to.
  * Beta had a single hardcoded Nether colour rather than a per-biome one, so all five share it.
+ *
+ * It is the same shape as the Overworld's above — one fog for the dimension, claimed by every biome
+ * — but its own file, because the era's Nether opened its fog at the camera and was a different
+ * colour: `WorldProviderHell` set `foggy` and `getFogColor` returned 0.2/0.03/0.03.
  */
 export const NETHER_CLIENT_FOG_ID = "mgg:fog_hell";
 

@@ -35,6 +35,22 @@ const ACH = Object.freeze({
 
 type AchievementKey = typeof ACH[keyof typeof ACH];
 
+const INVENTORY_ACHIEVEMENT_KEYS: readonly AchievementKey[] = Object.freeze([
+    ACH.TAKING_INVENTORY,
+    ACH.GETTING_WOOD,
+    ACH.BENCHMARKING,
+    ACH.TIME_TO_STRIKE,
+    ACH.TIME_TO_FARM,
+    ACH.TIME_TO_MINE,
+    ACH.GETTING_UPGRADE,
+    ACH.COW_TIPPER,
+    ACH.BAKE_BREAD,
+    ACH.THE_LIE,
+    ACH.DELICIOUS_FISH,
+    ACH.HOT_TOPIC,
+    ACH.ACQUIRE_HARDWARE
+]);
+
 const PARENTS: Readonly<Partial<Record<AchievementKey, AchievementKey>>> = Object.freeze({
     [ACH.GETTING_WOOD]: ACH.TAKING_INVENTORY,
     [ACH.BENCHMARKING]: ACH.GETTING_WOOD,
@@ -179,6 +195,8 @@ class AchievementSystem {
     }
 
     private checkInventory(player: Player): void {
+        if (INVENTORY_ACHIEVEMENT_KEYS.every((key) => this.has(player, key))) return;
+
         const invComp = player.getComponent(EntityComponentTypes.Inventory);
         const inv = invComp?.container;
         if (!inv) return;

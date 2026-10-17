@@ -36,6 +36,27 @@ interface ToolBonus {
     readonly blocks: ReadonlySet<string>;
 }
 
+const REDSTONE_BONUS: ToolBonus = {
+    system: "redstoneMining",
+    effect: "mining_fatigue",
+    duration: 10,
+    amplifier: 1,
+    tools: PICKAXES,
+    blocks: SLOW_BLOCKS
+};
+
+const SWORD_BONUS: ToolBonus = {
+    system: "swordMining",
+    effect: "haste",
+    duration: 10,
+    amplifier: 2,
+    tools: SWORDS,
+    blocks: SWORD_FAST_BLOCKS
+};
+
+const activeRedstone = new Set<string>();
+const activeSword = new Set<string>();
+
 function clearBonus(bonus: ToolBonus, active: Set<string>, player: Player): void {
     if (!active.delete(player.id)) return;
     runCatching(
@@ -44,61 +65,63 @@ function clearBonus(bonus: ToolBonus, active: Set<string>, player: Player): void
     );
 }
 
-function applyBonus(bonus: ToolBonus, active: Set<string>, player: Player): void {
-    const equippable = player.getComponent(EntityComponentTypes.Equippable);
-    const mainhand = equippable?.getEquipment(EquipmentSlot.Mainhand);
-
-    if (!mainhand || !bonus.tools.has(mainhand.typeId)) {
-        clearBonus(bonus, active, player);
-        return;
-    }
-
-    const blockRay = player.getBlockFromViewDirection({ maxDistance: MAX_DISTANCE });
-
-    if (blockRay?.block && bonus.blocks.has(blockRay.block.typeId)) {
-        player.addEffect(bonus.effect, bonus.duration, {
-            amplifier: bonus.amplifier,
-            showParticles: false
-        });
-        active.add(player.id);
-        return;
-    }
-
-    clearBonus(bonus, active, player);
-}
-
-function watchTool(bonus: ToolBonus): void {
-    const active = new Set<string>();
-
-    tickManager.register(bonus.system, TICK_INTERVAL, () => {
-        for (const player of world.getAllPlayers()) {
-            if (!player.isValid) continue;
-
-            runCatching({ system: bonus.system, operation: "checkPlayer", target: player.id }, () =>
-                applyBonus(bonus, active, player)
-            );
-        }
-    }, 0);
-
-    eventBus.onPlayerLeave((ev) => {
-        active.delete(ev.playerId);
+function applyBonusEffect(bonus: ToolBonus, active: Set<string>, player: Player): void {
+    player.addEffect(bonus.effect, bonus.duration, {
+        amplifier: bonus.amplifier,
+        showParticles: false
     });
+    active.add(player.id);
 }
 
-watchTool({
-    system: "redstoneMining",
-    effect: "mining_fatigue",
-    duration: 10,
-    amplifier: 1,
-    tools: PICKAXES,
-    blocks: SLOW_BLOCKS
+export function toolMiningJob(): void {
+    for (const player of world.getAllPlayers()) {
+        if (!player.isValid) continue;
+
+        runCatching({ system: "toolMining", operation: "checkPlayer", target: player.id }, () => {
+            const equippable = player.getComponent(EntityComponentTypes.Equippable);
+            const mainhand = equippable?.getEquipment(EquipmentSlot.Mainhand);
+            const mainhandId = mainhand?.typeId;
+
+            const isPickaxe = mainhandId !== undefined && PICKAXES.has(mainhandId);
+            const isSword = mainhandId !== undefined && SWORDS.has(mainhandId);
+
+            if (!isPickaxe) {
+                clearBonus(REDSTONE_BONUS, activeRedstone, player);
+            }
+            if (!isSword) {
+                clearBonus(SWORD_BONUS, activeSword, player);
+            }
+
+            if (!isPickaxe && !isSword) {
+                return;
+            }
+
+            const blockRay = player.getBlockFromViewDirection({ maxDistance: MAX_DISTANCE });
+            const hitBlockId = blockRay?.block?.typeId;
+
+            if (isPickaxe) {
+                if (hitBlockId !== undefined && SLOW_BLOCKS.has(hitBlockId)) {
+                    applyBonusEffect(REDSTONE_BONUS, activeRedstone, player);
+                } else {
+                    clearBonus(REDSTONE_BONUS, activeRedstone, player);
+                }
+            }
+
+            if (isSword) {
+                if (hitBlockId !== undefined && SWORD_FAST_BLOCKS.has(hitBlockId)) {
+                    applyBonusEffect(SWORD_BONUS, activeSword, player);
+                } else {
+                    clearBonus(SWORD_BONUS, activeSword, player);
+                }
+            }
+        });
+    }
+}
+
+tickManager.register("toolMining", TICK_INTERVAL, toolMiningJob, 0);
+
+eventBus.onPlayerLeave((ev) => {
+    activeRedstone.delete(ev.playerId);
+    activeSword.delete(ev.playerId);
 });
 
-watchTool({
-    system: "swordMining",
-    effect: "haste",
-    duration: 10,
-    amplifier: 2,
-    tools: SWORDS,
-    blocks: SWORD_FAST_BLOCKS
-});

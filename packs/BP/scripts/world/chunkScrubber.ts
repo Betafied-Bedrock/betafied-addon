@@ -10,9 +10,8 @@ import { NETHER_ID } from "../policy/betaConstants.js";
 const SCRUB_DUE_AT = new Map<string, number>();
 const MAX_TRACKED_CHUNKS = 8192;
 const CHUNKS_PER_TICK_LIMIT = 1;
-// A ruined portal is the one vanilla structure the Nether still generates, and its chest sits at the
-// portal: a single chunk of ring left the loot in the next chunk over until the player walked into it.
-const SCRUB_RADIUS = 2;
+// 64-block radius (4 chunks) sweeps out to the full Bedrock simulation distance.
+const SCRUB_RADIUS = 4;
 
 function buildNeighbourhood(): (readonly [number, number])[] {
     const offsets: [number, number][] = [];
@@ -35,6 +34,7 @@ const REVERIFY_SPREAD_TICKS = 600;
 // One read batch is one tick's slice of the fine pass: it ends in a yield, and the band is asked
 // whether anything unclassified is left once it has classified a type.
 const FINE_READ_BATCH = 512;
+const MAX_FINE_READS_PER_BAND = 1024;
 
 function reverifyOffset(key: string): number {
     let hash = 0;
@@ -320,6 +320,7 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
             try {
                 const locations = matches[Symbol.iterator]();
                 let exhausted = false;
+                let totalBandReads = 0;
 
                 while (!exhausted) {
                     let classifiedAnything = false;
@@ -332,6 +333,7 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
                             break;
                         }
                         reads++;
+                        totalBandReads++;
 
                         try {
                             const block = dimension.getBlock(next.value);
@@ -350,14 +352,17 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
                         }
                     }
 
+                    if (totalBandReads >= MAX_FINE_READS_PER_BAND) {
+                        exhausted = true;
+                    }
+
                     // A batch that ran the band out is followed by the band's own yield, so yielding here
                     // too would spend a whole tick on nothing.
                     if (reads > 0 && !exhausted) yield;
 
-                    // A batch that classified nothing new cannot end the pass, so probing here would buy
-                    // a whole-volume scan to learn what the batch already said. When it does end the
-                    // pass, every block left unread in the band is of a type already covered by a fill.
-                    if (classifiedAnything && !exhausted && !containsBlocksIn(dimension, volume, unclassifiedFilter(classified))) {
+                    // When all remaining blocks in the volume belong to types already covered by fills,
+                    // end the pass without reading every duplicate coordinate across the native bridge.
+                    if ((classifiedAnything || reads === FINE_READ_BATCH) && !exhausted && !containsBlocksIn(dimension, volume, unclassifiedFilter(classified))) {
                         exhausted = true;
                     }
                 }

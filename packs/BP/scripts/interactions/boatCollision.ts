@@ -10,7 +10,7 @@ const CONFIG = Object.freeze({
     // seen from the tick before the stop. The pass therefore has to be short enough to catch the boat
     // still travelling within the block it is about to hit: at the era's 0.4 blocks a tick, two ticks
     // is 0.8, and the four cells this reads reach two blocks out.
-    TICK_INTERVAL: 2,
+    TICK_INTERVAL: 4,
     BOATS_PER_TICK: 10,
     // `EntityBoat.onUpdate` destroyed a boat only when the move itself was blocked at speed:
     // `isCollidedHorizontally && var6 > 0.15D`, var6 being sqrt(motionX^2 + motionZ^2) in blocks a tick

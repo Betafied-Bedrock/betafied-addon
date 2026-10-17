@@ -243,4 +243,22 @@ describe("Beta Water Screen Tint - sentinel driver", () => {
             "a rejoined diver must be tinted again immediately"
         );
     });
+
+    it("uses cached dimension boundaries to avoid heightRange engine property reads on standard dimensions", () => {
+        let heightRangeReadCount = 0;
+        const diver = fakePlayer("diver", {
+            headBlock: { typeId: "minecraft:water", isLiquid: true }
+        });
+        Object.defineProperty(diver.dimension, "heightRange", {
+            get() {
+                heightRangeReadCount++;
+                return { min: -64, max: 320 };
+            }
+        });
+        mockPlayers.push(diver);
+        underwaterOverlayJob();
+
+        assert.equal(heightRangeReadCount, 0, "standard dimensions should not invoke the heightRange engine getter");
+    });
 });
+

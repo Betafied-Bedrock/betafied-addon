@@ -14,6 +14,8 @@ import {
 import {
     BETA_PROFILE_TINTS,
     NETHER_CLIENT_FOG_ID,
+    OVERWORLD_AIR_FOG,
+    OVERWORLD_CLIENT_FOG_ID,
     buildClientBiome,
     buildNetherClientBiome,
     resolveBiomeTint
@@ -188,6 +190,32 @@ describe("Beta 1.7.3 Biome Tints - Resource Pack Client Biomes", () => {
                 `${shortId} may declare nothing else: no ambience or atmosphere`
             );
         }
+    });
+
+    it("wears the era's air fog on every Overworld biome, from the tint table's own sky colour", () => {
+        // Beta's Overworld fog was one fog whose colour the client derived from the biome's sky
+        // colour, so the biome layer is where it belongs, and `classic_water:default_fog` is the data
+        // default that also sits underneath it. Both routes carry the era's values, which are derived
+        // in the tint table rather than picked: a hand-chosen colour here is the regression.
+        for (const shortId of OVERWORLD_BIOME_IDS) {
+            const content = JSON.parse(readFileSync(resolve(clientBiomesDir, `${shortId}.client_biome.json`), "utf-8"));
+
+            assert.equal(
+                content["minecraft:client_biome"].components["minecraft:fog_appearance"]?.fog_identifier,
+                OVERWORLD_CLIENT_FOG_ID,
+                `${shortId} must wear the era's air fog`
+            );
+        }
+
+        const fog = JSON.parse(
+            readFileSync(resolve(process.cwd(), "packs/RP/fogs/classic_water_default_fog.json"), "utf-8")
+        )["minecraft:fog_settings"];
+
+        assert.deepEqual(
+            fog.distance.air,
+            OVERWORLD_AIR_FOG,
+            "Beta's air fog is linear from a quarter of the render distance to the cull radius, not a 0.6/0.95 haze"
+        );
     });
 
     it("has a derived tint for every profile the biome table defines, and no others", () => {

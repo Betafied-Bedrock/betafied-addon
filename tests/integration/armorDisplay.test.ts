@@ -111,6 +111,31 @@ describe("Beta Armor Points & Titleraw HUD Display", () => {
             assert.equal(player.commandsRun.length, 1);
         });
 
+        it("re-broadcasts titleraw when player changes dimensions", () => {
+            const player = new Player();
+            player.id = "test_player_armor_dimension_change";
+
+            const equipment = new Map<EquipmentSlot, any>([
+                [EquipmentSlot.Chest, { typeId: "minecraft:diamond_chestplate", getComponent: () => null }]
+            ]);
+
+            player.setComponent(EntityComponentTypes.Equippable, {
+                getEquipment: (slot: EquipmentSlot) => equipment.get(slot) || null
+            });
+
+            updatePlayerArmorDisplay(player as any, true);
+            assert.equal(player.commandsRun.length, 1);
+
+            eventBus.dispatch("playerDimensionChange", {
+                player,
+                fromDimension: { id: "minecraft:overworld" },
+                toDimension: { id: "minecraft:nether" }
+            });
+
+            assert.equal(player.commandsRun.length, 2);
+            assert.equal(player.commandsRun[1], 'titleraw @s title {"rawtext":[{"text":"_a8"}]}');
+        });
+
         it("sends _a0 and suppresses armor display when player is in Creative mode", () => {
             const player = new Player();
             player.id = "test_player_creative";

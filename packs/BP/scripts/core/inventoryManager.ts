@@ -1,6 +1,5 @@
 import {
     world,
-    system,
     ItemStack,
     Player,
     Container,
@@ -59,11 +58,18 @@ interface SlotAccessor<K extends SlotKey> {
     split?(key: K, targetId: string, amount: number): void;
 }
 
+const STANDARD_INVENTORY_SIZE = 36;
+const STANDARD_INVENTORY_KEYS: readonly number[] = Object.freeze(
+    Array.from({ length: STANDARD_INVENTORY_SIZE }, (_, index) => index)
+);
+
 function inventorySlots(player: Player): SlotAccessor<number> | undefined {
     const container = player.getComponent(EntityComponentTypes.Inventory)?.container;
     if (!container) return undefined;
 
-    const keys = Array.from({ length: container.size }, (_, index) => index);
+    const keys = container.size === STANDARD_INVENTORY_SIZE
+        ? STANDARD_INVENTORY_KEYS
+        : Array.from({ length: container.size }, (_, index) => index);
 
     return {
         keys,
@@ -136,7 +142,7 @@ function sweepPlayer(player: Player, fullSweep: boolean, equipmentSweep: boolean
 }
 
 export function* inventorySweepJob(): Generator<void, void, unknown> {
-    const tick = system.currentTick;
+    const tick = tickManager.getCurrentTick();
     const fullSweep = tick % CONFIG.FULL_SWEEP_INTERVAL === 0;
     const equipmentSweep = tick % CONFIG.EQUIPMENT_SWEEP_INTERVAL === 0;
 
@@ -189,7 +195,27 @@ function preserveDurability(sourceItem: ItemStack, targetItem: ItemStack): void 
     }
 }
 
+function canHoldEnchantments(id: string): boolean {
+    return id.endsWith("_sword") ||
+        id.endsWith("_pickaxe") ||
+        id.endsWith("_axe") ||
+        id.endsWith("_shovel") ||
+        id.endsWith("_hoe") ||
+        id.endsWith("_helmet") ||
+        id.endsWith("_chestplate") ||
+        id.endsWith("_leggings") ||
+        id.endsWith("_boots") ||
+        id === "minecraft:bow" ||
+        id === BH_BOW_ID ||
+        id === "minecraft:fishing_rod" ||
+        id === "minecraft:shears" ||
+        id === "minecraft:flint_and_steel" ||
+        id === "minecraft:book";
+}
+
 function stripEnchantments(item: ItemStack, id: string): ItemNormalizationAction | undefined {
+    if (!canHoldEnchantments(id)) return undefined;
+
     const enchantable = item.getComponent(ItemComponentTypes.Enchantable);
     if (!enchantable || enchantable.getEnchantments().length === 0) return undefined;
 
@@ -364,7 +390,7 @@ export function sweepEquipment(player: Player): void {
 }
 
 function notifyPlayer(player: Player, msg: string): void {
-    const now = system.currentTick;
+    const now = tickManager.getCurrentTick();
     const last = msgCooldowns.get(player.id) ?? 0;
     if (now - last >= CONFIG.MESSAGE_COOLDOWN) {
         player.sendMessage(msg);

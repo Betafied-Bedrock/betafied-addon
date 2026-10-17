@@ -2,7 +2,7 @@ import { world } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import { tickManager } from "../core/tickManager.js";
 import { reportError } from "../core/errorReporter.js";
-import { NETHER_ID, OVERWORLD_ID } from "../policy/betaConstants.js";
+import { NETHER_ID } from "../policy/betaConstants.js";
 
 const CONFIG = Object.freeze({
     CHECK_INTERVAL: 20,
@@ -11,13 +11,14 @@ const CONFIG = Object.freeze({
 });
 
 /**
- * The era had one fog per dimension, and a fog pushed with `/fog` outranks the one a biome names.
- * The stack belongs to the player rather than to the dimension, so the pack has to own it: a push
- * made for the Overworld and merely left un-popped is the Overworld's blue haze sitting over the
- * Nether's red one.
+ * The Overworld's fog is not pushed: every Overworld biome's client biome file names the era's air
+ * fog, and a fog pushed with `/fog` outranks the one a biome names, so a push here would pin one
+ * entry over the whole biome layer. What is left is the Nether's red fog, which a push keeps on a
+ * player whatever that layer resolves to. The stack belongs to the player rather than to the
+ * dimension, so the pack has to own it: an entry pushed for the Nether and merely left un-popped is
+ * the Nether's red haze sitting over the Overworld's sky.
  */
 const ERA_FOG_BY_DIMENSION: Readonly<Record<string, string>> = Object.freeze({
-    [OVERWORLD_ID]: "classic_water:default_fog",
     [NETHER_ID]: "mgg:fog_hell"
 });
 

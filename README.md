@@ -19,7 +19,7 @@
   <a href="https://betafied.net"><img src="https://img.shields.io/badge/website-betafied.net-2b7489?style=flat-square" alt="Website"></a>
   <a href="https://discord.gg/BxD7jKs2Rb"><img src="https://img.shields.io/badge/discord-join%20community-5865F2?logo=discord&logoColor=white&style=flat-square" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="License: GNU AGPLv3"></a>
-  <a href="https://github.com/retrofit-studios/betafied/actions"><img src="https://img.shields.io/badge/tests-473%20passed-brightgreen?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/retrofit-studios/betafied/actions"><img src="https://img.shields.io/badge/tests-555%20passed-brightgreen?style=flat-square" alt="Tests"></a>
   <a href="#install"><img src="https://img.shields.io/badge/bedrock-1.26.51+-green?style=flat-square" alt="Bedrock Edition 1.26.51+"></a>
 </p>
 
@@ -144,8 +144,13 @@ npm run install-filters
 # 3. Build packs
 npm run build
 
-# 4. Run the quality gate (typecheck, lint, and 470+ automated tests)
+# 4. Run the quality gate (typecheck, lint, and 550+ automated tests)
 npm run check
+
+# Or run individual verification steps:
+npm test           # offline test suite
+npm run typecheck  # TypeScript check
+npm run lint       # ESLint scripts check
 ```
 
 Want to contribute? Check out our step-by-step **[Contributor Guide (CONTRIBUTING.md)](CONTRIBUTING.md)** for local Bedrock environment setup, coding patterns, and guidelines.

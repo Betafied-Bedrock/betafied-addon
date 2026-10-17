@@ -535,4 +535,28 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         );
         assert.equal(perBlockWrites, 0, "neither type may be written one block at a time");
     });
+
+    it("caps coordinate reads per band so unclassified repeats cannot stall the engine", () => {
+        const blocks = new Map<string, RecordedBlock>();
+        for (let y = 0; y < 50; y++) {
+            for (let z = 0; z < 10; z++) {
+                for (let x = 0; x < 6; x++) {
+                    blocks.set(`${x},${y},${z}`, recordingBlock("minecraft:crafter"));
+                }
+            }
+        }
+
+        const dim = scrubDimension(blocks);
+        // If containsBlock refuses or always returns true, reads must still be bounded
+        dim.containsBlock = () => true;
+
+        scrub(dim);
+
+        assert.ok(
+            dim.getBlockCalls <= 1024,
+            `expected fine read budget to cap reads at 1024, got ${dim.getBlockCalls}`
+        );
+        assert.ok(bulkFillsFor(dim, "minecraft:crafter").length > 0);
+    });
 });
+

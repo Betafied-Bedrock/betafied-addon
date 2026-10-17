@@ -2,6 +2,36 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.11 — 2026-10-17
+
+5.11 adds mob ground shadow decals, restores Beta 1.7.3 lava damage timing, updates biome foliage tints, and fixes tool mining speeds.
+
+### Mobs
+
+- Added authentic circular ground shadow decals beneath Beta mobs.
+- Optimized animal hop AI sweeps to evaluate players and mobs across tick slices.
+
+### Lava
+
+- Changed lava damage to deal 4 damage every 10 ticks while submerged.
+- Added a 15-second fire duration when submerged in lava.
+- Added debounce to prevent double damage when native lava damage ticks.
+
+### Mining
+
+- Added mining fatigue when breaking redstone ore with a pickaxe.
+- Added haste when breaking cobwebs and bamboo with swords.
+
+### World & visuals
+
+- Updated all client biome foliage and grass colors to match Beta colormaps.
+- Adjusted Overworld and Nether fog start and end distances.
+- Fixed death screen overlay flashing on uninitialized forms.
+
+### Tooling
+
+- Added scripts/analyze-profile.mjs to parse BDS CPU profiles.
+
 ## 5.10.1 — 2026-10-16
 
 5.10.1 fixes the Nether wearing the Overworld's blue fog.

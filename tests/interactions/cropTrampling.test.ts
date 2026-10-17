@@ -591,4 +591,29 @@ describe("Beta farmland trampling - landings", () => {
 
         assert.equal(dimension.store.get("0,63,0")?.typeId, "minecraft:dirt", "a stale watch must not resurrect dirt");
     });
+
+    it("bypasses lookahead scans when an entity is grounded on solid ground", () => {
+        let getBlockCount = 0;
+        const dimension = fakeDimension({
+            blocks: { "0,63,0": "minecraft:stone" }
+        });
+        const originalGetBlock = dimension.getBlock.bind(dimension);
+        dimension.getBlock = (loc) => {
+            getBlockCount++;
+            return originalGetBlock(loc);
+        };
+
+        const farmer = fakeWalker("farmer", dimension, { x: 0.5, y: 64, z: 0.5 });
+        farmer.isOnGround = true;
+        mockPlayers.push(farmer);
+
+        cropTramplingJob();
+        getBlockCount = 0;
+
+        farmer.location.x = 0.8;
+        withoutTrampleRoll(() => cropTramplingJob());
+
+        assert.ok(getBlockCount <= 2, `expected at most 2 block reads for grounded walker on stone, got ${getBlockCount}`);
+    });
 });
+

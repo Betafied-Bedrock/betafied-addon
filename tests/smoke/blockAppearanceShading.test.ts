@@ -192,6 +192,22 @@ describe("Block Appearance & Shading Contract", () => {
                 `leaves_${type}.tga must leave transparent gaps for the Fast tile to fill`
             );
 
+            // The era's own Fancy tile keeps #000000 under its holes because nothing ever showed that
+            // colour there; Bedrock does not grant the art that luxury. `alpha_test_to_opaque` -- the
+            // render method the engine gives leaves, "used for a block like the leaves" -- drops the
+            // alpha test at distance, so a black hole is a black gap, and black is also what the mip
+            // levels bleed into the leaf pixels around it. Beta never rendered tile (4,3) that way: its
+            // fast sprite, (5,3) and (5,8) for pine, is this same drawing with every hole painted one
+            // flat tone, and that tone is what has to sit under the alpha here.
+            const offTone = fancy.pixels.filter(
+                (pixel) => pixel[3] === 0 && (pixel[0] !== fill[0] || pixel[1] !== fill[1] || pixel[2] !== fill[2])
+            );
+            assert.equal(
+                offTone.length,
+                0,
+                `leaves_${type}.tga: ${offTone.length} of ${fancy.pixels.filter((p) => p[3] === 0).length} holes carry a tone that shows the moment the engine drops the alpha test; the era's Fast sprite paints them all ${fill.slice(0, 3).join(",")}`
+            );
+
             const fast = decodePng(`packs/RP/textures/blocks/leaves_${type}_opaque.png`);
             assert.deepEqual([fast.width, fast.height], [fancy.width, fancy.height], `${type}: the two tiles must be the same size`);
 

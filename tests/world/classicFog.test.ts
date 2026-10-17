@@ -4,7 +4,6 @@ import { fogJob } from "../../packs/BP/scripts/world/classicFog.js";
 import { resetMocks, world, Player, mockPlayers } from "../mocks/minecraftServer.js";
 
 const NETHER = "minecraft:nether";
-const OVERWORLD_FOG = "fog @s push classic_water:default_fog beta";
 const NETHER_FOG = "fog @s push mgg:fog_hell beta";
 const CLEAR_OWN_ENTRY = "fog @s remove beta";
 
@@ -35,28 +34,44 @@ describe("Classic Fog Dimension Table", () => {
         assert.deepEqual(player.commandsRun, [NETHER_FOG]);
     });
 
-    it("swaps the entry for the Nether's when the player crosses into it", () => {
+    it("leaves the Overworld alone, because the biome layer already names its fog", () => {
+        // Every Overworld biome's client biome file claims the era's air fog, and a pushed entry would
+        // outrank that layer and pin one colour over every biome.
+        const player = new Player("overworld_fog_player", "overworld_fog_player");
+        player.dimension = world.getDimension("minecraft:overworld") as any;
+        mockPlayers.push(player);
+
+        drain(fogJob());
+        drain(fogJob());
+
+        assert.deepEqual(player.commandsRun, []);
+    });
+
+    it("hands the stack back when the player crosses into the Nether and out again", () => {
         const player = new Player("fog_crosser", "fog_crosser");
         player.dimension = world.getDimension("minecraft:overworld") as any;
         mockPlayers.push(player);
 
         drain(fogJob());
         drain(fogJob());
-        assert.deepEqual(player.commandsRun, [OVERWORLD_FOG], "a settled player is not re-pushed every pass");
+        assert.deepEqual(player.commandsRun, [], "a settled player is not re-pushed every pass");
 
         player.dimension = nether();
         drain(fogJob());
+        assert.deepEqual(player.commandsRun, [NETHER_FOG], "nothing of the pack's was on the stack to clear");
 
+        player.dimension = world.getDimension("minecraft:overworld") as any;
+        drain(fogJob());
         assert.deepEqual(
             player.commandsRun,
-            [OVERWORLD_FOG, CLEAR_OWN_ENTRY, NETHER_FOG],
-            "the Overworld's entry is cleared before the Nether's goes on top of it"
+            [NETHER_FOG, CLEAR_OWN_ENTRY],
+            "the Nether's entry must come off the player's own stack on the way back"
         );
     });
 
-    it("leaves the pack's entry off a player in a dimension the era had no fog for", () => {
+    it("takes the pack's entry off a player in a dimension the era had no fog for", () => {
         const player = new Player("end_fog_player", "end_fog_player");
-        player.dimension = world.getDimension("minecraft:overworld") as any;
+        player.dimension = nether();
         mockPlayers.push(player);
 
         drain(fogJob());
@@ -64,7 +79,7 @@ describe("Classic Fog Dimension Table", () => {
         player.dimension = world.getDimension("minecraft:the_end") as any;
         drain(fogJob());
 
-        assert.deepEqual(player.commandsRun, [OVERWORLD_FOG, CLEAR_OWN_ENTRY]);
+        assert.deepEqual(player.commandsRun, [NETHER_FOG, CLEAR_OWN_ENTRY]);
     });
 });
 

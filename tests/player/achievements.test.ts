@@ -237,4 +237,33 @@ describe("Beta achievements", () => {
             "and the list shows the root as missing again, which it was not before the reset"
         );
     });
+
+    it("skips inventory slot scans when all inventory achievements are already unlocked", () => {
+        const player = makePlayer();
+        join(player);
+
+        const allKeys = [
+            ACH.TAKING_INVENTORY, ACH.GETTING_WOOD, ACH.BENCHMARKING,
+            ACH.TIME_TO_STRIKE, ACH.TIME_TO_FARM, ACH.TIME_TO_MINE,
+            ACH.GETTING_UPGRADE, ACH.COW_TIPPER, ACH.BAKE_BREAD,
+            ACH.THE_LIE, ACH.DELICIOUS_FISH, ACH.HOT_TOPIC,
+            ACH.ACQUIRE_HARDWARE
+        ];
+        for (const k of allKeys) {
+            player.setDynamicProperty(`ach:${k}`, true);
+        }
+
+        const inv = player.getComponent(EntityComponentTypes.Inventory)?.container as Container;
+        let itemQueries = 0;
+        const originalGetItem = inv.getItem.bind(inv);
+        inv.getItem = (slot) => {
+            itemQueries++;
+            return originalGetItem(slot);
+        };
+
+        runSweep();
+
+        assert.equal(itemQueries, 0, "completed achievements should bypass scanning 36 inventory slots");
+    });
 });
+

@@ -726,6 +726,19 @@ export class Entity {
         return this.tags.delete(tag);
     }
 
+    public damageApplied: { amount: number; options?: any }[] = [];
+    public fireApplied: { seconds: number; useEffects?: boolean }[] = [];
+
+    applyDamage(amount: number, options?: any): boolean {
+        this.damageApplied.push({ amount, options });
+        return true;
+    }
+
+    setOnFire(seconds: number, useEffects?: boolean): boolean {
+        this.fireApplied.push({ seconds, useEffects });
+        return true;
+    }
+
     getTags(): string[] {
         return [...this.tags];
     }

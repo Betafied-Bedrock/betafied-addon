@@ -69,6 +69,7 @@ const MOB_PARTICLE_ID = "bh:entity_shadow";
 const PLAYER_PARTICLE_ID = "bh:entity_shadow_player";
 const SPAN_PROPERTY = "betarock:shadow_span";
 const ALPHA_PROPERTY = "betarock:shadow_alpha";
+const GROUND_PROPERTY = "betarock:shadow_ground";
 const PLAYER_TYPE = "minecraft:player";
 const LOCAL_PLAYER_QUERY = "query.is_local_player";
 const FIRST_PERSON_QUERY = "query.is_first_person";
@@ -92,7 +93,12 @@ const DISTANCE_QUERY = "query.distance_from_camera";
 const KEEPS_ENGINE_SHADOW: ReadonlySet<string> = new Set([PLAYER_TYPE]);
 
 /** The entity queries that have been seen to resolve inside a particle, and no others. */
-const PARTICLE_QUERIES: readonly string[] = Object.freeze([DISTANCE_QUERY, LOCAL_PLAYER_QUERY]);
+const PARTICLE_QUERIES: readonly string[] = Object.freeze([
+    DISTANCE_QUERY,
+    LOCAL_PLAYER_QUERY,
+    "query.property",
+    "query.position"
+]);
 
 /** The sprite, measured: the disc's opaque radius over the sprite's half-width. */
 const SPRITE_DISC_RADIUS = 0.9;
@@ -145,12 +151,8 @@ function components(path: string): Record<string, any> {
     return readJson(path).particle_effect.components;
 }
 
-function positionExpressions(path: string): string[] {
-    const found = components(path);
-    return [
-        found["minecraft:emitter_shape_point"].offset[1],
-        found["minecraft:particle_motion_parametric"].relative_position[1]
-    ];
+function surfaceClearanceExpressions(path: string): string[] {
+    return [components(path)["minecraft:emitter_shape_point"].offset[1]];
 }
 
 function controllers(): Record<string, any> {
@@ -286,12 +288,23 @@ describe("Entity shadows - what each entity declares", () => {
             assert.equal(Number(span?.default), betaSpan, `${path}: span`);
             assert.equal(Number(alpha?.default), Number((0.5 - javaShadow(typeId)![1] / 8).toFixed(5)), `${path}: alpha`);
 
+            // The player draws no decal, so only a swapped mob declares the surface it is drawn on.
+            if (!KEEPS_ENGINE_SHADOW.has(typeId)) {
+                const ground = declaration[GROUND_PROPERTY];
+                assert.equal(ground?.client_sync, true, `${path} must client_sync ${GROUND_PROPERTY}`);
+                assert.equal(ground?.type, "float", `${path} must declare ${GROUND_PROPERTY} as a float`);
+                assert.equal(Number(ground?.default), 0, `${path}: an unwritten surface is the entity's own feet`);
+            }
+
             // The engine takes `0.7` and rejects `0` or `4` with "Error loading property
             // 'betarock:shadow_drop': 'default' value does not match the specified type 'float'"
             // followed by "'range' array should contain only 'float' type elements". A Molang default is
             // a string and the schema takes it as-is; a number without a decimal point is not.
             const text = readFileSync(resolve(root, path), "utf-8");
-            for (const identifier of [SPAN_PROPERTY, ALPHA_PROPERTY]) {
+            const identifiers = KEEPS_ENGINE_SHADOW.has(typeId)
+                ? [SPAN_PROPERTY, ALPHA_PROPERTY]
+                : [SPAN_PROPERTY, ALPHA_PROPERTY, GROUND_PROPERTY];
+            for (const identifier of identifiers) {
                 for (const literal of propertyLiterals(text, identifier)) {
                     if (literal.startsWith('"')) continue;
                     assert.ok(
@@ -513,7 +526,7 @@ describe("Entity shadows - the decal itself", () => {
             [PLAYER_TYPE, `${SURFACE_CLEARANCE} - (${LOCAL_PLAYER_QUERY} ? ${PLAYER_EYE_HEIGHT} : 0.0)`]
         ] as const) {
             const path = particleFile(typeId);
-            for (const expression of positionExpressions(path)) {
+            for (const expression of surfaceClearanceExpressions(path)) {
                 // A literal is written as a number and an expression as a string; only the text matters.
                 assert.equal(String(expression), expected, `${path}: the decal has to be born where it belongs`);
                 assert.equal(
@@ -523,6 +536,32 @@ describe("Entity shadows - the decal itself", () => {
                 );
             }
         }
+    });
+
+    it("projects onto the published surface instead of riding the entity's feet", () => {
+        // A local-space particle simulates in the entity's frame, so there is no terrain under it to
+        // collide with, and a particle's Molang has no world queries at all -- `above_top_solid` and
+        // `heightmap` are both rejected there. The ground therefore arrives as an entity property a
+        // server pass keeps current, and the decal turns it into a per-frame offset itself, because
+        // `query.position` is read on every frame while a synced property only lands every tick.
+        const path = MOB_PARTICLE_FILE;
+        const found = components(path);
+        assert.equal(found["minecraft:particle_motion_dynamic"], undefined, `${path}: physics cannot find terrain here`);
+        assert.equal(found["minecraft:particle_motion_collision"], undefined, `${path}: physics cannot find terrain here`);
+
+        const height = String(found["minecraft:particle_motion_parametric"].relative_position[1]);
+        assert.equal(
+            height,
+            `math.min(${SURFACE_CLEARANCE}, query.property('${GROUND_PROPERTY}') - query.position(1) + ${SURFACE_CLEARANCE})`,
+            `${path}: the decal drops to the published surface and never rises above its clearance`
+        );
+
+        // The player's decal is unbound while the swap is off, so it stays the plain pinned offset
+        // instead of reading a property the player may not declare.
+        const playerHeight = String(
+            components(PLAYER_PARTICLE_FILE)["minecraft:particle_motion_parametric"].relative_position[1]
+        );
+        assert.equal(playerHeight.includes(GROUND_PROPERTY), false, `${PLAYER_PARTICLE_FILE}: no ground to read`);
     });
 
     it("draws nothing for the local player and everyone else's shadow anyway", () => {
@@ -616,19 +655,24 @@ describe("Entity shadows - one emitter, forever", () => {
         );
     });
 
-    it("leaves the shadow to the client", () => {
-        // A script that published where the ground was used to sit behind this feature. Every part of
-        // that design is gone: the decal finds the ground from entity queries in its own resource-pack
-        // expressions, so no server-side pass runs per tick, and the two declared numbers are read by
-        // the resource pack.
+    it("publishes the surface from one scheduled pass, and nothing else", () => {
+        // The ground cannot come from the decal's own Molang: `above_top_solid` and `heightmap` are
+        // both rejected in a particle's context, and a local-space particle never collides with
+        // terrain. So the surface is a server fact again -- one synced property, written only when
+        // the column under a mob changes, and read per frame by the decal.
+        const modulePath = "packs/BP/scripts/mobs/entityShadow.ts";
         assert.equal(
-            existsSync(resolve(root, "packs/BP/scripts/mobs/entityShadow.ts")),
-            false,
-            "the shadow must not need a server-side pass"
+            existsSync(resolve(root, modulePath)),
+            true,
+            "the decal has to be given the surface it draws itself on"
         );
 
         const main = readFileSync(resolve(root, "packs/BP/scripts/main.ts"), "utf-8");
-        assert.equal(main.includes("entityShadow"), false, "and nothing may import one");
+        assert.ok(main.includes("./mobs/entityShadow.js"), "a pass nothing imports never runs");
+
+        const module = readFileSync(resolve(root, modulePath), "utf-8");
+        assert.ok(module.includes(GROUND_PROPERTY), "the pass has to write the property the decal reads");
+        assert.ok(module.includes("getBlockFromRay"), "an airborne mob's surface has to be found, not assumed");
 
         const offenders: string[] = [];
         const walk = (directory: string): void => {

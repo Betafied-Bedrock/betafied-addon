@@ -34,6 +34,11 @@
     "controls": [
       {
         "death_screen@bfui-death_screen.root_panel": {
+          // Declared hidden, so the gate below is the only way the era's tree ever draws. A view binding is
+          // not guaranteed to have run when the control is built, and one that writes nothing leaves the
+          // control at its own default - visible for a panel. Left at that default, this tree was what the
+          // first frame of every other pack's form on this shared screen looked like.
+          "visible": false,
           "bindings": [
             {
               "binding_type": "view",
@@ -106,6 +111,11 @@
             { "hud@bfui-death_screen.hud": {} },
             { "wash@bfui-death_screen.wash": {} }
           ],
+          // Same guard as the content router, and it is the one that shows up in game: the slot is shared by
+          // every form the engine draws, so a wash that draws before the title read says otherwise is the
+          // red gradient flashing on another pack's form. Vanilla pairs the two properties the same way
+          // (`world_template_type_filters` in store_filter_menu_screen.json).
+          "visible": false,
           "bindings": [
             {
               "binding_type": "view",

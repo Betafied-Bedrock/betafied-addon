@@ -5,7 +5,8 @@
       "identifier": "minecraft:chicken",
       "properties": {
           "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.3, "client_sync": true },
-          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.45, "client_sync": true }
+          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.45, "client_sync": true },
+          "betarock:shadow_ground": { "type": "float", "range": [-64.0, 320.0], "default": 0.0, "client_sync": true }
       },
       "spawn_category": "creature",
       "is_spawnable": true,

@@ -35,7 +35,7 @@
             "minecraft:particle_motion_parametric": {
                 "relative_position": [
                     0,
-                    0.02,
+                    "math.min(0.02, query.property('betarock:shadow_ground') - query.position(1) + 0.02)",
                     0
                 ]
             },
