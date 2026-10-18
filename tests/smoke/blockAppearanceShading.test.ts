@@ -243,6 +243,20 @@ describe("Block Appearance & Shading Contract", () => {
         }
     });
 
+    it("carries a darker AO exponent on birch leaves than the rest of the leaf family", () => {
+        // The engine tints birch leaves on its own path (`birch_foliage`, which ignores
+        // `minecraft:foliage_appearance`), and that path renders them brighter than the oak leaves
+        // beside them at the same AO. The exponent is the one per-block brightness value the
+        // renderer still honours, so the compensation lives here rather than in the tint.
+        const block = readJson("packs/RP/blocks.json").birch_leaves;
+        assert.ok(block, "missing block definition for birch_leaves");
+        assert.equal(
+            block.ambient_occlusion_exponent,
+            0.5,
+            "birch_leaves must stay darker than the 0.25 the other leaves use"
+        );
+    });
+
     it("bakes Beta directional face dimming onto the leaf faces", () => {
         const blocks = readJson("packs/RP/blocks.json");
         const terrain = readJson("packs/RP/textures/terrain_texture.json").texture_data;

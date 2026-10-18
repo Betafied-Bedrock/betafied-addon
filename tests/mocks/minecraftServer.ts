@@ -86,6 +86,8 @@ export class ItemStack {
     }
 }
 
+export let blockResolveCalls = 0;
+
 export class BlockPermutation {
     private static cache = new Map<string, BlockPermutation>();
 
@@ -102,6 +104,7 @@ export class BlockPermutation {
     }
 
     static resolve(typeId: string, states: Record<string, any> = {}): BlockPermutation {
+        blockResolveCalls++;
         const key = `${typeId}:${JSON.stringify(states)}`;
         let perm = BlockPermutation.cache.get(key);
         if (!perm) {
@@ -754,11 +757,60 @@ export class MockItemEntity extends Entity {
     }
 }
 
+/**
+ * The real stack rejects a push past 16 entries, which is the state an older sweep could leave a
+ * player in; the mock keeps that limit so the recovery path is exercised rather than assumed.
+ */
+export const FOG_STACK_LIMIT = 16;
+
+export class MockFogSettings {
+    private entries: { id: string; tag: string }[] = [];
+
+    getStack(): string[] {
+        return this.entries.map(entry => entry.id);
+    }
+
+    getTags(): string[] {
+        return this.entries.map(entry => entry.tag);
+    }
+
+    push(fogId: string, tag: string = "untagged"): number {
+        if (this.entries.length >= FOG_STACK_LIMIT) {
+            throw new Error(`fog stack limit of ${FOG_STACK_LIMIT} exceeded`);
+        }
+        this.entries.push({ id: fogId, tag });
+        return this.entries.length - 1;
+    }
+
+    pop(tag?: string): string | undefined {
+        for (let index = this.entries.length - 1; index >= 0; index--) {
+            if (tag === undefined || this.entries[index].tag === tag) {
+                return this.entries.splice(index, 1)[0].id;
+            }
+        }
+        return undefined;
+    }
+
+    remove(tag?: string): boolean {
+        const before = this.entries.length;
+        this.entries = tag === undefined ? [] : this.entries.filter(entry => entry.tag !== tag);
+        return this.entries.length !== before;
+    }
+
+    setStack(fogIds: string[], tag: string = "untagged"): void {
+        if (fogIds.length > FOG_STACK_LIMIT) {
+            throw new Error(`fog stack limit of ${FOG_STACK_LIMIT} exceeded`);
+        }
+        this.entries = fogIds.map(id => ({ id, tag }));
+    }
+}
+
 export class Player extends Entity {
     name: string = "Steve";
     public gameMode: string = GameMode.Survival;
     public commandsRun: string[] = [];
     public messagesSent: string[] = [];
+    public readonly fogSettings = new MockFogSettings();
 
     setGameMode(gameMode: string): void {
         this.gameMode = gameMode;
@@ -840,6 +892,7 @@ export class Player extends Entity {
         return { successCount: 1 };
     }
 }
+
 export class Container {
     private slots = new Map<number, any>();
     public readonly size: number;

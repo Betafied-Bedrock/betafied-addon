@@ -512,7 +512,7 @@ Also still open: the raw-ore clamp discards the surplus of a stack that arrived 
 save, since it reads a raw ore drop as one mined block. If the era's one-ore-per-block reading is
 ever dropped, delete `ORE_DROP_AMOUNT` so the amount rides across — do not change one caller.
 
-## 15. The shadow swap cannot be had without aggro invisibility, so the player keeps Bedrock's own
+## 15. The shadow swap cannot be had without aggro invisibility, so the engine's shadow is switched off instead
 
 The 5.6 blob shadows take the wiki's only reliable route to a shadowless entity: a permanent
 invisibility effect, which is what stops the engine drawing its own decal, plus
@@ -529,11 +529,15 @@ an always-invisible player answered that filter with "no" for as long as the pla
 targeting bug rather than a rendering one because retaliation is a sight-free path: hitting a mob still
 worked, and so did standing close enough to be hit by its swing.
 
-**Decided:** the player carries none of the three components and binds no decal, so Bedrock draws its
-own shadow under players again. A world that already ran 5.6.1 has the effect applied to its players,
-and it does not lapse: the migration wrote twenty million ticks, so `entityMigration` now strips the
-invisibility back off any Beta mob whose definition no longer declares the component it was installed
-under. Nothing else in the era grants invisibility, so the absence of that component is an exact
+**Decided:** the player carries none of the three components and binds no decal. Beta drew no shadow
+under the player, so `packs/RP/materials/shadows.material` removes the engine's blob shadow for every
+entity instead: its `shadow_overlay` blends the destination back unchanged, which is no shadow at all.
+A Beta mob's only shadow is then the pack's own decal, rather than that decal laid over the engine's.
+The route is the one the wiki marks dead after RenderDragon, so whether a given client honours the file
+is unverified in-game; deleting it gives the engine shadows back. A world that already ran 5.6.1 has the
+effect applied to its players, and it does not lapse: the migration wrote twenty million ticks, so
+`entityMigration` now strips the invisibility back off any Beta mob whose definition no longer declares
+the component it was installed under. Nothing else in the era grants invisibility, so the absence of that component is an exact
 marker for the pack's own leftover. The swap, the decal binding and the gate that hid the local player's own
 decal are gone; `entity_shadow_player.json` stays in the pack, unreferenced, as the decal a safe swap
 would bind again. The two `betarock:shadow_*` properties stay declared on the player, because the
@@ -550,7 +554,10 @@ second tick and writes `betarock:shadow_ground` only when the surface under a mo
 entity's own feet are that surface, the only reading exact on a half block, so the raycast is spent
 only on mobs the engine reports in the air. The decal turns the published height into
 `ground - query.position(1)` on every frame, which keeps the motion at render rate while the property
-itself only syncs when a block boundary is crossed.
+itself only syncs when a block boundary is crossed. The same pair of readings gives the decal its height
+falloff: Beta draws a block's shadow at `(opacity - (height + 1) / 2) * 0.5`, so the opacity loses a
+quarter per block of clearance and a decal is gone about a block and a half up -- a jumping mob trails a
+fainter disc the higher it goes, rather than the same one hanging in the air.
 
 **Still open, and now load-bearing for the rest of the roster:**
 
@@ -1038,16 +1045,23 @@ boundary read `betaRegistry` alone and deleted the item the block pays — the e
 cobweb came through as blocks and vanished as drops. Both spellings now sit in `BETA_BLOCK_IDS`, the
 one set `isBetaBlock`, `isBetaItem` and the scrubber's untouched filter all read.
 
-## 25. Generated chests are deleted by the sweep while the id stays authentic to the drop boundary
+## 25. Generated chests and spawners are deleted by the sweep while the ids stay authentic to the drop boundary
 
 A structure chest carries loot from the Nether Update, and the chest this pack hands a player is
 `bh:chest`, so a `minecraft:chest` in the world is always a generated one. `minecraft:chest` still reads
 as authentic Beta terrain in `BETA_BLOCK_IDS` — the drop boundary needs the item the block pays, and the
 id is the era's own — while `chunkScrubber` deletes the block. The two stances cannot be folded into one
 table: the untouched-terrain filter excludes everything in `BETA_BLOCK_IDS`, so "preserve this block" and
-"delete this block" cannot both be expressed there. The chest pass reads the filtered volume directly
+"delete this block" cannot both be expressed there. The structure pass reads the filtered volume directly
 instead, and deletes rather than retypes onto `bh:chest`, because a retype would open the pack's
 container screen over the structure's loot.
+
+`minecraft:mob_spawner` takes the same route for the same reason. A dungeon spawner is authentic terrain
+in the pre-generated Overworld template, so the id stays in `BETA_BLOCK_IDS`; the Nether's only spawner is
+a fortress blaze spawner, and fortresses arrived after 1.7.3. A spawner is unobtainable — a player can
+neither place nor break one — so every one the Nether sweep finds is vanilla generation, and it is
+deleted: a spawner left standing would keep spawning what the era never spawned there. One presence probe
+covers both ids, so the second type costs the pass no extra volume scan.
 
 The ring the sweep walks went from one chunk to two for the same reason: the chest sits at the portal,
 which is usually in the chunk past the old ring, so the loot stayed until the player walked into it.
@@ -1066,15 +1080,17 @@ with the era's one fog, a zero precipitation density and an empty music definiti
 ambient definition is blanked in `packs/RP/sounds/sound_definitions.json` the way `ambient.nether_wastes`
 already was.
 
-**The fog half of this was settled by a second mechanism that outranked both routes.** `/fog push` puts a
-fog on the player's own stack, above the biome layer, and that stack belongs to the player rather than to
-the dimension. `classicFog.ts` pushed the Overworld fog for a player seen in the Overworld and popped it
-only once a sweep saw them somewhere else, so the Nether's biome fog was never what decided the Nether:
-while that entry stood, the Overworld's blue haze was the fog on screen, which is the reported symptom.
-The sweep now reads the era's fog from a table keyed by dimension, clears its one stack id and pushes
-that dimension's fog, so what shows is always the entry this pass put there rather than whatever a pop
-managed to reach. The client biome fog above stays declared: it is what shows before the sweep's next
-pass, and it is the answer if the stack is emptied by something outside the pack.
+**The fog half is settled by the command layer, and that layer has to be read rather than remembered.**
+`/fog push` puts a fog on the player's own stack, above the biome layer, and the engine saves that layer
+per player and restores it on world load. `classicFog.ts` therefore cannot decide from what it remembers
+pushing: the record is lost to every reload and blind to whatever an earlier build left behind. That is
+how the reported symptom came back — the 5.11 world held **16 entries of `bt:old_water_fog`**, one per
+join of an earlier build whose push the stack never lost, and 16 is the engine's ceiling, so the Nether's
+push was rejected and the Overworld's blue haze stayed on screen in every dimension. The sweep now reads
+`player.fogSettings` every pass, removes every entry carrying its `beta` tag and pushes the era's fog for
+the dimension, so what shows is the entry this pass put there and a saturated stack drains instead of
+blocking. The client biome fog above stays declared: it is what shows before the sweep's next pass, and
+it is the answer if the stack is emptied by something outside the pack.
 
 **Still open:** whether a client biome file replaces the vanilla definition for its biome or merges into
 it. Fog is no longer the thing the answer decides, since the command layer now carries it in both

@@ -31,6 +31,9 @@ const BAND_HEIGHT = 128;
 const CHUNK_SIZE = 16;
 const REVERIFY_INTERVAL_TICKS = 2400;
 const REVERIFY_SPREAD_TICKS = 600;
+// A pass that ends unfinished comes back on this clock instead of the re-verify one: the chunk is
+// still dirty, and the long window is what hid a patch a player had walked back to.
+const RETRY_INTERVAL_TICKS = 120;
 // One read batch is one tick's slice of the fine pass: it ends in a yield, and the band is asked
 // whether anything unclassified is left once it has classified a type.
 const FINE_READ_BATCH = 512;
@@ -67,9 +70,24 @@ function buildUntouchedTypes(): string[] {
     return excludeTypes;
 }
 
-const UNTOUCHED_TYPES: string[] = buildUntouchedTypes();
+/**
+ * Both tables resolve block ids, and this module's top level runs in early execution: a lookup there
+ * throws, so a table built at load time came out empty and stayed empty for the session. Built on
+ * first use instead, which is a tick, in default execution.
+ */
+let untouchedTypesCache: string[] | undefined;
 
-const UNTOUCHED_FILTER: BlockFilter = Object.freeze({ excludeTypes: UNTOUCHED_TYPES });
+function untouchedTypes(): string[] {
+    untouchedTypesCache ??= buildUntouchedTypes();
+    return untouchedTypesCache;
+}
+
+let untouchedFilterCache: BlockFilter | undefined;
+
+function untouchedFilter(): BlockFilter {
+    untouchedFilterCache ??= Object.freeze({ excludeTypes: untouchedTypes() });
+    return untouchedFilterCache;
+}
 
 const PLANKS_TARGET = BLOCK_BULK_REPLACEMENTS.find(([target]) => target.endsWith("_planks"))?.[1] ?? "minecraft:planks";
 
@@ -105,7 +123,17 @@ function buildPostBetaWoodTargets(): readonly (readonly [string, string])[] {
     return targets;
 }
 
-function buildScrubTargets(): readonly (readonly [string, string])[] {
+/**
+ * The probe list. An id this engine build cannot resolve has no block to find in the world, and a
+ * probe or fill that names it throws - a refused probe reads as "present", so the fill built for it
+ * is refused too and the band ends before a real target is reached. The tables are hand-written, so
+ * this is also what keeps one stale spelling from taking the whole sweep down.
+ *
+ * Exported with the resolver injectable so a test can stand in for a build that lacks an id.
+ */
+export function buildScrubTargets(
+    isRegistered: (id: string) => boolean = engineRegistersBlock
+): readonly (readonly [string, string])[] {
     const seen = new Set<string>();
     const targets: [string, string][] = [];
     for (const [target, replacement] of [
@@ -115,36 +143,61 @@ function buildScrubTargets(): readonly (readonly [string, string])[] {
     ]) {
         if (seen.has(target)) continue;
         seen.add(target);
+        if (!isRegistered(target)) continue;
         targets.push([target, replacement]);
     }
     return targets;
 }
 
-const SCRUB_TARGETS: readonly (readonly [string, string])[] = buildScrubTargets();
+function engineRegistersBlock(id: string): boolean {
+    try {
+        BlockPermutation.resolve(id);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
-const BULK_TARGET_TYPES: string[] = SCRUB_TARGETS.map(([target]) => target);
+let resolvedTargets: readonly (readonly [string, string])[] | undefined;
+
+function scrubTargets(): readonly (readonly [string, string])[] {
+    resolvedTargets ??= buildScrubTargets();
+    return resolvedTargets;
+}
+
+let resolvedTargetTypes: string[] | undefined;
+
+function bulkTargetTypes(): string[] {
+    resolvedTargetTypes ??= scrubTargets().map(([target]) => target);
+    return resolvedTargetTypes;
+}
 
 const BULK_RANGE_FILTERS = new Map<string, BlockFilter>();
 function bulkRangeFilter(lo: number, hi: number): BlockFilter {
     const key = `${lo}:${hi}`;
     let filter = BULK_RANGE_FILTERS.get(key);
     if (filter === undefined) {
-        filter = { includeTypes: BULK_TARGET_TYPES.slice(lo, hi + 1) };
+        filter = { includeTypes: bulkTargetTypes().slice(lo, hi + 1) };
         BULK_RANGE_FILTERS.set(key, filter);
     }
     return filter;
 }
 
-const BULK_BY_TARGET = new Map(SCRUB_TARGETS);
+let bulkByTarget: ReadonlyMap<string, string> | undefined;
 
-function markScrubbed(key: string, tick: number): void {
+function bulkReplacementFor(typeId: string): string | undefined {
+    bulkByTarget ??= new Map(scrubTargets());
+    return bulkByTarget.get(typeId);
+}
+
+function markScrubbed(key: string, tick: number, delayTicks: number): void {
     if (SCRUB_DUE_AT.size >= MAX_TRACKED_CHUNKS) {
         const oldest = SCRUB_DUE_AT.keys().next().value;
         if (oldest !== undefined) {
             SCRUB_DUE_AT.delete(oldest);
         }
     }
-    SCRUB_DUE_AT.set(key, tick + REVERIFY_INTERVAL_TICKS + reverifyOffset(key));
+    SCRUB_DUE_AT.set(key, tick + delayTicks);
 }
 
 function needsScrub(key: string, tick: number): boolean {
@@ -162,15 +215,19 @@ function isInFlight(key: string, tick: number): boolean {
 }
 
 // Uses native fillBlocks directly to bypass command parsing and the 32,768 block command volume cap.
-function fill(dim: Dimension, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, block: string, filter?: BlockFilter): void {
+// Answers the engine's refusal, or `undefined` when the write was accepted: the fill is the only
+// proof a band was actually written, and a chunk that keeps its success mark after a refused one
+// stays dirty for the whole re-verify window.
+function fill(dim: Dimension, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, block: string, filter?: BlockFilter): unknown {
     try {
         dim.fillBlocks(
             new BlockVolume({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }),
             block,
             { blockFilter: filter, ignoreChunkBoundErrors: true }
         );
-    } catch {
-        // Outside loaded chunks; retried on later pass.
+        return undefined;
+    } catch (error) {
+        return error;
     }
 }
 
@@ -190,7 +247,7 @@ function toFillTarget(target: string): string {
 function fineTargetOf(typeId: string): string | undefined {
     if (typeId === PLANKS_TARGET) return PLANKS_RETYPE;
 
-    const bulkTarget = BULK_BY_TARGET.get(typeId);
+    const bulkTarget = bulkReplacementFor(typeId);
     if (bulkTarget !== undefined) return toFillTarget(bulkTarget);
 
     const fineTarget = BLOCK_FINE_REPLACEMENTS[typeId];
@@ -212,7 +269,7 @@ function retypePlanks(block: Block): void {
  * keeps the answer on the conservative side: keep reading.
  */
 function unclassifiedFilter(classified: ReadonlyMap<string, string>): BlockFilter {
-    return { excludeTypes: [...UNTOUCHED_TYPES, ...classified.keys()] };
+    return { excludeTypes: [...untouchedTypes(), ...classified.keys()] };
 }
 
 function containsBlocksIn(dimension: Dimension, volume: BlockVolume, filter: BlockFilter): boolean {
@@ -223,8 +280,14 @@ function containsBlocksIn(dimension: Dimension, volume: BlockVolume, filter: Blo
     }
 }
 
-/** Binary search to find which scrub target types exist in volume with minimal containsBlock calls. */
-function collectBulkTargets(dimension: Dimension, volume: BlockVolume, lo: number, hi: number, present: number[]): void {
+/**
+ * Binary search to find which scrub target types exist in volume with minimal containsBlock calls.
+ *
+ * Exported so a test can pin the inverted-range case: an empty table asks for `0..-1`, and an
+ * unbounded recursion there is a stack overflow the watchdog answers by killing the whole pack.
+ */
+export function collectBulkTargets(dimension: Dimension, volume: BlockVolume, lo: number, hi: number, present: number[]): void {
+    if (lo > hi) return;
     if (!containsBlocksIn(dimension, volume, bulkRangeFilter(lo, hi))) return;
 
     if (lo === hi) {
@@ -237,10 +300,13 @@ function collectBulkTargets(dimension: Dimension, volume: BlockVolume, lo: numbe
     collectBulkTargets(dimension, volume, mid + 1, hi, present);
 }
 
-function runBulkReplacements(dimension: Dimension, volume: BlockVolume, cx: number, cz: number, bandBottom: number, bandTop: number): void {
+function runBulkReplacements(dimension: Dimension, volume: BlockVolume, cx: number, cz: number, bandBottom: number, bandTop: number): unknown {
+    const targets = scrubTargets();
+    if (targets.length === 0) return undefined;
+
     const present: number[] = [];
-    collectBulkTargets(dimension, volume, 0, SCRUB_TARGETS.length - 1, present);
-    if (present.length === 0) return;
+    collectBulkTargets(dimension, volume, 0, targets.length - 1, present);
+    if (present.length === 0) return undefined;
 
     const x1 = cx * CHUNK_SIZE;
     const z1 = cz * CHUNK_SIZE;
@@ -248,23 +314,36 @@ function runBulkReplacements(dimension: Dimension, volume: BlockVolume, cx: numb
     const z2 = z1 + CHUNK_SIZE - 1;
 
     for (const i of present) {
-        const [target, replacement] = SCRUB_TARGETS[i];
-        fill(dimension, x1, bandBottom, z1, x2, bandTop, z2, replacement, { includeTypes: [target] });
+        const [target, replacement] = targets[i];
+        const refusal = fill(dimension, x1, bandBottom, z1, x2, bandTop, z2, replacement, { includeTypes: [target] });
+        if (refusal !== undefined) return refusal;
     }
+    return undefined;
 }
 
 /**
- * A structure chest carries loot the era never had, and the chest the pack gives a player is
- * `bh:chest`, so a `minecraft:chest` in the world is always a generated one. It is deleted rather
- * than retyped: opening it would run the pack's container screen over the structure's own loot. The
- * id stays in `BETA_BLOCK_IDS` for the drop boundary, so this cannot live in the compatibility
- * tables — which is also what keeps the untouched-terrain filter from preserving it as Beta terrain.
+ * Structure blocks the era had no way to reach. A chest carries loot the Nether Update added and the
+ * pack's own chest is `bh:chest`, so a `minecraft:chest` in a swept chunk is a ruined portal's. A
+ * spawner is a fortress's blaze spawner, and fortresses arrived after 1.7.3 — a spawner is unobtainable
+ * (a player can neither place nor break one), so any in the Nether is vanilla generation too.
+ *
+ * Both are deleted rather than retyped: opening a chest would run the pack's container screen over
+ * the structure's loot, and the spawner block has no era behaviour to become. The ids stay in
+ * `BETA_BLOCK_IDS` for the drop boundary, so this cannot live in the compatibility tables — which is
+ * also what keeps the untouched-terrain filter from preserving them as Beta terrain. One probe
+ * covers both, to keep the cost of the pass flat: it is one native volume scan per band.
  */
-const GENERATED_CHEST_FILTER: BlockFilter = Object.freeze({ includeTypes: ["minecraft:chest"] });
+const GENERATED_STRUCTURE_TYPES: readonly string[] = Object.freeze(["minecraft:chest", "minecraft:mob_spawner"]);
+const GENERATED_STRUCTURE_FILTER: BlockFilter = Object.freeze({ includeTypes: [...GENERATED_STRUCTURE_TYPES] });
 
-function clearGeneratedChests(dimension: Dimension, volume: BlockVolume, x1: number, bandBottom: number, z1: number, bandTop: number): void {
-    if (!containsBlocksIn(dimension, volume, GENERATED_CHEST_FILTER)) return;
-    fill(dimension, x1, bandBottom, z1, x1 + CHUNK_SIZE - 1, bandTop, z1 + CHUNK_SIZE - 1, "minecraft:air", GENERATED_CHEST_FILTER);
+function clearGeneratedStructures(dimension: Dimension, volume: BlockVolume, x1: number, bandBottom: number, z1: number, bandTop: number): unknown {
+    if (!containsBlocksIn(dimension, volume, GENERATED_STRUCTURE_FILTER)) return undefined;
+
+    for (const typeId of GENERATED_STRUCTURE_TYPES) {
+        const refusal = fill(dimension, x1, bandBottom, z1, x1 + CHUNK_SIZE - 1, bandTop, z1 + CHUNK_SIZE - 1, "minecraft:air", { includeTypes: [typeId] });
+        if (refusal !== undefined) return refusal;
+    }
+    return undefined;
 }
 
 // Dimension.getBlocks may throw unhandled native errors on certain engine builds; latch to avoid log spam.
@@ -286,18 +365,30 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
     let refusedBands = 0;
     let refusedReads = 0;
     let refusedBlocks = 0;
+    let refusedWrites = 0;
+    let incomplete = false;
     let firstError: unknown;
 
     for (let y = yMin; y <= yMax; y += BAND_HEIGHT) {
+        // The pass spans ticks, so the chunk can leave the player's loaded set between bands. A write
+        // there is refused, and a chunk must never take its success mark for a band it never wrote.
+        if (!dimension.isChunkLoaded({ x: x1, y, z: z1 })) return false;
+
         const bandTop = Math.min(y + BAND_HEIGHT - 1, yMax);
         const volume = new BlockVolume({ x: x1, y, z: z1 }, { x: x1 + CHUNK_SIZE - 1, y: bandTop, z: z1 + CHUNK_SIZE - 1 });
 
-        runBulkReplacements(dimension, volume, cx, cz, y, bandTop);
-        clearGeneratedChests(dimension, volume, x1, y, z1, bandTop);
+        // A refused fill ends the band: the rest of it is work the engine would refuse as well.
+        const refusal = runBulkReplacements(dimension, volume, cx, cz, y, bandTop)
+            ?? clearGeneratedStructures(dimension, volume, x1, y, z1, bandTop);
+        if (refusal !== undefined) {
+            refusedWrites++;
+            firstError ??= refusal;
+            break;
+        }
 
         let matches: BlockLocationIterator | null = null;
         try {
-            matches = dimension.getBlocks(volume, UNTOUCHED_FILTER, true).getBlockLocationIterator();
+            matches = dimension.getBlocks(volume, untouchedFilter(), true).getBlockLocationIterator();
         } catch (error) {
             refusedBands++;
             if (!fineQueryRefusalReported) {
@@ -316,6 +407,7 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
 
         if (matches !== null) {
             const classified = new Map<string, string>();
+            let truncated = false;
 
             try {
                 const locations = matches[Symbol.iterator]();
@@ -354,6 +446,9 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
 
                     if (totalBandReads >= MAX_FINE_READS_PER_BAND) {
                         exhausted = true;
+                        // The cap ends this pass's reads, not the band's work: a type this pass never
+                        // classified is still standing, so the chunk has to come back for it.
+                        truncated = containsBlocksIn(dimension, volume, unclassifiedFilter(classified));
                     }
 
                     // A batch that ran the band out is followed by the band's own yield, so yielding here
@@ -372,21 +467,31 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
             }
 
             for (const [typeId, target] of classified) {
-                fill(dimension, x1, y, z1, x1 + CHUNK_SIZE - 1, bandTop, z1 + CHUNK_SIZE - 1, target, { includeTypes: [typeId] });
+                const writeRefusal = fill(dimension, x1, y, z1, x1 + CHUNK_SIZE - 1, bandTop, z1 + CHUNK_SIZE - 1, target, { includeTypes: [typeId] });
+                if (writeRefusal !== undefined) {
+                    refusedWrites++;
+                    firstError ??= writeRefusal;
+                }
             }
+
+            if (truncated) incomplete = true;
         }
+
+        if (refusedWrites > 0) break;
 
         yield;
     }
 
     if (firstError !== undefined) {
         reportError(
-            { system: "chunkScrubber", operation: "fineScrub", target: `${cx},${cz}`, details: { refusedReads, refusedBlocks } },
+            { system: "chunkScrubber", operation: "fineScrub", target: `${cx},${cz}`, details: { refusedReads, refusedBlocks, refusedWrites } },
             firstError
         );
     }
 
-    return true;
+    // Only a chunk that was read to the end and written is clean. A refused fill, or a band whose read
+    // cap cut it short, leaves ground standing that the re-verify window would hide for two minutes.
+    return refusedWrites === 0 && !incomplete;
 }
 
 let playerCursor = 0;
@@ -434,9 +539,12 @@ export function* chunkScanJob(): Generator<void, void, unknown> {
             const clean = yield* scrubFineDetails(dimension, chunkX, chunkZ);
             SCRUB_IN_FLIGHT.delete(key);
 
+            // Every chunk takes a mark, so one that keeps failing cannot hold the front of the queue
+            // and starve the rest of the neighbourhood; only a finished pass earns the long window.
+            markScrubbed(key, tick, clean ? REVERIFY_INTERVAL_TICKS + reverifyOffset(key) : RETRY_INTERVAL_TICKS);
+
             if (!clean) continue;
 
-            markScrubbed(key, tick);
             scrubbed++;
         }
     }

@@ -1,0 +1,45 @@
+{
+  "materials": {
+    "version": "1.0.0",
+
+    // Vanilla's shadow_overlay darkens the ground wherever shadow_front and shadow_back filled the
+    // stencil. Destination times one plus source times zero writes the ground back unchanged, which
+    // is the whole of the effect: no shader is replaced, so this survives RenderDragon. Delete this
+    // file to get the engine's shadows back.
+    "shadow_overlay": {
+      "+states": [
+        "DisableDepthTest",
+        "DisableCulling",
+        "Blending",
+        "EnableStencilTest"
+      ],
+
+      "vertexShader": "shaders/color.vertex",
+      "vrGeometryShader": "shaders/color.geometry",
+      "fragmentShader": "shaders/shadow_stencil_overlay.fragment",
+
+      "blendSrc": "Zero",
+      "blendDst": "One",
+
+      "frontFace": {
+        "stencilFunc": "Equal",
+        "stencilPass": "Replace"
+      },
+
+      "backFace": {
+        "stencilFunc": "Equal",
+        "stencilPass": "Replace"
+      },
+
+      "stencilRef": 1,
+      "stencilReadMask": 255,
+      "stencilWriteMask": 0,
+
+      "vertexFields": [
+        { "field": "Position" },
+        { "field": "Color" }
+      ],
+      "msaaSupport": "Both"
+    }
+  }
+}

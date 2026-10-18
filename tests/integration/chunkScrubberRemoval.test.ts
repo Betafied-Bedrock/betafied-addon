@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { BlockPermutation } from "@minecraft/server";
-import { scrubFineDetails } from "../../packs/BP/scripts/world/chunkScrubber.js";
+import { BlockPermutation, BlockVolume } from "@minecraft/server";
+import { buildScrubTargets, collectBulkTargets, scrubFineDetails } from "../../packs/BP/scripts/world/chunkScrubber.js";
 
 // The refused-query and refused-write cases both report through the ambient Bedrock console, so
 // capture it rather than let those lines land in the test output.
@@ -199,6 +199,25 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         assert.equal(perBlockWrites, 0, "a deleted type must not be written one block at a time");
     });
 
+    it("repaints the Nether ores the era never had, so neither id is left in-game", () => {
+        const dim = scrubDimension(new Map<string, RecordedBlock>([
+            ["2,16,2", recordingBlock("minecraft:quartz_ore")],
+            ["9,12,9", recordingBlock("minecraft:ancient_debris")]
+        ]));
+
+        scrub(dim);
+
+        // Quartz and ancient debris arrived with the Nether Update. Netherrack is what stands in
+        // their place: deleting them to air opens holes the era's generation would never have.
+        for (const id of ["minecraft:quartz_ore", "minecraft:ancient_debris"]) {
+            assert.deepEqual(
+                bulkFillsFor(dim, id),
+                [`fill 0 0 0 15 127 15 minecraft:netherrack replace ${id}`],
+                `${id} must be repainted to netherrack`
+            );
+        }
+    });
+
     it("clears a post-Beta plant through the bulk path", () => {
         const dim = scrubDimension(new Map<string, RecordedBlock>([
             ["3,70,2", recordingBlock("minecraft:vine")]
@@ -246,6 +265,24 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
         assert.deepEqual(generated.setTypeCalls, [], "the chest goes by volume fill, not one write per block");
         assert.deepEqual(own.setTypeCalls, [], "the pack's own chest must survive the sweep");
         assert.deepEqual(own.permutationCalls, []);
+    });
+
+    it("deletes a generated Nether mob spawner, and only that spawner", () => {
+        const spawner = recordingBlock("minecraft:mob_spawner");
+
+        const dim = scrubDimension(new Map<string, RecordedBlock>([
+            ["7,40,7", spawner]
+        ]));
+
+        scrub(dim);
+
+        // Blaze spawners are a fortress block, and fortresses arrived after 1.7.3. A player has no
+        // way to place a spawner, so one in the Nether is generation the era did not have.
+        assert.deepEqual(bulkFillsFor(dim, "minecraft:mob_spawner"), [
+            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:mob_spawner"
+        ]);
+        assert.deepEqual(spawner.setTypeCalls, [], "the spawner goes by volume fill, not one write per block");
+        assert.deepEqual(spawner.permutationCalls, []);
     });
 
     it("never builds the chest fill for a chunk that holds no generated chest", () => {
@@ -557,6 +594,113 @@ describe("Chunk Scrubber - Inverse Allowlist Enforcement", () => {
             `expected fine read budget to cap reads at 1024, got ${dim.getBlockCalls}`
         );
         assert.ok(bulkFillsFor(dim, "minecraft:crafter").length > 0);
+    });
+
+    it("keeps a type this engine build cannot resolve out of the probe table", () => {
+        // A probe names a whole slice of the table at once. One id this build cannot resolve makes
+        // the query throw, a refused probe reads as "present", and the fill built for that id is
+        // refused too - which abandoned every band before a real target was reached.
+        const unregistered = new Set(["minecraft:dirt_with_roots"]);
+        const targets = buildScrubTargets(id => !unregistered.has(id));
+
+        assert.ok(
+            !targets.some(([modern]) => modern === "minecraft:dirt_with_roots"),
+            "a type the engine cannot resolve must never reach a probe or a fill filter"
+        );
+        assert.ok(
+            buildScrubTargets().some(([modern]) => modern === "minecraft:dirt_with_roots"),
+            "the table names Bedrock's id for rooted dirt, not Java's"
+        );
+        assert.ok(
+            targets.some(([modern]) => modern === "minecraft:deepslate"),
+            "a type this build does register must stay in the table"
+        );
+    });
+
+    it("returns from an inverted probe range instead of recursing on it", () => {
+        const dim = scrubDimension(new Map<string, RecordedBlock>());
+        // An engine that refuses a filtered query answers "present" to every probe, which is the
+        // state an empty target table put the sweep in: it recursed on `0..-1` until the stack gave
+        // out, and the watchdog answered that by killing the pack.
+        dim.containsBlock = () => true;
+
+        const present: number[] = [];
+        collectBulkTargets(
+            dim as any,
+            new BlockVolume({ x: 0, y: 0, z: 0 }, { x: 15, y: 127, z: 15 }) as any,
+            0,
+            -1,
+            present
+        );
+
+        assert.deepEqual(present, [], "an inverted range holds no target");
+    });
+
+    it("does not claim a chunk whose fill the engine refused", () => {
+        const dim = scrubDimension(new Map<string, RecordedBlock>([
+            ["2,64,2", recordingBlock("minecraft:andesite")]
+        ]));
+        // A chunk that is loaded but not writable answers a fill with a throw. Keeping the success
+        // mark anyway is what leaves the terrain standing for the whole re-verify window.
+        dim.fillBlocks = () => {
+            throw new Error("the location is not loaded");
+        };
+
+        assert.equal(drain(dim), false, "a refused fill leaves the chunk dirty, not clean");
+        assert.ok(
+            warnings.lines.some(line => line.includes("refusedWrites=1")),
+            `a refused write has to be reported for its chunk: ${warnings.lines.join(" | ")}`
+        );
+    });
+
+    it("does not claim a chunk that left the loaded set between bands", () => {
+        const dim = scrubDimension(new Map<string, RecordedBlock>([
+            ["2,64,2", recordingBlock("minecraft:andesite")]
+        ]));
+        dim.heightRange = { min: 0, max: 255 };
+
+        // The entry check and the first band see the chunk; the second band finds it gone, which is
+        // what a chunk at the edge of the player's loaded set does while a pass spans ticks.
+        let loads = 0;
+        dim.isChunkLoaded = () => loads++ < 2;
+
+        assert.equal(drain(dim), false, "a chunk that vanished mid-pass must stay queued");
+        assert.deepEqual(
+            bulkFillsFor(dim, "minecraft:andesite"),
+            ["fill 0 0 0 15 127 15 minecraft:stone replace minecraft:andesite"],
+            "the band that was still loaded must still be written"
+        );
+    });
+
+    it("comes back for a band the read cap cut short instead of calling the chunk clean", () => {
+        const blocks = new Map<string, RecordedBlock>();
+        for (let y = 0; y < 64; y++) {
+            for (let z = 0; z < 16; z++) {
+                for (let x = 0; x < 4; x++) {
+                    blocks.set(`${x},${y},${z}`, recordingBlock("minecraft:crafter"));
+                }
+            }
+        }
+        // Sorts after the mass, so the first pass spends its whole read window on one type and never
+        // classifies the second block standing at the far corner.
+        blocks.set("15,70,15", recordingBlock("minecraft:lightning_rod"));
+
+        const dim = scrubDimension(blocks);
+
+        assert.equal(drain(dim), false, "a band with a type left unread is not a finished chunk");
+        assert.deepEqual(bulkFillsFor(dim, "minecraft:crafter"), [
+            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:crafter"
+        ]);
+        assert.deepEqual(
+            bulkFillsFor(dim, "minecraft:lightning_rod"),
+            [],
+            "the second type stood past the read window"
+        );
+
+        assert.equal(drain(dim), true, "the retry has to finish the band the cap left half-read");
+        assert.deepEqual(bulkFillsFor(dim, "minecraft:lightning_rod"), [
+            "fill 0 0 0 15 127 15 minecraft:air replace minecraft:lightning_rod"
+        ]);
     });
 });
 

@@ -2,6 +2,40 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.12 — 2026-10-18
+
+5.12 fixes several Nether cleanup issues, corrects stuck fog, and finishes the mob shadow system.
+
+### Nether
+
+- Fixed the Nether scrubber marking chunks clean while modern blocks were still present.
+- Fixed the Nether scrubber failing when it encountered an unregistered block identifier.
+- Changed failed Nether sweeps to retry sooner instead of leaving modern blocks in place for up to two minutes.
+- Changed Nether fortress brick cleanup to replace it with air instead of wooden fences and cobblestone stairs.
+- Removed generated mob spawners from the Nether.
+
+### Fog
+
+- Fixed Nether fog remaining blue in worlds where an older build had left entries in the fog stack.
+
+### Mobs
+
+- Changed mob shadows to fade by roughly 25% per block above the ground.
+- Fixed mob shadows updating one step behind the mob.
+- Fixed mob shadows jittering while the mob was standing still.
+- Fixed shadow decals clipping into the ground and causing z-fighting.
+- Removed the engine shadow under players and the double shadow under mobs.
+- Fixed bees logging a missing nectar property once per session.
+
+### World & visuals
+
+- Fixed birch leaves rendering brighter than nearby oak leaves.
+- Removed an invalid swamp client-biome override that produced an error on world load.
+
+### Tooling
+
+- Changed the client-biome generator to delete overrides for biome identifiers that are no longer used.
+
 ## 5.11 — 2026-10-17
 
 5.11 adds mob ground shadow decals, restores Beta 1.7.3 lava damage timing, updates biome foliage tints, and fixes tool mining speeds.

@@ -120,6 +120,14 @@ describe("Beta 1.7.3 Biome Table - Overworld Remap and Appearance", () => {
                 `${shortId} is a vanilla Nether biome with no Beta override`
             );
         }
+
+        // The list above is where a Java-only spelling shows up: `swamp` is what Java calls the biome
+        // Bedrock registers as `swampland`, and a client biome keyed to it binds no server biome, so
+        // the engine reports the id on every load and the tint never applies.
+        const unknown = Object.keys(OVERWORLD_BIOME_PROFILE).filter(
+            (shortId) => !VANILLA_OVERWORLD_BIOMES.includes(shortId)
+        );
+        assert.deepEqual(unknown, [], "a remap key has to be a biome id Bedrock actually registers");
     });
 });
 

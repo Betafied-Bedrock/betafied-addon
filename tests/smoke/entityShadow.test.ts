@@ -44,10 +44,12 @@ const NO_DECAL = ["ghast"];
 
 /**
  * How far above the ground the decal is drawn. Java uses 1/64, which is close enough to the block
- * face that the decal z-fights it in Bedrock's depth buffer. Two centimetres is the clearance this
- * pack has always used, and it is a deliberate deviation.
+ * face that the decal z-fights it in Bedrock's depth buffer. It also has to clear the one error the
+ * decal cannot cancel: its offset subtracts a tick-sampled height from an emitter the client draws
+ * interpolated, so any vertical motion pushes the disc under the surface by up to a tick of it, and a
+ * two-centimetre lift leaves the top of the disc intersecting the ground and buzzing.
  */
-const SURFACE_CLEARANCE = 0.02;
+const SURFACE_CLEARANCE = 0.05;
 
 /** The eye offset a local player's decal is measured down from; for a remote player, nothing. */
 const PLAYER_EYE_HEIGHT = 1.62;
@@ -518,6 +520,20 @@ describe("Entity shadows - the decal itself", () => {
         }
     });
 
+    it("fades with the entity's height above the surface", () => {
+        // Beta draws one block's shadow at `((opacity - (height + 1) / 2) * 0.5)` (Render.java:137),
+        // which is the ground-level opacity less a quarter per block of clearance: a mob two blocks up
+        // carries half the decal it carries standing, and a long fall ends with none. The clamp is
+        // part of the curve -- a negative height would brighten the decal as the mob rose.
+        const tint = String(components(MOB_PARTICLE_FILE)["minecraft:particle_appearance_tinting"].color[3]);
+        assert.ok(
+            tint.includes(
+                `- 0.25 * math.max(query.position(1) - query.property('${GROUND_PROPERTY}'), 0)`
+            ),
+            `${MOB_PARTICLE_FILE}: the decal has to fade with the entity's height above the surface`
+        );
+    });
+
     it("places the decal without reading a variable it cannot see", () => {
         // A `pre_effect_script` variable resolves in the appearance subsection only. Read from the
         // position ones it is unknown on every frame of every decal, and evaluates to zero.
@@ -673,6 +689,21 @@ describe("Entity shadows - one emitter, forever", () => {
         const module = readFileSync(resolve(root, modulePath), "utf-8");
         assert.ok(module.includes(GROUND_PROPERTY), "the pass has to write the property the decal reads");
         assert.ok(module.includes("getBlockFromRay"), "an airborne mob's surface has to be found, not assumed");
+
+        // The decal reads the surface against the entity's own height on every frame, so a pass that
+        // lands a tick after the step leaves the decal on the old surface while the body rises -- the
+        // bounce on every step. And a write on any difference at all re-syncs the property for feet
+        // jitter a player cannot see, which is a bounce while standing still.
+        assert.ok(/INTERVAL_TICKS: 1\b/.test(module), "the surface has to be current on the tick it changes");
+        assert.ok(/PUBLISH_EPSILON/.test(module), "a write has to be a real move, not jitter");
+
+        // The player binds no decal and declares no surface, so asking them for one throws once per
+        // player per sweep. The guard is the difference between a quiet pass and a log full of
+        // `publishGround [target: minecraft:player]` warnings.
+        assert.ok(
+            /if \(entity\.typeId === "minecraft:player"\) continue;/.test(module),
+            "the sweep has to skip the player"
+        );
 
         const offenders: string[] = [];
         const walk = (directory: string): void => {

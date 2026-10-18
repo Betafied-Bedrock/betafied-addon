@@ -4,11 +4,15 @@ import { tickManager } from "../core/tickManager.js";
 import { isBetaMob } from "../policy/betaRegistry.js";
 
 const CONFIG = Object.freeze({
-    // The value only changes when the column under the entity does, so a slower pass costs a tick of
-    // lag at a ledge and nothing at all on flat ground.
-    INTERVAL_TICKS: 2,
+    // The surface changes on the tick the entity steps, and the decal reads it against the entity's
+    // own height: a pass that lands a tick late leaves the decal on the old surface while the body
+    // rises, which is the bounce a player sees on every step.
+    INTERVAL_TICKS: 1,
     RADIUS: 64,
-    MAX_FALL: 16
+    MAX_FALL: 16,
+    // Feet carry sub-millimetre jitter on a slab or a moving entity, and exact equality turns that
+    // into a fresh synced value every pass -- the same shiver, at rest. A write has to be a real move.
+    PUBLISH_EPSILON: 0.01
 });
 
 const GROUND_PROPERTY = "betarock:shadow_ground";
@@ -39,7 +43,8 @@ function publishGround(entity: Entity): void {
     }
 
     const ground = groundFor(feet.y, onGround, hitBlockY);
-    if (entity.getProperty(GROUND_PROPERTY) === ground) return;
+    const published = entity.getProperty(GROUND_PROPERTY);
+    if (typeof published === "number" && Math.abs(published - ground) < CONFIG.PUBLISH_EPSILON) return;
 
     entity.setProperty(GROUND_PROPERTY, ground);
 }
@@ -63,6 +68,9 @@ function sweep(): void {
 
         for (const entity of entities) {
             if (seen.has(entity.id) || !entity.isValid) continue;
+            // The player draws no decal and declares no surface to draw one on, so the read below
+            // throws for them on every pass -- one warning per player per sweep in the content log.
+            if (entity.typeId === "minecraft:player") continue;
             if (!isBetaMob(entity.typeId)) continue;
 
             seen.add(entity.id);

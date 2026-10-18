@@ -43,7 +43,7 @@ export const BLOCK_BULK_REPLACEMENTS: readonly [string, string][] = [
     ["minecraft:packed_mud", "minecraft:gravel"],
     ["minecraft:muddy_mangrove_roots", "minecraft:gravel"],
     ["minecraft:powder_snow", "minecraft:snow"],
-    ["minecraft:rooted_dirt", "minecraft:dirt"],
+    ["minecraft:dirt_with_roots", "minecraft:dirt"],
     ["minecraft:coarse_dirt", "minecraft:dirt"],
     ["minecraft:red_sand", "minecraft:sand"],
     ["minecraft:suspicious_sand", "minecraft:sand"],
@@ -51,7 +51,6 @@ export const BLOCK_BULK_REPLACEMENTS: readonly [string, string][] = [
 
     ["minecraft:hardened_clay", "minecraft:sandstone"],
     ["minecraft:stained_hardened_clay", "minecraft:sandstone"],
-    ["minecraft:terracotta", "minecraft:sandstone"],
     ["minecraft:red_terracotta", "minecraft:sandstone"],
     ["minecraft:orange_terracotta", "minecraft:sandstone"],
     ["minecraft:yellow_terracotta", "minecraft:sandstone"],
@@ -120,9 +119,7 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     "minecraft:sweet_berry_bush": "minecraft:air",
     "minecraft:vine": "minecraft:air",
     "minecraft:cave_vines": "minecraft:air",
-    "minecraft:cave_vines_body": "minecraft:air",
     "minecraft:cave_vines_body_with_berries": "minecraft:air",
-    "minecraft:cave_vines_head": "minecraft:air",
     "minecraft:cave_vines_head_with_berries": "minecraft:air",
     "minecraft:big_dripleaf": "minecraft:air",
     "minecraft:small_dripleaf_block": "minecraft:air",
@@ -149,13 +146,6 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     "minecraft:hanging_roots": "minecraft:air",
 
     "minecraft:leaf_litter": "minecraft:air",
-    "minecraft:oak_leaf_litter": "minecraft:air",
-    "minecraft:spruce_leaf_litter": "minecraft:air",
-    "minecraft:birch_leaf_litter": "minecraft:air",
-    "minecraft:jungle_leaf_litter": "minecraft:air",
-    "minecraft:cherry_leaf_litter": "minecraft:air",
-    "minecraft:pale_oak_leaf_litter": "minecraft:air",
-    "minecraft:dark_oak_leaf_litter": "minecraft:air",
     "minecraft:infested_deepslate": "minecraft:stone",
     "minecraft:infested_stone": "minecraft:stone",
     "minecraft:brain_coral": "minecraft:water",
@@ -172,6 +162,16 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
 
     "minecraft:basalt": "minecraft:air",
     "minecraft:polished_basalt": "minecraft:air",
+    // Nether brick arrived after 1.7.3 and the only thing that generates it is a fortress, which the
+    // era never had. Left to the suffix rules its trim came back as a wooden fence and cobblestone
+    // stairs, so the shape of a fortress stood in cleared ground.
+    "minecraft:nether_brick": "minecraft:air",
+    "minecraft:nether_brick_fence": "minecraft:air",
+    "minecraft:nether_brick_stairs": "minecraft:air",
+    "minecraft:red_nether_brick": "minecraft:air",
+    "minecraft:red_nether_brick_stairs": "minecraft:air",
+    "minecraft:chiseled_nether_bricks": "minecraft:air",
+    "minecraft:cracked_nether_bricks": "minecraft:air",
     "minecraft:blackstone": "minecraft:air",
     "minecraft:polished_blackstone": "minecraft:air",
     "minecraft:chiseled_polished_blackstone": "minecraft:air",

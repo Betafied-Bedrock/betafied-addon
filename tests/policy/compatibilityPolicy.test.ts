@@ -74,6 +74,10 @@ describe("World block replacement policy", () => {
 
         assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:basalt"], "minecraft:air");
         assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:blackstone"], "minecraft:air");
+        assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:nether_brick"], "minecraft:air");
+        assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:nether_brick_fence"], "minecraft:air");
+        assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:nether_brick_stairs"], "minecraft:air");
+        assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:red_nether_brick"], "minecraft:air");
         assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:crimson_nylium"], "minecraft:netherrack");
         assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:warped_nylium"], "minecraft:netherrack");
         assert.equal(BLOCK_FINE_REPLACEMENTS["minecraft:soul_soil"], "minecraft:soul_sand");
