@@ -1,11 +1,14 @@
 {
-  "format_version": "1.13.0",
+  "format_version": "1.21.70",
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:bee",
       "is_spawnable": false,
       "is_summonable": false,
-      "is_experimental": false
+      "is_experimental": false,
+      "properties": {
+        "minecraft:has_nectar": { "type": "bool", "client_sync": true, "default": false }
+      }
     },
     "components": {
       "minecraft:type_family": {

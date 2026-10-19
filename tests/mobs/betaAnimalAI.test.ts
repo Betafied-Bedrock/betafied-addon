@@ -75,7 +75,34 @@ describe("Beta Animal AI Generator Batching", () => {
         while (!job.next().done) {}
         assert.equal(staleAccessed, false, "stale animal handles from earlier ticks must not be accessed");
     });
+
+    it("does not re-query getAllPlayers on every animal iteration within a batch", () => {
+        const overworld = world.getDimension("minecraft:overworld") as any;
+        const player = new Player("steve");
+        player.dimension = overworld;
+        player.location = { x: 0, y: 64, z: 0 };
+        mockPlayers.push(player);
+
+        for (let i = 0; i < 5; i++) {
+            overworld.spawnEntity("minecraft:pig", { x: 0, y: 64, z: 0 });
+        }
+
+        let playerQueries = 0;
+        const originalGetAll = world.getAllPlayers.bind(world);
+        world.getAllPlayers = () => {
+            playerQueries++;
+            return originalGetAll();
+        };
+
+        const job = animalJumpJob();
+        while (!job.next().done) {}
+
+        world.getAllPlayers = originalGetAll;
+
+        assert.equal(playerQueries, 1, `expected 1 player query across the batch, got ${playerQueries}`);
+    });
 });
+
 
 /**
  * Pins the hop roll for one case: a chance-based trigger is a threshold question, so the test asserts

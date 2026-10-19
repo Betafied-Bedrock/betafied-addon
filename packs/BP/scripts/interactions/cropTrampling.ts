@@ -273,10 +273,8 @@ function pruneLandingWatch(dimension: Dimension, list: WatchedLanding[], nowTick
     list.length = kept;
 }
 
-function superviseLanding(entity: Entity, nowTick: number): void {
+function superviseLanding(entity: Entity, dimension: Dimension, location: Vector3, nowTick: number): void {
     const id = entity.id;
-    const dimension = entity.dimension;
-    const location = entity.location;
     const prior = walkers.get(id);
     const rawX = prior === undefined ? 0 : location.x - prior.lastX;
     const rawZ = prior === undefined ? 0 : location.z - prior.lastZ;
@@ -295,8 +293,9 @@ function superviseLanding(entity: Entity, nowTick: number): void {
 
     let budget = captureLanding(entity, dimension, columnX, columnZ, location.y, nowTick, CONFIG.LANDING_READ_BUDGET);
 
-    const alongX = Math.min(CONFIG.LANDING_LOOKAHEAD, Math.ceil(Math.abs(deltaX)));
-    const alongZ = Math.min(CONFIG.LANDING_LOOKAHEAD, Math.ceil(Math.abs(deltaZ)));
+    // Airborne fast movement is what crosses columns between ticks; a grounded walker does not cross in flight.
+    const alongX = entity.isOnGround ? 0 : Math.min(CONFIG.LANDING_LOOKAHEAD, Math.ceil(Math.abs(deltaX)));
+    const alongZ = entity.isOnGround ? 0 : Math.min(CONFIG.LANDING_LOOKAHEAD, Math.ceil(Math.abs(deltaZ)));
     const furthest = Math.max(alongX, alongZ);
 
     for (let ahead = 1; ahead <= furthest && budget > 0; ahead++) {
@@ -310,19 +309,20 @@ function superviseLanding(entity: Entity, nowTick: number): void {
 }
 
 function sample(entity: Entity, nowTick: number, mode?: GameMode): void {
+    const dimension = entity.dimension;
+    const location = entity.location;
     runCatching({ system: "cropTrampling", operation: "landingGuard", target: entity.id }, () =>
-        superviseLanding(entity, nowTick)
+        superviseLanding(entity, dimension, location, nowTick)
     );
     runCatching({ system: "cropTrampling", operation: "walkRule", target: entity.id }, () =>
-        walkRule(entity, nowTick, mode)
+        walkRule(entity, dimension, location, nowTick, mode)
     );
 }
 
-function walkRule(entity: Entity, nowTick: number, mode?: GameMode): void {
+function walkRule(entity: Entity, dimension: Dimension, location: Vector3, nowTick: number, mode?: GameMode): void {
     if (!eraRulesApply(mode)) return;
 
     const id = entity.id;
-    const location = entity.location;
     const prior = walkers.get(id);
     const state: WalkState = prior ?? {
         lastX: location.x,
@@ -360,11 +360,11 @@ function walkRule(entity: Entity, nowTick: number, mode?: GameMode): void {
     );
     if (riding !== undefined) return;
 
-    const target = resolveTrampleTarget(entity.dimension, walked);
+    const target = resolveTrampleTarget(dimension, walked);
 
     if (target !== undefined && Math.floor(Math.random() * CONFIG.TRAMPLE_ROLL) === 0) {
         forgetLandingsAt(walked);
-        breakCrop(entity.dimension, walked);
+        breakCrop(dimension, walked);
         target.setType(DIRT_ID);
     }
 }

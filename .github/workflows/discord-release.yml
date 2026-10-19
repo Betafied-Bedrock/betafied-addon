@@ -33,7 +33,7 @@ jobs:
     steps:
       # Pinned to the default branch rather than the released tag: a release event otherwise checks
       # out the tag, whose older copy of the script would post a payload the hourly refresh cannot
-      # keep in step with. The changelog embed images come from here for the same reason.
+      # keep in step with.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -45,6 +45,8 @@ jobs:
         name: Post the release notes to the changelog channel
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          CHANGELOG_BANNER_URL: https://cdn.discordapp.com/attachments/1558734093167099976/1560915627206508614/changelog-bf.png?ex=6ad47375&is=6ad321f5&hm=f48974665d6aa3bc6d78dc4a03a3df02b8e17503369e97192940e7f8c6d38d0&
+          CHANGELOG_DIVIDER_URL: https://cdn.discordapp.com/attachments/1558734093167099976/1560910583488978965/divider3.png?ex=6ad46ec3&is=6ad31d43&hm=e547ef24bcc0c666ac17bbe9cec2206c2773c8a5f924a98e3ab66af67fc26a72&
         run: |
           set -euo pipefail
           if [ -z "${CHANGELOG_WEBHOOK}" ]; then
@@ -56,25 +58,24 @@ jobs:
           jq '{
             content: null,
             embeds: [
-              { color: null, image: { url: "attachment://changelog.png" } },
+              { color: null, image: { url: env.CHANGELOG_BANNER_URL } },
               {
                 title: ("Betafied - " + .tag_name),
                 description: ((((.body // "") | gsub("\r\n"; "\n")) | sub("[[:space:]]+$"; "")) + "\n\n## [DOWNLOAD](" + .html_url + ")"),
                 color: null,
-                image: { url: "attachment://divider.png" }
+                image: { url: env.CHANGELOG_DIVIDER_URL }
               }
-            ],
-            attachments: []
+            ]
           }' release.json > payload.json
 
-          # The embed images are uploaded with the message rather than linked, so the announcement
-          # never depends on an expiring Discord CDN URL. `payload_json=<file` sends the file's
-          # *contents* as a form field; `@file` sends it as an uploaded file part, which Discord
-          # files away as an attachment and renders no embeds.
+          # The artwork is referenced by URL, as the release post's is: nothing is uploaded with the
+          # message, so the embeds carry no `attachment://` reference for a file to satisfy. Discord
+          # re-signs its own attachment links when a client renders the message, so the `ex`/`is`/`hm`
+          # signature these URLs were copied with expiring does not blank the image in Discord — it
+          # only makes the URL unusable from outside it.
           curl --fail-with-body --silent --show-error \
-            --form "payload_json=<payload.json" \
-            --form "files[0]=@assets/discord/changelog.png;type=image/png" \
-            --form "files[1]=@assets/discord/divider.png;type=image/png" \
+            --header "content-type: application/json" \
+            --data-binary @payload.json \
             "${CHANGELOG_WEBHOOK}"
 
       # The release post is built and published by the statistics tooling, which also refreshes it

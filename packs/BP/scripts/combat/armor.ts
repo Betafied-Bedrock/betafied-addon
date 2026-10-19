@@ -183,9 +183,9 @@ export function updatePlayerArmorDisplay(player: Player, force = false): void {
     const last = lastSentArmorPoints.get(player.id);
 
     if (force || last === undefined || last !== current) {
-        lastSentArmorPoints.set(player.id, current);
         runCatching({ system: "armor", operation: "updateDisplay", target: player.id }, () => {
             player.runCommand(`titleraw @s title {"rawtext":[{"text":"_a${current}"}]}`);
+            lastSentArmorPoints.set(player.id, current);
         });
     }
 }
@@ -244,6 +244,13 @@ eventBus.onEntityHurtBefore((ev) => {
 
 eventBus.onPlayerSpawn((ev) => {
     if (ev.player) {
+        updatePlayerArmorDisplay(ev.player, true);
+    }
+});
+
+eventBus.onPlayerDimensionChange((ev) => {
+    if (ev.player) {
+        lastSentArmorPoints.delete(ev.player.id);
         updatePlayerArmorDisplay(ev.player, true);
     }
 });

@@ -5,6 +5,9 @@
       "identifier": "minecraft:ice_plains"
     },
     "components": {
+      "minecraft:fog_appearance": {
+        "fog_identifier": "classic_water:default_fog"
+      },
       "minecraft:grass_appearance": {
         "color": "#97BE4B"
       },

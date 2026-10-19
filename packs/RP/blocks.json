@@ -394,7 +394,7 @@
         "textures": "birch_sign"
     },
     "birch_leaves": {
-        "ambient_occlusion_exponent": 0.25,
+        "ambient_occlusion_exponent": 0.5,
         "carried_textures": "oak_leaves_carried",
         "isotropic": false,
         "sound": "grass",

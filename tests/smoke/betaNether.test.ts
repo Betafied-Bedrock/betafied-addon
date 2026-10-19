@@ -91,6 +91,19 @@ describe("Beta 1.7.3 Nether Contract", () => {
         assert.equal(fog.distance.air.fog_color.toLowerCase(), "#330808", "Beta's hardcoded Nether colour, 0.2/0.03/0.03");
     });
 
+    it("opens the Nether's fog at the camera, as the era's own provider did", () => {
+        // WorldProviderHell set `foggy`, which pulled GL_FOG_START to zero and left the end at the full
+        // render distance. The `render` pair keeps both ends proportional to the player's own render
+        // distance the way the era's `farPlaneDistance` was, which vanilla's fixed 10/96 does not.
+        const fog = JSON.parse(
+            readFileSync(resolve(root, "packs/RP/fogs/hell_fog_setting.json"), "utf-8")
+        )["minecraft:fog_settings"];
+
+        assert.equal(fog.distance.air.render_distance_type, "render", "the era's fog scaled with the render distance");
+        assert.equal(fog.distance.air.fog_start, 0, "the era's foggy provider started the fog at the camera");
+        assert.equal(fog.distance.air.fog_end, 1, "and ended it at the cull radius, not before it");
+    });
+
     it("blanks every Nether ambient loop in the pack's own sound definitions", () => {
         // The client biome files omit `minecraft:ambient_sounds`, which only silences the loops when
         // the engine replaces the vanilla component rather than merging into it. A definition whose

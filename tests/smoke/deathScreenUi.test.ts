@@ -85,6 +85,11 @@ describe("Beta death screen - resource pack contract", () => {
 
         const death = root.controls.find((control: any) => "death_screen@bfui-death_screen.root_panel" in control);
         assert.ok(death, "the death screen tree lives in the router");
+        assert.equal(
+            death["death_screen@bfui-death_screen.root_panel"].visible,
+            false,
+            "declared hidden, so a binding that has not run yet cannot draw the era's tree"
+        );
         assert.deepEqual(death["death_screen@bfui-death_screen.root_panel"].bindings, [
             {
                 binding_type: "view",
@@ -116,6 +121,11 @@ describe("Beta death screen - resource pack contract", () => {
         assert.deepEqual(names, ["death_underlay"]);
 
         const deathUnderlay = underlay.controls[0].death_underlay;
+        assert.equal(
+            deathUnderlay.visible,
+            false,
+            "the wash is off until the title read says otherwise, or every form on the screen wears it"
+        );
         assert.deepEqual(deathUnderlay.bindings, [
             {
                 binding_type: "view",

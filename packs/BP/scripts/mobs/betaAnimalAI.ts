@@ -236,16 +236,17 @@ function tryAnimalHop(entity: Entity, dimension: Dimension, currentTick: number)
 }
 
 export function* animalJumpJob(): Generator<void, void, unknown> {
-    const playerIds = world.getAllPlayers().map(p => p.id);
-    if (playerIds.length === 0) return;
+    const players = world.getAllPlayers();
+    if (players.length === 0) return;
 
     const currentTick = tickManager.getCurrentTick();
     const processedIds = new Set<string>();
     let evaluated = 0;
 
-    for (const playerId of playerIds) {
-        const player = world.getAllPlayers().find(p => p.id === playerId);
-        if (!player || !player.isValid) continue;
+    for (const initialPlayer of players) {
+        if (!initialPlayer || !initialPlayer.isValid) continue;
+        const playerId = initialPlayer.id;
+        let player: Player | undefined = initialPlayer;
 
         let animalIds: string[];
         try {
@@ -264,8 +265,7 @@ export function* animalJumpJob(): Generator<void, void, unknown> {
         }
 
         for (const animalId of animalIds) {
-            const currentPlayer = world.getAllPlayers().find(p => p.id === playerId);
-            if (!currentPlayer || !currentPlayer.isValid) break;
+            if (!player || !player.isValid) break;
 
             const entity = world.getEntity(animalId);
             if (!entity || !entity.isValid) continue;
@@ -273,7 +273,7 @@ export function* animalJumpJob(): Generator<void, void, unknown> {
             processedIds.add(entity.id);
 
             try {
-                tryAnimalHop(entity, currentPlayer.dimension, currentTick);
+                tryAnimalHop(entity, player.dimension, currentTick);
             } catch (e) {
                 reportError({
                     system: "betaAnimalAI",
@@ -285,6 +285,7 @@ export function* animalJumpJob(): Generator<void, void, unknown> {
             evaluated++;
             if (evaluated % CONFIG.ANIMALS_PER_TICK === 0) {
                 yield;
+                player = world.getAllPlayers().find(p => p.id === playerId);
             }
         }
     }

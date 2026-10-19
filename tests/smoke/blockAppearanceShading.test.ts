@@ -192,6 +192,22 @@ describe("Block Appearance & Shading Contract", () => {
                 `leaves_${type}.tga must leave transparent gaps for the Fast tile to fill`
             );
 
+            // The era's own Fancy tile keeps #000000 under its holes because nothing ever showed that
+            // colour there; Bedrock does not grant the art that luxury. `alpha_test_to_opaque` -- the
+            // render method the engine gives leaves, "used for a block like the leaves" -- drops the
+            // alpha test at distance, so a black hole is a black gap, and black is also what the mip
+            // levels bleed into the leaf pixels around it. Beta never rendered tile (4,3) that way: its
+            // fast sprite, (5,3) and (5,8) for pine, is this same drawing with every hole painted one
+            // flat tone, and that tone is what has to sit under the alpha here.
+            const offTone = fancy.pixels.filter(
+                (pixel) => pixel[3] === 0 && (pixel[0] !== fill[0] || pixel[1] !== fill[1] || pixel[2] !== fill[2])
+            );
+            assert.equal(
+                offTone.length,
+                0,
+                `leaves_${type}.tga: ${offTone.length} of ${fancy.pixels.filter((p) => p[3] === 0).length} holes carry a tone that shows the moment the engine drops the alpha test; the era's Fast sprite paints them all ${fill.slice(0, 3).join(",")}`
+            );
+
             const fast = decodePng(`packs/RP/textures/blocks/leaves_${type}_opaque.png`);
             assert.deepEqual([fast.width, fast.height], [fancy.width, fancy.height], `${type}: the two tiles must be the same size`);
 
@@ -225,6 +241,20 @@ describe("Block Appearance & Shading Contract", () => {
                 assert.equal(block.brightness_gamma, undefined, `${id} must not carry legacy brightness_gamma`);
             }
         }
+    });
+
+    it("carries a darker AO exponent on birch leaves than the rest of the leaf family", () => {
+        // The engine tints birch leaves on its own path (`birch_foliage`, which ignores
+        // `minecraft:foliage_appearance`), and that path renders them brighter than the oak leaves
+        // beside them at the same AO. The exponent is the one per-block brightness value the
+        // renderer still honours, so the compensation lives here rather than in the tint.
+        const block = readJson("packs/RP/blocks.json").birch_leaves;
+        assert.ok(block, "missing block definition for birch_leaves");
+        assert.equal(
+            block.ambient_occlusion_exponent,
+            0.5,
+            "birch_leaves must stay darker than the 0.25 the other leaves use"
+        );
     });
 
     it("bakes Beta directional face dimming onto the leaf faces", () => {

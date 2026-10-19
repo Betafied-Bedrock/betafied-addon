@@ -13,7 +13,13 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { NETHER_BIOME_IDS, OVERWORLD_BIOME_IDS, OVERWORLD_BIOME_PROFILE, biomeIdentifier } from "./lib/betaBiomes.mjs";
+import {
+    NETHER_BIOME_IDS,
+    OVERWORLD_BIOME_IDS,
+    OVERWORLD_BIOME_PROFILE,
+    RETIRED_BIOME_IDENTIFIERS,
+    biomeIdentifier
+} from "./lib/betaBiomes.mjs";
 import { buildClientBiome, buildNetherClientBiome } from "./lib/betaBiomeTints.mjs";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -26,6 +32,7 @@ const planned = Object.freeze([
 ]);
 
 const managed = new Set(planned.map(([shortId]) => biomeIdentifier(shortId)));
+const retired = new Set(RETIRED_BIOME_IDENTIFIERS);
 const problems = [];
 
 function readIdentifier(path) {
@@ -41,7 +48,7 @@ if (existsSync(biomesDir)) {
         const path = resolve(biomesDir, file);
         const identifier = readIdentifier(path);
 
-        if (identifier && managed.has(identifier) && !check) {
+        if (identifier && (managed.has(identifier) || retired.has(identifier)) && !check) {
             rmSync(path);
         }
     }

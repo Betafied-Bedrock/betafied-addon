@@ -60,7 +60,7 @@ export class TickManager {
     }
 
     getCurrentTick(): number {
-        return this.currentTick;
+        return this.currentTick || system.currentTick || 0;
     }
 
     getRegisteredTaskIds(): string[] {

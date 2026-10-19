@@ -372,4 +372,23 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
             }
         });
     });
+
+    describe("Hot-path performance discipline", () => {
+        it("bypasses getComponent(Enchantable) for items that cannot hold enchantments", () => {
+            const dirt = new ItemStack("minecraft:dirt", 64);
+            let componentQueried = false;
+            const originalGetComponent = dirt.getComponent.bind(dirt);
+            dirt.getComponent = (typeId: any) => {
+                if (typeId === ItemComponentTypes.Enchantable) {
+                    componentQueried = true;
+                }
+                return originalGetComponent(typeId);
+            };
+
+            const action = evaluateItemAction(dirt);
+            assert.equal(action.type, "keep");
+            assert.equal(componentQueried, false, "dirt is not enchantable; probing getComponent wastes an engine call");
+        });
+    });
 });
+

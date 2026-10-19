@@ -121,7 +121,6 @@ export const OVERWORLD_BIOME_PROFILE = Object.freeze({
     grove: "forest",
 
     // Swampland
-    swamp: "swampland",
     swampland: "swampland",
     swampland_mutated: "swampland",
     mangrove_swamp: "swampland",
@@ -247,8 +246,10 @@ export const UNMANAGED_BIOME_IDENTIFIERS = Object.freeze(["minecraft:the_end"]);
 
 /**
  * Identifiers this table used to emit and must now delete, so a corrected id never leaves the
- * superceded override behind as a stray file.
+ * superceded override behind as a stray file. `minecraft:swamp` is Java's spelling: Bedrock's swamp
+ * is `minecraft:swampland`, so a client biome keyed to the Java id had no server biome to bind to
+ * and the engine reported it on every load.
  */
-export const RETIRED_BIOME_IDENTIFIERS = Object.freeze(["minecraft:nether_wastes"]);
+export const RETIRED_BIOME_IDENTIFIERS = Object.freeze(["minecraft:nether_wastes", "minecraft:swamp"]);
 
 export const OVERWORLD_BIOME_IDS = Object.freeze(Object.keys(OVERWORLD_BIOME_PROFILE));

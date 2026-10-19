@@ -2,14 +2,77 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.12 — 2026-10-18
+
+5.12 fixes several Nether cleanup issues, corrects stuck fog, and finishes the mob shadow system.
+
+### Nether
+
+- Fixed the Nether scrubber marking chunks clean while modern blocks were still present.
+- Fixed the Nether scrubber failing when it encountered an unregistered block identifier.
+- Changed failed Nether sweeps to retry sooner instead of leaving modern blocks in place for up to two minutes.
+- Changed Nether fortress brick cleanup to replace it with air instead of wooden fences and cobblestone stairs.
+- Removed generated mob spawners from the Nether.
+
+### Fog
+
+- Fixed Nether fog remaining blue in worlds where an older build had left entries in the fog stack.
+
+### Mobs
+
+- Changed mob shadows to fade by roughly 25% per block above the ground.
+- Fixed mob shadows updating one step behind the mob.
+- Fixed mob shadows jittering while the mob was standing still.
+- Fixed shadow decals clipping into the ground and causing z-fighting.
+- Removed the engine shadow under players and the double shadow under mobs.
+- Fixed bees logging a missing nectar property once per session.
+
+### World & visuals
+
+- Fixed birch leaves rendering brighter than nearby oak leaves.
+- Removed an invalid swamp client-biome override that produced an error on world load.
+
+### Tooling
+
+- Changed the client-biome generator to delete overrides for biome identifiers that are no longer used.
+
+## 5.11 — 2026-10-17
+
+5.11 adds mob ground shadow decals, restores Beta 1.7.3 lava damage timing, updates biome foliage tints, and fixes tool mining speeds.
+
+### Mobs
+
+- Added authentic circular ground shadow decals beneath Beta mobs.
+- Optimized animal hop AI sweeps to evaluate players and mobs across tick slices.
+
+### Lava
+
+- Changed lava damage to deal 4 damage every 10 ticks while submerged.
+- Added a 15-second fire duration when submerged in lava.
+- Added debounce to prevent double damage when native lava damage ticks.
+
+### Mining
+
+- Added mining fatigue when breaking redstone ore with a pickaxe.
+- Added haste when breaking cobwebs and bamboo with swords.
+
+### World & visuals
+
+- Updated all client biome foliage and grass colors to match Beta colormaps.
+- Adjusted Overworld and Nether fog start and end distances.
+- Fixed death screen overlay flashing on uninitialized forms.
+
+### Tooling
+
+- Added scripts/analyze-profile.mjs to parse BDS CPU profiles.
+
 ## 5.10.1 — 2026-10-16
 
 5.10.1 fixes the Nether wearing the Overworld's blue fog.
 
 ### Nether
 
-- Fixed the Nether's red fog losing to the Overworld's blue one: a fog pushed with `/fog` outranks the fog a biome names, and the Overworld's entry was left on the stack after a portal crossing.
-- Changed the classic fog sweep to push the era's fog for the dimension the player is in (`classic_water:default_fog` in the Overworld, `mgg:fog_hell` in the Nether), clearing that stack entry with `fog @s remove` first.
+- Fixed the Nether's fog staying the Overworld's blue one after a portal crossing.
 
 ## 5.10 — 2026-10-16
 
@@ -17,83 +80,82 @@ Notable changes in each Betafied release. Version numbers match the behavior and
 
 ### Nether
 
-- Fixed lit Nether portals breaking with their obsidian frames still standing: portal, fire and farmland were read as modern terrain and erased by the sweep.
-- Added client biome files for the five Nether biomes, so each carries Beta's one fog and none of the Nether Update's ash, spores or music.
-- Blanked the Nether's biome ambience in the pack's sound definitions, leaving the era's own cave sounds.
-- Changed the sweep's ring from one chunk to two, so a ruined portal's loot chest goes with the portal rather than waiting to be found.
-- Removed the loot chests generated structures leave in the Nether.
-- Changed the fine pass to write one whole block type per band instead of a block at a time, cutting the world reads and writes a swept chunk costs.
+- Fixed lit Nether portals breaking with their obsidian frames still standing.
+- Changed the Nether's biomes to wear Beta's red fog, with none of the Nether Update's ash or spores.
+- Removed the Nether Update's ambience and music, leaving the era's cave sounds.
+- Removed the loot chests a ruined portal leaves in the Nether.
+- Changed the Nether sweep to write whole block types instead of one block at a time.
 
 ### Blocks
 
-- Fixed dead bushes, cobwebs, monster spawners, repeaters and stone slabs dropping nothing, because the drop boundary did not know the legacy Bedrock spellings the sweep preserves.
-- Fixed the Fast-graphics leaf tiles filling their cut-outs with black instead of the era's flat leaf tone, which read as black gaps in the canopy.
+- Fixed dead bushes, cobwebs, monster spawners, repeaters and stone slabs dropping nothing.
+- Fixed fast-graphics leaf tiles filling their cut-outs with black instead of the era's flat leaf tone.
 
 ### Appearance
 
-- Removed the masking that hid post-Beta blocks: 105 atlas tiles and 16 block definitions resolve to their real art again.
-- Changed the two fire flipbook entries to animate the fire tiles they are named for, instead of painting vanilla's fire frames onto soul fire.
+- Removed the masking that made post-Beta blocks draw nothing.
+- Fixed the fire animation painting vanilla's fire frames onto soul fire.
 
 ### Mobs
 
-- Changed zombie pigmen to drop up to two cooked porkchops, the count Beta's own drop rule rolled.
-- Removed the wolf's modern coat variants, leaving the era's one skin set.
+- Changed zombie pigmen to drop up to two cooked porkchops.
+- Removed the wolf's modern coat variants.
 
 ### Building
 
-- Fixed the build ceiling refusing clicks it does not own, which blocked cake, slabs, chests and bonemeal at height.
+- Fixed the build ceiling blocking cake, slabs, chests and bonemeal at height.
 
 ## 5.9.2 — 2026-10-15
 
-5.9.2 fixes boats breaking against any shore they came near, and the sugar cane, sugar and paper the pack was destroying or failing to craft. It also makes the packaged world template import again.
+5.9.2 fixes boats breaking against any shore they came near, restores sugar cane, sugar and paper, and makes the world template import again.
 
 ### Boats
 
-- Fixed boats breaking whenever a solid block stood beside them, which destroyed boats moored at a dock, resting on a shore and drifting in a stream.
-- Changed the break to the era's own condition: a boat is destroyed by a blocked move above 0.15 blocks a tick, as `EntityBoat.onUpdate` did.
-- Changed the collision read to skip liquids, so flowing water no longer counts as a bank.
-- Changed the boat sweep from every 10 ticks to every 2, so a ramming boat is still moving when the pass sees it.
+- Fixed boats breaking whenever a block stood beside them.
+- Changed the break to the era's condition, a blocked move above 0.15 blocks a tick.
+- Changed the boat check to ignore flowing water.
+- Changed the boat check from every 10 ticks to every 2.
 
 ### Sugar cane
 
-- Fixed broken sugar cane dropping nothing, because the cane was renamed to the reed block's id, which is not an item.
-- Fixed a conversion the game refuses destroying the drop it was meant to convert.
-- Changed the sugar and paper recipes to name the cane item, so both craft again.
-- Kept stacks of `minecraft:reeds` as they are, since the game still ships that block.
+- Fixed broken sugar cane dropping nothing.
+- Fixed a conversion the game refuses destroying the drop it was converting.
+- Changed the sugar and paper recipes to name the cane item.
+- Kept stacks of `minecraft:reeds` as they are.
 
 ### World template
 
-- Fixed the packaged world template being refused on import because its manifest carried no `base_game_version`.
-- Changed the template's base game version to come from the behavior pack being shipped, so a world never loads against older vanilla data than the packs were built for.
+- Fixed the world template being refused on import.
+- Changed the template's base game version to come from the behavior pack being shipped.
 
 ### Tooling
 
-- Fixed each release posting a second Discord release post, instead of relabelling the one the mod already has.
-- Added the release notes to the changelog channel, posted ahead of the release post.
+- Fixed each release posting a second Discord release post.
+- Added the release notes to the Discord changelog channel.
 
 ## 5.9.1 — 2026-10-15
 
-5.9.1 removes the chunk scrubber and the biome and feature overrides for the Overworld, which the world template now supplies. It adds the Discord statistics card and hardens the world template packaging.
+5.9.1 removes the Overworld chunk sweep, its biome and feature overrides, and adds the Discord statistics card.
 
 ### Terrain
 
-- Removed the Overworld chunk scrubber, leaving the Nether sweep and the Nether ice mechanics as they were.
-- Removed the ragged bedrock floor at Y=0 and the fallen-log sweep that ran beside it.
-- Removed the 84 Overworld biome definitions, so biome tags, ore spread and decoration come from the game.
-- Removed the 53 feature overrides and 20 feature rules that suppressed modern decoration and retuned Beta's ore spread, so dungeons, monster rooms, emerald and copper generate again.
-- Kept Beta's grass, foliage and sky colours, which the client biomes and colormaps carry without a biome definition.
+- Removed the Overworld chunk sweep, keeping the Nether's.
+- Removed the ragged bedrock floor at Y=0 and the fallen-log sweep.
+- Removed the 84 Overworld biome definitions.
+- Removed the 53 feature overrides and 20 feature rules that suppressed modern decoration.
+- Kept Beta's grass, foliage and sky colours.
 
 ### Tooling
 
-- Added a Discord statistics card with all-time downloads, downloads in the past 24 hours and page views for the last 30 days, refreshed hourly.
-- Changed the release post to carry the standing download total beside its download button, and to be edited in place instead of re-posted.
-- Added `npm run stats` to publish or preview both messages by hand.
-- Changed the release workflow to publish its post through the statistics tooling, so one builder owns the button and the total.
+- Added a Discord statistics card with downloads and page views.
+- Changed the release post to carry the download total and to be edited in place.
+- Added `npm run stats` to publish both messages by hand.
+- Changed the release workflow to publish its post through the statistics tooling.
 
 ### Releases
 
-- Fixed world template packaging shipping a manifest the game will not list, by writing `lock_template_options` and checking the manifest before the template is packed.
-- Changed the world icon to come from `assets/world_icon.jpeg` rather than the copy the last play session left in the template folder.
+- Fixed world template packaging shipping a manifest the game will not list.
+- Changed the world icon to come from the pack's own file.
 
 ## 5.9 — 2026-10-15
 
@@ -128,24 +190,24 @@ Notable changes in each Betafied release. Version numbers match the behavior and
 
 ### Respawn
 
-- Fixed players without a bed being stuck in a slowly voiding world with no possibility of return.
-- Added a world spawn recorded on the world's first join, where a player without a bed or respawn anchor now respawns.
-- Changed a join position the dimension cannot hold to never become that world spawn.
+- Fixed players without a bed being stuck in a voiding world.
+- Added a world spawn recorded on the world's first join, where a bed-less player now respawns.
+- Changed a join position the dimension cannot hold to never become the world spawn.
 - Changed a respawn with no bed and no recorded world spawn to leave the player where they died.
 
 ### Signs
 
-- Fixed clicks on standing and wall signs being swallowed, which left signs nobody could write on.
-- Changed the top face to place the standing sign turned to the placing player's rotation, as Beta's `ItemSign` did.
-- Fixed a sign placed against a block being written twice, once by the pack and once by the item's own placer.
+- Fixed clicks on standing and wall signs being swallowed.
+- Changed standing signs to face the placing player's rotation, as Beta did.
+- Fixed a sign placed against a block being written twice.
 
 ### Blocks
 
-- Fixed an extended piston losing its head when a chunk loaded, which left a broken piston behind.
+- Fixed an extended piston losing its head when a chunk loaded.
 
 ### Tooling
 
-- Fixed the test mock answering a resolved world spawn, which kept the death loop passing offline.
+- Fixed the test mock answering a resolved world spawn.
 
 ## 5.7 — 2026-10-13
 

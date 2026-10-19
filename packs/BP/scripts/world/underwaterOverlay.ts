@@ -1,8 +1,9 @@
 import { world } from "@minecraft/server";
-import type { Player } from "@minecraft/server";
+import type { Player, Vector3 } from "@minecraft/server";
 import { tickManager } from "../core/tickManager.js";
 import { eventBus } from "../core/eventBus.js";
 import { runCatching, reportError } from "../core/errorReporter.js";
+import { OVERWORLD_ID, NETHER_ID } from "../policy/betaConstants.js";
 
 // Sentinel recognized by packs/RP/ui/hud_screen.json to drive the Beta water tint.
 export const UNDERWATER_SENTINEL = "_w";
@@ -11,9 +12,16 @@ export const UNDERWATER_SENTINEL = "_w";
 export const CLEAR_SENTINEL = "_w0";
 
 const CONFIG = Object.freeze({
-    CHECK_INTERVAL: 1,
+    CHECK_INTERVAL: 2,
     REFRESH_INTERVAL: 5
 });
+
+const STATIC_HEIGHT_RANGES: Readonly<Record<string, { min: number; max: number }>> = Object.freeze({
+    [OVERWORLD_ID]: { min: -64, max: 320 },
+    [NETHER_ID]: { min: 0, max: 256 }
+});
+
+const SCRATCH_BLOCK_POS: Vector3 = { x: 0, y: 0, z: 0 };
 
 const tintedPlayers = new Set<string>();
 
@@ -21,17 +29,18 @@ let ticksSinceRefresh = 0;
 
 export function isHeadSubmerged(player: Player): boolean {
     const head = player.getHeadLocation();
-    const { min, max } = player.dimension.heightRange;
+    const dimension = player.dimension;
+    const range = STATIC_HEIGHT_RANGES[dimension.id] ?? dimension.heightRange;
 
-    if (head.y < min || head.y >= max) {
+    if (head.y < range.min || head.y >= range.max) {
         return false;
     }
 
-    const block = player.dimension.getBlock({
-        x: Math.floor(head.x),
-        y: Math.floor(head.y),
-        z: Math.floor(head.z)
-    });
+    SCRATCH_BLOCK_POS.x = Math.floor(head.x);
+    SCRATCH_BLOCK_POS.y = Math.floor(head.y);
+    SCRATCH_BLOCK_POS.z = Math.floor(head.z);
+
+    const block = dimension.getBlock(SCRATCH_BLOCK_POS);
 
     return block !== undefined && block.isLiquid && block.typeId.includes("water");
 }
