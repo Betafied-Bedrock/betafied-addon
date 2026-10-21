@@ -47,6 +47,14 @@ had no stone bricks), while the deleted table claimed `stone_bricks → minecraf
 kept the removal, since the scrubber's job is to erase blocks the era never had. Worth confirming
 that deleting a player's stone bricks is the intent rather than converting them to stone.
 
+Decided for the appearance half: the block id and its scrubber removal stand, and the Overworld's
+stone bricks are made to read as the era's material by texture instead. `blocks.json` points every
+stone-brick block — plain, cracked, chiseled, mossy, and each one's stairs, slab and wall — at the
+`cobblestone` shortname (mossy at `cobblestone_mossy`), and `packed_ice` / `blue_ice` at `ice`, all
+of which the pack ships its own art for. That covers the pre-generated Overworld, which the
+Nether-only sweep never reaches; a stone brick the Nether sweep does find is still deleted, and the
+question above still stands for that half.
+
 ## 3. Resolved: `raw_copper` lands on cobblestone on both paths
 
 The ore-drop special case used to send `normalizeEntityDrop("minecraft:raw_copper")` to
@@ -244,6 +252,12 @@ faces and leaves wall signs with no editor UI (which no script API can open in i
 vanilla items back, fluid handling and sign placement are both the engine's own, and the era's cap is
 the sweep's to keep instead of an item JSON's: `BETA_CAPPED_VANILLA_IDS` holds `minecraft:bucket` and
 `minecraft:oak_sign`, and `inventoryManager.ts` splits a stack of them one per slot in player inventories.
+
+That split only runs when every piece has a free slot to land in. Dropping the spill at the player's
+feet does not unstack it: the engine's own limit for these ids is still sixteen, so it merges the drop
+straight back into the slot the sweep just capped and the next sweep evicts it again, which is the
+report of a crafted sign stuck trying to enter a full inventory. With no room for the whole stack, it
+stays in its slot until one frees, and a full inventory is the transient the era's cap pays for.
 
 Still open, all of it engine-dependent and needing an in-game look:
 
@@ -1148,6 +1162,32 @@ kelp — as vanilla art, in a world that is otherwise the era's. Hiding them aga
 **in the world**, which for the Overworld is generation or a wider sweep, never a masked tile. Both
 halves need an in-game look: the atlas cannot be compiled offline, so no test here can show that a
 restored tile actually draws.
+
+## 29. The sword's break runs on a script clock, and the block pays through a command
+
+The sword used to be a `haste` effect applied while a player looked at a wood-class block. The effect
+is a uniform multiplier on everything mined inside its ten-tick window, so it also sped up blocks the
+sword was never meant to touch, and its real time never matched the era's. `ItemSword.func_79_a`
+answers **15** against the web and **1.5** against everything else, and a break takes
+`hardness * 30 / speed` ticks — 8 for the web, 4 for leaves, 16 for wool, 20 for a pumpkin and 40 for
+planks or the oak stairs. Those numbers now live in `SWORD_MINING_TICKS` in `betaRegistry`, and the
+key set is the whole of the pack's sword bonus.
+
+The clock itself is simulated. `playerStartBreakingBlock` and `playerCancelBreakingBlock` exist in
+the pinned module, but the only progress they expose is `breakProgress` on a cancel, so
+`swordMining.ts` (the bottom of `interactions/toolMining.ts`) counts the ticks a block has spent
+under the sword and re-checks the raycast each one: release, a look away, a tool change or a changed
+cell drops the swing and starts the next one from zero, which is what the era did.
+
+The forced break rides `/setblock <x> <y> <z> air destroy`, which is one of the two cases the corpus
+names as having no script equivalent (`reference-docs/bedrock-wiki/docs/scripting/script-server.md`):
+the API can place a block but cannot destroy one and pay its loot table, and spawning the drop from a
+private table would duplicate every loot rule the block already declares. `minecraft:web` is in the
+table beside `minecraft:cobweb` for the same reason the registry carries both spellings elsewhere.
+
+**Still open, and needs an in-game look:** that the start and cancel events fire on every input mode;
+that the engine's own break cannot land after ours and pay a second drop; and whether a block popping
+at the era's tick, while the client's crack overlay is only part-way, reads acceptably.
 
 ## Why this file exists
 

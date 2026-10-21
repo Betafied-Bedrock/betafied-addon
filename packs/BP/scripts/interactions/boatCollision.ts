@@ -6,22 +6,15 @@ import { OVERWORLD_KEY } from "../policy/betaConstants.js";
 import { normalizeXZ, scale } from "../core/vectorMath.js";
 
 const CONFIG = Object.freeze({
-    // Beta read the boat's motion at the tick its move was blocked, so a shore it rammed was only ever
-    // seen from the tick before the stop. The pass therefore has to be short enough to catch the boat
-    // still travelling within the block it is about to hit: at the era's 0.4 blocks a tick, two ticks
-    // is 0.8, and the four cells this reads reach two blocks out.
+    // Short enough to catch the boat still moving at the block it is about to hit; four cells reach two blocks out.
     TICK_INTERVAL: 4,
     BOATS_PER_TICK: 10,
-    // `EntityBoat.onUpdate` destroyed a boat only when the move itself was blocked at speed:
-    // `isCollidedHorizontally && var6 > 0.15D`, var6 being sqrt(motionX^2 + motionZ^2) in blocks a tick
-    // and read before that tick's decay. Contact below it decayed the motion and left the boat alone.
+    // EntityBoat.onUpdate: destroyed only when a blocked move's horizontal speed exceeded 0.15 blocks/tick.
     BREAK_SPEED: 0.15,
     NON_SOLID_WHITELIST: Object.freeze(["minecraft:air", "minecraft:water", "minecraft:soul_sand"])
 });
 
-// The era's condition is a horizontal collision with a solid block's box, so nothing a boat can travel
-// through may read as shoreline. `flowing_water` is its own block id on this engine and is what a
-// stream's surface cell carries, so a stream was breaking boats outright.
+// flowing_water is its own block id here and is what a stream's surface cell carries.
 function isSolidBlock(block: Block | undefined): boolean {
     const id = block?.typeId;
     if (!id || CONFIG.NON_SOLID_WHITELIST.includes(id)) return false;
@@ -114,14 +107,11 @@ export function* boatLoopJob(): Generator<void, void, unknown> {
     }
 }
 
-/**
- * Runs the boat pass to completion in one go, which is how a test drives it: the tick pass registers
- * the generator and yields every few boats instead.
- */
+// Drains the generator in one go, which is how a test drives the pass.
 export function boatCollisionJob(): void {
     const job = boatLoopJob();
     while (!job.next().done) {
-        // Drain generator synchronously
+        // Synchronous drain: a yielding tick pass would never finish here.
     }
 }
 

@@ -42,6 +42,38 @@ function spawnDoorInWorld(cell: { x: number; y: number; z: number }, open: boole
     return { dim, lower, upper };
 }
 
+/** A sign beside the door, carrying the lines far.land's lockette writes. */
+function attachSign(cell: { x: number; y: number; z: number }, text: string) {
+    const sign = dimension().getBlock(cell);
+    sign.setType("minecraft:standing_sign");
+    sign.getComponent = (componentId: string) =>
+        componentId === "minecraft:sign" ? { getText: () => text } : undefined;
+    return sign;
+}
+
+function attachWallSign(
+    cell: { x: number; y: number; z: number },
+    facingDirection: number,
+    text: string
+) {
+    const sign = dimension().getBlock(cell);
+    sign.setPermutation(
+        BlockPermutation.resolve("minecraft:wall_sign", { facing_direction: facingDirection })
+    );
+    sign.getComponent = (componentId: string) =>
+        componentId === "minecraft:sign" ? { getText: () => text } : undefined;
+    return sign;
+}
+
+function punch(player: Player, block: unknown): void {
+    eventBus.dispatch("entityHitBlock", {
+        damagingEntity: player,
+        hitBlock: block,
+        hitBlockPermutation: (block as { permutation: unknown }).permutation,
+        blockFace: Direction.North
+    });
+}
+
 describe("Door Punch - Beta 1.7.3 punch-to-toggle wooden door", () => {
     beforeEach(() => {
         resetMocks();
@@ -158,6 +190,50 @@ describe("Door Punch - Beta 1.7.3 punch-to-toggle wooden door", () => {
             });
             assert.equal(lower.permutation.getState("open_bit"), false, "closed after cooldown passed");
             assert.equal((dim as any).soundsPlayed.length, 2);
+        });
+
+        it("leaves a door locked by a private sign closed for a stranger", () => {
+            const { dim, lower, upper } = spawnDoorInWorld({ x: 40, y: 64, z: 20 }, false);
+            attachSign({ x: 39, y: 64, z: 20 }, "[Private]\nAlice\n");
+            const stranger = new Player("stranger", "Charlie");
+
+            punch(stranger, lower);
+
+            assert.equal(lower.permutation.getState("open_bit"), false, "the door must not open");
+            assert.equal(upper.permutation.getState("open_bit"), false);
+            assert.equal((dim as any).soundsPlayed.length, 0, "a refused punch makes no door sound");
+        });
+
+        it("lets the owner and a named guest punch their own private door", () => {
+            const owned = spawnDoorInWorld({ x: 42, y: 64, z: 20 }, false);
+            attachSign({ x: 41, y: 64, z: 20 }, "[Private]\nAlice\nBob");
+
+            punch(new Player("owner", "Alice"), owned.lower);
+            assert.equal(owned.lower.permutation.getState("open_bit"), true, "owner keeps the punch");
+
+            const guestDoor = spawnDoorInWorld({ x: 44, y: 64, z: 20 }, false);
+            attachSign({ x: 43, y: 64, z: 20 }, "[Private]\nAlice\nBob");
+
+            punch(new Player("guest", "Bob"), guestDoor.lower);
+            assert.equal(guestDoor.lower.permutation.getState("open_bit"), true, "guest keeps the punch");
+        });
+
+        it("finds a wall sign mounted on the door's upper half from a punch below", () => {
+            const { lower } = spawnDoorInWorld({ x: 48, y: 64, z: 20 }, false);
+            attachWallSign({ x: 47, y: 65, z: 20 }, 4, "[Private]\nAlice\n");
+
+            punch(new Player("stranger", "Charlie"), lower);
+
+            assert.equal(lower.permutation.getState("open_bit"), false, "a sign on either half governs the door");
+        });
+
+        it("ignores a private sign that is not attached to the door", () => {
+            const { lower } = spawnDoorInWorld({ x: 46, y: 64, z: 20 }, false);
+            attachSign({ x: 44, y: 64, z: 20 }, "[Private]\nAlice\n");
+
+            punch(new Player("stranger", "Charlie"), lower);
+
+            assert.equal(lower.permutation.getState("open_bit"), true, "an unrelated sign must not lock the door");
         });
 
         it("ignores hits from non-player entities", () => {

@@ -18,14 +18,9 @@ export class TickManager {
     private masterIntervalId: number | null = null;
     private currentTick: number = 0;
 
-    /**
-     * The phase is required, and it is the module's own tick alignment. It used to default to the
-     * registry size, which made every sweep's phase depend on how many tasks happened to be
-     * registered before it: inserting one import into main.ts re-phased everything below it.
-     */
+    // Phase is required: defaulting it to the registry size let a new import in main.ts re-phase every sweep.
     register(id: string, intervalTicks: number, task: TaskCallback, phase: number): void {
-        // A second registration under a live id would silently replace that schedule, so the first
-        // one keeps running and the collision is reported instead of losing a subsystem's ticks.
+        // Keep the first schedule and report: silently replacing it would lose a subsystem's ticks.
         const existing = this.tasks.get(id);
         if (existing) {
             reportError(

@@ -19,7 +19,7 @@ export class JobRunner {
         this.activeJobs = new Set<number>();
     }
 
-    /** Starts the job and hands back its id, or `undefined` when the engine refused to start it. */
+    // Starts the job and hands back its id, or `undefined` when the engine refused to start it.
     public run(
         generator: Generator<void, void, void>,
         options?: JobOptions
@@ -119,8 +119,7 @@ export class JobRunner {
                 yield;
             }
         } catch (err) {
-            // The caller's own callbacks run through runCatching, the module's one way to contain a
-            // failure without aborting the job that is already unwinding.
+            // Callbacks go through runCatching so a failing handler cannot abort the job already unwinding.
             runCatching({ system: systemName, operation: "onError" }, () => options?.onError?.(err));
             reportError(
                 {

@@ -601,7 +601,7 @@
     "blue_ice": {
         "isotropic": false,
         "sound": "glass",
-        "textures": "blue_ice"
+        "textures": "ice"
     },
     "blue_shulker_box": {
         "isotropic": false,
@@ -1081,6 +1081,11 @@
         "sound": "stone",
         "textures": "chiseled_polished_blackstone"
     },
+    "chiseled_stone_bricks": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone"
+    },
     "chorus_flower": {
         "isotropic": false,
         "sound": "stone",
@@ -1262,6 +1267,11 @@
         "isotropic": false,
         "sound": "stone",
         "textures": "cracked_polished_blackstone_bricks"
+    },
+    "cracked_stone_bricks": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone"
     },
     "crafting_table": {
         "isotropic": false,
@@ -3232,10 +3242,30 @@
         "sound": "stone",
         "textures": "cobblestone_mossy"
     },
+    "mossy_stone_brick_double_slab": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone_mossy"
+    },
+    "mossy_stone_brick_slab": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone_mossy"
+    },
     "mossy_stone_brick_stairs": {
         "isotropic": false,
         "sound": "stone",
-        "textures": "mossy_stone_brick"
+        "textures": "cobblestone_mossy"
+    },
+    "mossy_stone_brick_wall": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone_mossy"
+    },
+    "mossy_stone_bricks": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone_mossy"
     },
     "movingBlock": {
         "textures": "missing_tile"
@@ -3521,7 +3551,7 @@
     "packed_ice": {
         "isotropic": false,
         "sound": "glass",
-        "textures": "ice_packed"
+        "textures": "ice"
     },
     "packed_mud": {
         "isotropic": false,
@@ -4576,8 +4606,28 @@
         "sound": "stone",
         "textures": "stone"
     },
+    "stone_brick_double_slab": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone"
+    },
+    "stone_brick_slab": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone"
+    },
     "stone_brick_stairs": {
-        "textures": "stonebrick"
+        "textures": "cobblestone"
+    },
+    "stone_brick_wall": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone"
+    },
+    "stone_bricks": {
+        "isotropic": false,
+        "sound": "stone",
+        "textures": "cobblestone"
     },
     "stone_button": {
         "isotropic": false,
@@ -4631,7 +4681,7 @@
     "stonebrick": {
         "isotropic": false,
         "sound": "stone",
-        "textures": "stonebrick"
+        "textures": "cobblestone"
     },
     "stonecutter": {
         "sound": "stone",

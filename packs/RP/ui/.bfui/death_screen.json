@@ -1,31 +1,8 @@
 {
-  // Beta 1.7.3's death screen (GuiGameOver.drawScreen), rebuilt on the form the script layer already
-  // owns. Everything below is derived from the era's own source: the gradient rectangle, the two text
-  // rows at their scale and baseline, GuiButton's 200x20 metrics, and the HUD the era left visible
-  // behind the screen. Values and their source lines are pinned by tests/smoke/deathScreenUi.test.ts so
-  // a later edit has to change the test too.
-  //
-  // The form screen this is drawn on is the engine's one screen for every server form in the game, so
-  // both places this pack fills on it - the content `server_form.main_screen_content` instantiates, and
-  // the background slot `server_form.third_party_server_screen` serves - route on the form title and
-  // hand anything that is not the era's own title back untouched. `form_root` and `screen_underlay`
-  // below are that pair, and each keys on the same `$death_title`, which is the script's
-  // `DEATH_SCREEN_COPY.title`.
+  // Beta 1.7.3's GuiGameOver.drawScreen; both slots it fills route on $death_title, and values are pinned by deathScreenUi.test.ts.
   "namespace": "bfui-death_screen",
 
-  // What `server_form.main_screen_content`'s factory instantiates for every ActionFormData in the game,
-  // in place of the engine's `server_form.long_form` - a name that is deliberately left to the engine
-  // and to any other pack, because it is what *their* forms are drawn through. The era's screen is
-  // chosen by the form's own title: the death form is the one form this pack shows, and every other
-  // title is a form this pack has no business drawing, so it is handed to `long_form`.
-  //
-  // `layer: 2` is vanilla's own value for its dialog here, and it is what puts the content above the
-  // background slot: base_screen mounts that slot at layer 2 and the safezone matrix - which carries
-  // this screen's content - at the same layer, so the content's own layer decides where it lands.
-  //
-  // Both branches are instantiated and one is hidden, because a binding chooses what is drawn and not
-  // what is built. `#enabled` follows `#visible` on each of them: a hidden branch that kept its form
-  // buttons would go on taking the focus and the clicks the visible branch's buttons are there for.
+  // Router keyed on $death_title; layer 2 puts content above the background slot, and #enabled follows #visible so a hidden branch cannot take clicks.
   "form_root": {
     "type": "panel",
     "size": [ "100%", "100%" ],
@@ -34,10 +11,7 @@
     "controls": [
       {
         "death_screen@bfui-death_screen.root_panel": {
-          // Declared hidden, so the gate below is the only way the era's tree ever draws. A view binding is
-          // not guaranteed to have run when the control is built, and one that writes nothing leaves the
-          // control at its own default - visible for a panel. Left at that default, this tree was what the
-          // first frame of every other pack's form on this shared screen looked like.
+          // Hidden until the title binding runs, or this tree draws on every other pack's first frame.
           "visible": false,
           "bindings": [
             {
@@ -72,9 +46,7 @@
     ]
   },
 
-  // The screen's own content: the two text rows and the buttons. Everything the era drew *under* them -
-  // the HUD and the wash - is mounted in `screen_underlay`, because that slot is the one rect in this
-  // screen the engine resolves outside the content's safezone inset.
+  // The era's two text rows and buttons; everything under them lives in screen_underlay, outside the safezone inset.
   "root_panel": {
     "type": "panel",
     "size": [ "100%", "100%" ],
@@ -85,19 +57,7 @@
     ]
   },
 
-  // The era's paint order is the world, then the HUD (GuiIngame.renderGameOverlay), then the screen's
-  // gradient over it, then the screen's own text and buttons. Everything below the text is mounted here,
-  // in the engine's background slot, for three reasons: base_screen mounts that slot as
-  // `bg_no_safezone_screen_panel@$screen_bg_content` *outside* the safezone stack, so it is the one rect
-  // this screen resolves without the content's inset; the wash can only cover the HUD if the two are
-  // drawn in one panel with the wash second; and that slot's own default is an empty panel, so a form
-  // this pack does not own has only to be left alone to read the way the engine reads it. The era's HUD
-  // is redrawn at all because the dead player is parked in GameMode.Spectator, and spectator is what
-  // hides Bedrock's HUD.
-  //
-  // The slot belongs to the screen rather than to the death form, so what is served from it is routed
-  // the same way the content is - and by the same title, down to the string - because every other form
-  // the engine draws on this screen, modal forms included, comes through here too.
+  // Era paint order (HUD, then wash) in the background slot, the one rect outside the safezone; its empty default is what other forms see.
   "screen_underlay": {
     "type": "panel",
     "size": [ "100%", "100%" ],
@@ -111,10 +71,7 @@
             { "hud@bfui-death_screen.hud": {} },
             { "wash@bfui-death_screen.wash": {} }
           ],
-          // Same guard as the content router, and it is the one that shows up in game: the slot is shared by
-          // every form the engine draws, so a wash that draws before the title read says otherwise is the
-          // red gradient flashing on another pack's form. Vanilla pairs the two properties the same way
-          // (`world_template_type_filters` in store_filter_menu_screen.json).
+          // Same title guard: the slot is shared, so an unguarded wash flashes on every other pack's form.
           "visible": false,
           "bindings": [
             {
@@ -128,23 +85,7 @@
     ]
   },
 
-  // drawGradientRect(0, 0, width, height, 1615855616, -1602211792): 0x60500000 at the top vertices and
-  // 0xA0803030 at the bottom ones (Gui.drawGradientRect, where the first colour takes var2). Alpha stops
-  // short of opaque on purpose - the era never hid the world behind the screen.
-  //
-  // Baked into a texture rather than left to `gradient_renderer`, because that renderer draws through the
-  // engine's `ui_fill_gradient` material and this pack re-blends that material to Java's crosshair
-  // function (GuiIngame's glBlendFunc(775, 769), the difference blend the crosshair needs). A gradient
-  // drawn there comes out as a filter over the world instead of a translucent wash. An image takes the
-  // ordinary alpha path. The two colours and the interpolation between them are pinned by
-  // tests/smoke/deathScreenUi.test.ts.
-  //
-  // An image does not fill the control it is given: the engine's `keep_ratio` is on by default and *fits*
-  // the sprite inside its rect, centred. Measured off a screenshot of the running pack, this one drew
-  // 16:512 fitted to the screen height - 49 device px wide by the full height, at the same 5x UI scale
-  // that puts the era's 200x20 buttons at ~1000x100 device px - a band down the middle of the screen. The
-  // stretch is therefore declared and not inherited; `fill` and `keep_ratio: false` are the pair the
-  // engine itself stretches a sprite with.
+  // 0x60500000 -> 0xA0803030 baked to a texture: ui_fill_gradient is re-blended for the crosshair, so a gradient_renderer here would filter the world.
   "wash": {
     "type": "image",
     "texture": "textures/ui/death_gradient",
@@ -153,8 +94,7 @@
     "fill": true
   },
 
-  // renderGameOverlay's own order: the hotbar bar, its selection frame, the ten hearts, then the
-  // crosshair. The wash above is drawn after all of it, which is what tints the HUD the way the era does.
+  // renderGameOverlay's order; the wash above is drawn last and tints it.
   "hud": {
     "type": "panel",
     "size": [ "100%", "100%" ],
@@ -227,17 +167,7 @@
     ]
   },
 
-  // drawTexturedModalRect(width / 2 - 91, height - 22, 0, 0, 182, 22), and the 24x22 selection frame at
-  // width / 2 - 92 + currentItem * 20, height - 23. Both anchor to the bottom edge, so the era's own
-  // heights are the offsets.
-  //
-  // `uv_size` is the crop and has no default: with only a `uv` start, the engine maps the *whole* sheet
-  // into the control, which is what put all of gui.png and icons.png on screen at once - the HUD came out
-  // as a mash of every sprite in the two atlases, each squeezed into the era's own 182x22 and 9x9 boxes.
-  // Every `uv` in the engine's own UI carries its `uv_size` for this reason.
-  //
-  // The frame is drawn on slot 0: the era read currentItem from the player and nothing in a form screen
-  // binds it, which is the one value of the era's HUD this skin cannot follow.
+  // uv_size is required or the engine maps the whole sheet; the selection frame stays on slot 0, the one HUD value a form screen cannot bind.
   "hotbar": {
     "type": "image",
     "texture": "textures/gui/gui",
@@ -259,17 +189,7 @@
     "offset": [ -80, -1 ]
   },
 
-  // Ten empty containers at width / 2 - 91 + i * 8, height - 32, uv (16, 0) of icons.png - the container
-  // the era draws and leaves empty, because the health it just rolled back is not the zero the screen
-  // renders. The sprites are 9px wide on the era's 8px pitch, which is the pixel they overlap by, and
-  // their bottom edge is the era's height - 23.
-  //
-  // The x offsets are therefore half pixels (the row's centre is width / 2 - 50.5 and a `bottom_middle`
-  // anchor places the sprite's own centre).
-  //
-  // The slot is a panel carrying the era's x, with the container sprite inside it carrying the jitter:
-  // an `offset` animation writes the whole offset, so animating the slot itself would move it off its own
-  // column.
+  // Era's 8px pitch with 9px sprites (hence half-pixel x); the slot carries x so the offset animation can only jitter y.
   "heart": {
     "type": "panel",
     "size": [ 9, 9 ],
@@ -289,12 +209,7 @@
     "anims": [ "@bfui-death_screen.heart_jitter_a" ]
   },
 
-  // renderGameOverlay: `if (var13 <= 4) { var17 += this.rand.nextInt(2); }` - with health at 0 the era
-  // drops each slot by 0 or 1px, per slot, every tick, from an RNG it reseeds off the tick counter, so no
-  // UI animation can replay the pattern. These loop a 1px drop on three staggered periods instead, which
-  // reads as the same buzz; the ten hearts are dealt one of the three by index, so they drift in and out
-  // of step rather than bouncing as a row. A self-referencing `next` is how the engine's own
-  // `anim_scrollbar_box_fadeout` loops.
+  // The era re-rolls a 0-or-1px drop per slot each tick from an RNG no animation can replay; three staggered 1px loops read the same.
   "heart_jitter_a": {
     "anim_type": "offset",
     "easing": "linear",
@@ -304,8 +219,7 @@
     "next": "@bfui-death_screen.heart_jitter_a"
   },
 
-  // Spelled out rather than inherited from `heart_jitter_a`, because `next` inherits too: a copy would
-  // chain into `a` and stop being a loop of its own.
+  // Spelled out because next inherits too: a copy would chain into jitter_a and stop being its own loop.
   "heart_jitter_b": {
     "anim_type": "offset",
     "easing": "linear",
@@ -324,13 +238,7 @@
     "next": "@bfui-death_screen.heart_jitter_c"
   },
 
-  // drawTexturedModalRect(width / 2 - 7, height / 2 - 7, 0, 0, 16, 16) under glBlendFunc(775, 769): the
-  // 9x1 and 1x9 arms of icons.png's crosshair, centred. The difference blend is why the era's crosshair
-  // inverts the world rather than painting white over it, and a `gradient_renderer` fill is the only
-  // control this engine draws through the material the pack re-blends to that function
-  // (materials/ui.material). The centre pixel is covered twice by the two arms, and Java's blend cancels
-  // there, so the 1x1 centre is what puts it back - the pack's own HUD crosshair composes the same three
-  // fills for the same reason.
+  // Difference blend inverts the world; gradient_renderer is the only control drawn through the material the pack re-blends for it.
   "crosshair_pixel": {
     "type": "custom",
     "renderer": "gradient_renderer",
@@ -341,8 +249,7 @@
     "anchor_to": "center"
   },
 
-  // "Game over!" under glScalef(2, 2, 2) at y=30. The scale doubles the 8px font, so the baseline sits
-  // at 60 and the glyph box starts at 44 - the offset here is the box, not the baseline.
+  // glScalef(2,2,2) at y=30: baseline 60, glyph box top 44.
   "title": {
     "type": "label",
     "size": [ "100%", "default" ],
@@ -361,13 +268,7 @@
     ]
   },
 
-  // "Score: &e" + score, unscaled, baseline y=100 - box top 92. The ampersand is the era's own bug: its
-  // renderer only translated the section sign, so the escape printed literally.
-  //
-  // The body arrives on `#form_text`, and the property bag carries the same string as its declared
-  // default. A label draws the property bag's value when the binding that would fill it has not run,
-  // so a form body the engine does not push into this tree still prints the era's line rather than
-  // nothing. The two copies are pinned together by tests/smoke/deathScreenUi.test.ts.
+  // Baseline 100 (box 92); '&e' printed literally in the era, and the property-bag default keeps the body when no binding runs.
   "score": {
     "type": "label",
     "size": [ "100%", "default" ],
@@ -388,13 +289,7 @@
     ]
   },
 
-  // initGui places the buttons at height / 4 + 72 and height / 4 + 96, so they ride a quarter of the
-  // screen rather than its centre, 72 below that line. That is the quarter as a percentage offset - a
-  // percentage resolves against the parent's height there, which is how the Java-styled packs slide a
-  // window in - and then the era's own 72 as a fixed spacer, the way vanilla spaces a stack. An
-  // asymmetric anchor pair cannot say it: this engine resolves anchor_from against the parent and
-  // anchor_to against the child, the opposite of the JSON UI reference table, so the +72 was measured
-  // from the top of the screen and the buttons landed on the header.
+  // height / 4 + 72, as 25% of the parent plus the era's 72 (asymmetric anchors resolve backwards here).
   "button_layout": {
     "type": "stack_panel",
     "orientation": "vertical",
@@ -408,8 +303,7 @@
     ]
   },
 
-  // One item per form button, drawn from the engine's own form_buttons collection so a click still
-  // arrives as a form response - the whole reason this is a screen rather than a HUD overlay.
+  // The engine's form_buttons collection, so a click arrives as a form response.
   "form_buttons": {
     "type": "stack_panel",
     "orientation": "vertical",
@@ -438,9 +332,7 @@
     ]
   },
 
-  // GuiButton at width 200, height 20. textures/ui/vanilla_default, _pressed and _locked are this
-  // pack's crops of the era's gui.png widget rows - normal, hover and disabled - so the skin reuses
-  // them rather than restating the art.
+  // GuiButton at 200x20; the textures are the pack's crops of the era's widget rows.
   "button@common_buttons.light_text_button": {
     "$button_type_panel": "bfui-death_screen.button_label",
     "$pressed_button_name": "button.form_button_click",
@@ -451,7 +343,7 @@
     "$hover_button_texture": "textures/ui/vanilla_pressed",
     "$pressed_button_texture": "textures/ui/vanilla_pressed",
     "$locked_button_texture": "textures/ui/vanilla_locked",
-    // GuiButton.drawButton: 14737632 enabled, 16777120 hovered, -6250336 disabled.
+    // GuiButton.drawButton colours: 14737632 enabled, 16777120 hovered, -6250336 disabled.
     "$default_text_color": [ 0.87843137, 0.87843137, 0.87843137, 1 ],
     "$hover_text_color": [ 1, 1, 0.62745098, 1 ],
     "$pressed_text_color": [ 1, 1, 0.62745098, 1 ],
@@ -464,8 +356,7 @@
     "size": [ 200, 20 ],
     "anchor_from": "top_middle",
     "anchor_to": "top_middle",
-    // Binds this item to its own row of the collection, which is what makes #form_button_text above
-    // resolve per button rather than once for the whole list.
+    // Binds each item to its own row, so #form_button_text resolves per button.
     "bindings": [
       {
         "binding_type": "collection_details",

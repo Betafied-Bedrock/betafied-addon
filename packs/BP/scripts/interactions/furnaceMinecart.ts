@@ -22,7 +22,7 @@ const PUSHABLE_CART_TYPES = Object.freeze(new Set([
     "minecraft:tnt_minecart"
 ]));
 
-/** One task per moving cart: the tick manager owns the schedule the cart's own loop used to hold. */
+// One task per moving cart: the tick manager owns the schedule the cart's loop used to hold.
 function cartTaskId(entityId: string): string {
     return `furnaceMinecart:cart:${entityId}`;
 }
@@ -70,8 +70,7 @@ function isValidPositionJson(raw: unknown): Vector3 | null {
             }
         }
     } catch {
-        // A malformed value is the repair path, not a failure: readProperty reports it and rewrites
-        // the key, so a report here would double the log for one bad value.
+        // A malformed value is the repair path: readProperty reports it and rewrites the key.
         return null;
     }
     return null;
@@ -83,10 +82,7 @@ const POSITION_KEY = "lastPosition";
 // The engine inlines this union on setDynamicProperty instead of exporting a type for it.
 type PropertyValue = string | number | boolean | Vector3;
 
-/**
- * One cart property read: a value the key's own parser rejects is repaired to what the key expects and
- * reported, because the engine hands back whatever the last build wrote.
- */
+// A value the key's parser rejects is repaired and reported: the engine returns whatever the last build wrote.
 function readProperty<T>(
     entity: Entity,
     key: string,
@@ -169,8 +165,7 @@ function isOnRail(entity: Entity): boolean {
         const block = entity.dimension.getBlock(entity.location);
         return Boolean(block?.typeId.includes("minecraft:") && block?.typeId.includes("rail"));
     } catch (err) {
-        // A cart crossing an unloaded chunk throws on the block read, and the false below is what
-        // clears its velocity: the reason it stopped has to be visible.
+        // An unloaded chunk throws here, and the false return is what clears the cart's velocity.
         reportError({ system: "furnaceMinecart", operation: "isOnRail", target: entity.id }, err);
         return false;
     }

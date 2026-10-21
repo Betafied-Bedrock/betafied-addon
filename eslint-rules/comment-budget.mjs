@@ -1,18 +1,5 @@
-/**
- * A comment that outgrows a handful of lines stops being a comment: it is read on every visit to the
- * file, it is not compiled or tested, and it drifts from the code under it the first time that code
- * changes. Asking for the "why" only and never the "what" sets no ceiling by itself, so a paragraph
- * of "why" reads as compliant while burying the function it describes. This is the ceiling.
- *
- * The measure is a run of consecutive comment lines rather than a share of the file, because the
- * failure being prevented is vertical: a wall of prose that pushes the code off the screen. Sharing
- * the file with a second file's worth of comments is the same defect whether the file is 40 lines or
- * 400, and a ratio can be walked around by appending unrelated code.
- *
- * Waive per block with `// eslint-disable-next-line betafied/comment-budget -- <reason>`; the
- * directive is not itself counted as prose, so it does not inflate the run it suppresses.
- */
-const DEFAULT_MAX_CONSECUTIVE_LINES = 12;
+// One line, or none: a paragraph of "why" is read on every visit and drifts from the code under it.
+const DEFAULT_MAX_CONSECUTIVE_LINES = 1;
 
 /** A trailing comment on a code line annotates that line; it is not part of a prose block. */
 function isOwnLineComment(sourceCode, comment) {
@@ -40,7 +27,7 @@ export default {
         schema: [
             {
                 type: "object",
-                properties: { max: { type: "integer", minimum: 2 } },
+                properties: { max: { type: "integer", minimum: 1 } },
                 additionalProperties: false
             }
         ],

@@ -2,9 +2,7 @@ import { eventBus } from "./core/eventBus.js";
 import { tickManager } from "./core/tickManager.js";
 import "./core/jobRunner.js";
 
-// Import order is load-bearing, not alphabetical. The EventBus dispatches in
-// subscription order and short-circuits once a beforeEvent is cancelled, so the
-// sequence below decides which handlers observe a cancelled interaction.
+// Import order is load-bearing: the bus dispatches in subscription order and stops at the first cancelled before-event.
 import "./core/inventoryManager.js";
 import "./player/achievements.js";
 import "./player/welcome.js";

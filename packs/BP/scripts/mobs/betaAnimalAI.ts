@@ -33,8 +33,6 @@ export const PASSIVE_MOBS = Object.freeze(new Set([
 export const WOOL_DROP_MIN = 1;
 export const WOOL_DROP_MAX = 3;
 
-// The cooldown maps are this module's own bookkeeping: every read and write is below, so neither
-// has an importer and neither needs to be part of the module's surface.
 const hurtCooldowns = new Map<string, number>();
 const jumpCooldowns = new Map<string, number>();
 
@@ -69,11 +67,7 @@ eventBus.onEntityHurt((ev) => {
     }
 });
 
-/**
- * The water question — the one probe whose answer is final either way. `undefined` says the question
- * does not apply to this cell (no water to stand in, or a cell that could not be read) and leaves the
- * decision to the probe that follows.
- */
+// The one probe whose answer is final either way; `undefined` hands the decision to the next probe.
 function hopsFromWater(dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const currentBlock = dimension.getBlock({
@@ -85,18 +79,13 @@ function hopsFromWater(dimension: Dimension, loc: Vector3): boolean | undefined 
             return Math.random() < CONFIG.WATER_HOP_CHANCE;
         }
     } catch {
-        // This runs per animal per pass, and a cell outside the loaded range is the ordinary case at the
-        // edge of a group: the water test simply has no answer for that cell and the hop falls through
-        // to the checks below, so reporting it would log normal wandering as an error.
+        // An unloaded cell is ordinary wandering at a group's edge, not an error to log.
     }
 
     return undefined;
 }
 
-/**
- * Whether the cell the animal is facing is solid, fenced or walled. The era's animal hops on a winning
- * roll and simply carries on asking on a losing one, so only a win is this probe's answer.
- */
+// Only a winning roll answers; a losing one still leaves the crowd question to be asked.
 function hopsFromObstacle(entity: Entity, dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const viewDir = entity.getViewDirection();
@@ -112,20 +101,15 @@ function hopsFromObstacle(entity: Entity, dimension: Dimension, loc: Vector3): b
             if (Math.random() < CONFIG.OBSTACLE_HOP_CHANCE) {
                 return true;
             }
-            // A losing roll here is not an answer: the crowd question is still the animal's to ask.
         }
     } catch {
-        // Same read, same expected throw: an unloaded obstacle cell is a cell with no obstacle in it,
-        // so the animal keeps its chance of a plain wander hop rather than losing the whole decision.
+        // An unloaded cell has no obstacle in it, so the wander hop still gets its chance.
     }
 
     return undefined;
 }
 
-/**
- * Whether the passive animals standing around this one are close enough to decide a hop. As with the
- * obstacle, a losing roll leaves the question to the plain wander chance below it.
- */
+// A losing roll leaves the question to the plain wander chance below.
 function hopsFromCrowd(entity: Entity, dimension: Dimension, loc: Vector3): boolean | undefined {
     try {
         const nearby = dimension.getEntities({
@@ -145,9 +129,7 @@ function hopsFromCrowd(entity: Entity, dimension: Dimension, loc: Vector3): bool
             return true;
         }
     } catch (err) {
-        // Unlike the cell reads above, a failed crowd query on a live animal is not an expected
-        // condition: the neighbour count is what decides a crowd hop, so losing it silently turns
-        // the animal's behaviour into a coin flip nobody can diagnose.
+        // Unlike the cell reads, a failed crowd query on a live animal changes behaviour silently.
         if (entity.isValid) {
             reportError({ system: "betaAnimalAI", operation: "countCrowdNeighbours", target: entity.id }, err);
         }
@@ -156,13 +138,7 @@ function hopsFromCrowd(entity: Entity, dimension: Dimension, loc: Vector3): bool
     return undefined;
 }
 
-/**
- * The order the era's animal asks its questions in: the water it stands in, then the cell it faces,
- * then the crowd around it, and last a plain wander chance. Each probe answers `undefined` for a
- * question that does not apply here, which is why the answers are compared rather than chained with
- * `||`: the water answer is final either way, so a water animal that rolls low does not then get to
- * roll again for the obstacle it is facing.
- */
+// Era order: water, obstacle, crowd, wander; compared rather than `||` so a water roll is final.
 export function evaluateHopConditions(entity: Entity, dimension: Dimension): boolean {
     const loc = entity.location;
 
@@ -196,8 +172,7 @@ export function applyRandomHop(entity: Entity): void {
                     z: viewDir.z * CONFIG.FORWARD_IMPULSE
                 });
             } catch (err) {
-                // A despawn between the validity check and the read is how a staggered impulse normally
-                // ends, so only a failure on an entity that is still live is worth reporting.
+                // A despawn mid-flight is normal; only a live entity's failure is reported.
                 if (entity.isValid) {
                     reportError({ system: "betaAnimalAI", operation: "applyHopImpulse", target: entity.id }, err);
                 }
@@ -218,8 +193,7 @@ function tryAnimalHop(entity: Entity, dimension: Dimension, currentTick: number)
         const vel = entity.getVelocity();
         if (Math.abs(vel.y) > 0.15) return;
     } catch (err) {
-        // The animal most often despawns between the cooldown checks and this read; a throw while it
-        // is still valid is a real fault, and both cases skip the hop exactly as before.
+        // A despawn between cooldown check and read is normal; report only while the entity is valid.
         if (entity.isValid) {
             reportError({ system: "betaAnimalAI", operation: "readHopVelocity", target: entity.id }, err);
         }

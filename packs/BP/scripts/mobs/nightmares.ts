@@ -39,8 +39,6 @@ interface BedInteraction {
 
 export const nightmareJobRunner = new JobRunner();
 
-// The module's own sighting state: a bed click is armed, watched and released here and nowhere else,
-// so a caller cannot hand this module a sighting it did not take.
 const bedInteractions = new Map<string, BedInteraction>();
 
 function isNight(): boolean {
@@ -89,9 +87,7 @@ export function tryTriggerNightmare(bedKey: string): void {
             }
             spawnNightmare(player, bedBlock);
         } catch (err) {
-            // The bed's chunk can be unloaded by the time this delayed read runs, which makes the
-            // block lookup throw. The sighting is then simply skipped, and the reason has to reach
-            // the log or a bed that never fires looks like a broken trigger.
+            // The bed's chunk may have unloaded; the sighting is skipped but the reason is logged.
             reportError({
                 system: "nightmares",
                 operation: "readBedBlock",
@@ -128,10 +124,7 @@ export function* lightCheckGenerator(dimensionId: string, bedLoc: Vector3, bedKe
                         return;
                     }
                 } catch {
-                    // A cell past the loaded chunk rim makes the read throw, and the scan is meant to run
-                    // past that rim: the cell reads as no light source, which is what `continue` does.
-                    // Reporting each one would drown the log in a 26x11x26 sweep, so this stays silent
-                    // by design rather than by omission.
+                    // Cells past the loaded rim read as no light source; logging each would drown the sweep.
                 }
 
                 checked++;
@@ -239,8 +232,7 @@ export function handlePlayerLeave(event: { playerId: string }): void {
     }
 }
 
-// A bed click is observed rather than claimed, so the sighting has to be taken before any rule cancels
-// the click away from this handler.
+// Observed rather than claimed, so the sighting is taken before a rule can cancel the click.
 eventBus.onPlayerInteractWithBlock((event) => {
     noteBedInteraction(event.player, event.block);
 }, InteractPriority.RULE);

@@ -18,7 +18,7 @@ import {
 } from "../../packs/BP/scripts/core/inventoryManager.js";
 import { PLAYER_TAGS } from "../../packs/BP/scripts/core/permissions.js";
 import { eventBus } from "../../packs/BP/scripts/core/eventBus.js";
-import { mockPlayers, Player } from "../mocks/minecraftServer.js";
+import { mockPlayers, mockSpawnedItems, Player } from "../mocks/minecraftServer.js";
 
 describe("Inventory Manager Item Normalization & Unstacking", () => {
     describe("Placer Item Normalization", () => {
@@ -126,6 +126,53 @@ describe("Inventory Manager Item Normalization & Unstacking", () => {
                     assert.equal(stack.totalAmount, 5);
                 }
             }
+        });
+
+        it("holds a capped stack whole when the inventory has no room to split it into", () => {
+            const player = new Player();
+            player.name = "FullPockets";
+            player.id = "full_pockets_1";
+            player.gameMode = GameMode.Survival;
+
+            const inv = new Container(36);
+            inv.setItem(0, new ItemStack("minecraft:oak_sign", 3));
+            for (let slot = 1; slot < 36; slot++) {
+                inv.setItem(slot, new ItemStack("minecraft:cobblestone", 64));
+            }
+            player.setComponent(EntityComponentTypes.Inventory, { container: inv });
+            mockSpawnedItems.length = 0;
+
+            sweepInventory(player);
+
+            assert.equal(inv.getItem(0)?.amount, 3, "a stack with nowhere to go waits in its slot");
+            assert.equal(
+                mockSpawnedItems.length,
+                0,
+                "the spill is not dropped where the engine merges it straight back into the slot it just left"
+            );
+        });
+
+        it("splits a capped stack across the free slots it does have, dropping nothing", () => {
+            const player = new Player();
+            player.name = "OneFreeSlot";
+            player.id = "one_free_slot_1";
+            player.gameMode = GameMode.Survival;
+
+            const inv = new Container(36);
+            inv.setItem(0, new ItemStack("minecraft:oak_sign", 3));
+            for (let slot = 4; slot < 36; slot++) {
+                inv.setItem(slot, new ItemStack("minecraft:cobblestone", 64));
+            }
+            player.setComponent(EntityComponentTypes.Inventory, { container: inv });
+            mockSpawnedItems.length = 0;
+
+            sweepInventory(player);
+
+            for (const slot of [0, 1, 2]) {
+                assert.equal(inv.getItem(slot)?.amount, 1, `slot ${slot} must hold one sign`);
+            }
+            assert.equal(inv.getItem(3), undefined, "the split stops at the last sign");
+            assert.equal(mockSpawnedItems.length, 0, "every piece found a slot, so none is dropped");
         });
 
         it("splits a vanilla bucket stack without retyping it, one per slot", () => {

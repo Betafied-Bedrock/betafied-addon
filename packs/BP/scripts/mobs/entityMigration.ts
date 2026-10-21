@@ -43,10 +43,7 @@ export const BETA_ENTITY_EFFECT_REMOVAL_RULES: readonly EntityEffectRemovalRule[
     }
 ]);
 
-/**
- * What one migration pass runs. Configuration arrives as a single object, the way the sibling
- * sanitizer takes it, so the two hooks a caller runs over an entity are configured alike.
- */
+// One config object, mirroring the sibling sanitizer's shape.
 export interface EntityMigrationOptions {
     readonly propertyRules: readonly EntityPropertyRule[];
     readonly effectRules: readonly EntityEffectRule[];
@@ -59,24 +56,18 @@ export const BETA_ENTITY_MIGRATION: EntityMigrationOptions = Object.freeze({
     removalRules: BETA_ENTITY_EFFECT_REMOVAL_RULES
 });
 
-/** A rule without a type list is one every entity the pass sees is asked about. */
+// A rule without a type list applies to every entity the pass sees.
 function ruleAppliesTo(rule: { readonly targetTypes?: ReadonlySet<string> }, typeId: string): boolean {
     return rule.targetTypes === undefined || rule.targetTypes.has(typeId);
 }
 
-/**
- * A property the entity does not carry yet is the unmigrated one. The reset asks the entity's own
- * definition for it, and a refusal there is the only signal that the rule's default is what repairs
- * the value rather than the definition already agreeing with it.
- */
+// A missing property is the unmigrated one; a refused reset means the rule's default repairs it.
 function repairProperty(entity: Entity, rule: EntityPropertyRule): void {
     if (entity.getProperty(rule.identifier) !== undefined) return;
 
     try {
         entity.resetProperty(rule.identifier);
     } catch (err) {
-        // A refused reset is what routes us to the rule's default, and it is the only signal that the
-        // property was repaired rather than already correct.
         reportError({
             system: "entityMigration",
             operation: "resetProperty",
@@ -89,7 +80,7 @@ function repairProperty(entity: Entity, rule: EntityPropertyRule): void {
     }
 }
 
-/** The effect an entity is missing, added only where its own definition can carry the swap. */
+// The effect an entity is missing, added only where its own definition can carry it.
 function applyEffect(entity: Entity, rule: EntityEffectRule): void {
     if (rule.requireComponent && !entity.hasComponent(rule.requireComponent)) return;
     if (entity.getEffect(rule.effectType)) return;
@@ -99,10 +90,7 @@ function applyEffect(entity: Entity, rule: EntityEffectRule): void {
     });
 }
 
-/**
- * An effect this pack put on an entity that no longer justifies it. Twenty million ticks outlive the
- * save, so it has to be taken back rather than waited out.
- */
+// 20M ticks outlive the save, so the effect has to be taken back rather than waited out.
 function withdrawEffect(entity: Entity, rule: EntityEffectRemovalRule): void {
     if (entity.hasComponent(rule.absentComponent)) return;
     if (!entity.getEffect(rule.effectType)) return;

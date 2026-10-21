@@ -76,8 +76,7 @@
     "$text_box_name": "#message_text_box",
     "$text_edit_box_content_binding_name": "#message_text_box_content",
     "always_listening": true,
-    // Vanilla chat.text_edit_box marks the chat box as the default focused input; without it the
-    // ported screen opens with focus unassigned, which leaves touch-input platforms needing a tap.
+    // Default focused input; without it touch platforms need a tap.
     "default_focus_precedence": 1,
     "$focus_id": "text_edit_box_focus_id",
     "max_length": 20000,
@@ -85,7 +84,6 @@
     "$text_background_locked": "$text_background_default",
     "$text_clear_button_enabled|default": false,
     "button_mappings": [
-      // Original Mappings - defined in common.text_edit_box //
       {
         "from_button_id": "button.menu_select",
         "to_button_id": "$text_edit_box_selected_to_button_id",
@@ -99,7 +97,7 @@
         "handle_select": false,
         "handle_deselect": true,
         "mapping_type": "global",
-        // Deselect textbox and allow selection of another UI control with same mouse press
+        // Deselect and let the same click select another control.
         "consume_event": false
       },
       {
@@ -134,8 +132,6 @@
         "handle_deselect": false,
         "mapping_type": "focused"
       },
-
-      // Extra Mappings //
       {
         "from_button_id": "button.menu_autocomplete",
         "to_button_id": "button.chat_autocomplete",
@@ -164,8 +160,6 @@
         "handle_deselect": false,
         "mapping_type": "focused"
       },
-
-      // Controller Mappings //
       {
         "from_button_id": "button.controller_select",
         "to_button_id": "button.send",

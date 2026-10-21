@@ -2,6 +2,39 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.13 — 2026-10-21
+
+5.13 adds the era's sword break times and bone meal that grows only Beta's two flowers. Capped stacks no longer spill at a player's feet.
+
+### Mining
+
+- Removed the haste effect from sword mining.
+- Changed sword mining to use Beta's per-block break times.
+- Changed cobwebs to break in 0.4 seconds with a sword.
+- Changed wood-class blocks to break at Beta's speed with a sword, from 0.2 to 2 seconds.
+
+### Bone meal
+
+- Changed the modern flowers bone meal grows into poppies and dandelions.
+- Changed bone meal to grow dandelions twice as often as poppies.
+- Removed the modern two-block flowers that bone meal could leave behind.
+- Removed bee nests from trees grown with bone meal.
+
+### Inventory
+
+- Fixed stacks over the era's limit dropping at the player's feet.
+- Changed a capped stack with no free slot to wait in its slot.
+
+### Blocks
+
+- Changed stone bricks, their stairs, slabs and walls to draw cobblestone.
+- Changed mossy stone bricks to draw mossy cobblestone.
+- Changed packed ice and blue ice to draw ice.
+
+### Tooling
+
+- Removed an unused command function that rewrote flowers for bone meal.
+
 ## 5.12 — 2026-10-18
 
 5.12 fixes several Nether cleanup issues, corrects stuck fog, and finishes the mob shadow system.

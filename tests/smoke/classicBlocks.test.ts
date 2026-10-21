@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { SWORD_FAST_BLOCKS } from "../../packs/BP/scripts/interactions/toolMining.js";
+import { SWORD_MINING_TICKS } from "../../packs/BP/scripts/policy/betaRegistry.js";
 
 const root = process.cwd();
 
@@ -199,10 +199,10 @@ describe("Classic Block Contract - Beta 1.7.3 logs, stairs and slabs", () => {
         }
     });
 
-    it("gives the sword haste only to the wood-class blocks", () => {
-        assert.ok(SWORD_FAST_BLOCKS.has("bh:oak_stairs"), "custom wooden stairs must break fast with a sword");
+    it("gives the sword's shorter swing only to the wood-class blocks", () => {
+        assert.ok(SWORD_MINING_TICKS.has("bh:oak_stairs"), "custom wooden stairs must break fast with a sword");
         assert.equal(
-            SWORD_FAST_BLOCKS.has("bh:wooden_slab"),
+            SWORD_MINING_TICKS.has("bh:wooden_slab"),
             false,
             "the stone-backed wooden slab must not get the sword bonus"
         );
