@@ -1,9 +1,13 @@
 {
     "ui_defs": [
         "ui/debug_screen.json",
+        "ui/.bfui/anim.json",
+        "ui/.bfui/button.json",
         "ui/.bfui/common.json",
-        "ui/.bfui/chat_screen.json",
-        "ui/.bfui/pause_screen.json",
-        "ui/.bfui/death_screen.json"
+        "ui/.bfui/misc.json",
+        "ui/.bfui/screens/chat_screen.json",
+        "ui/.bfui/screens/death_screen.json",
+        "ui/.bfui/screens/hud_screen.json",
+        "ui/.bfui/screens/pause_screen.json"
     ]
 }

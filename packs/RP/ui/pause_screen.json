@@ -1,7 +1,8 @@
 {
   "pause_screen": {
-    "$screen_content": "bfui-pause_screen.root_panel",
-    "$screen_bg_content": "bfui-pause_screen.screen_background",
+    "force_render_below": true,
+    "$screen_content": "bfui:pause_screen.root_panel",
+    "$screen_bg_content": "bfui:common.screen_background",
     "variables": []
   }
 }

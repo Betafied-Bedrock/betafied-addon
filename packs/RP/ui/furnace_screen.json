@@ -1,0 +1,40 @@
+{
+  "toolbar_panel": {
+    "ignored": true
+  },
+  "furnace_panel_top_half": {
+    "type": "panel",
+    "size": [ "100%", "50% - 12px" ],
+    "offset": [ 5, 7 ],
+    "anchor_to": "top_left",
+    "anchor_from": "top_left",
+    "controls": [
+      { "furnace_label@furnace_label": {} },
+      { "input@furnace_input_panel": {} },
+      { "furnace_arrow_empty_image@furnace_arrow_empty_image": {
+          "anchor_to": "center",
+          "anchor_from": "center"
+      }},
+      { "furnace_arrow_full_image@furnace_arrow_full_image": {
+          "anchor_to": "center",
+          "anchor_from": "center"
+      }},
+      { "output@furnace_output_panel": {} }
+  ]},
+  "furnace_label": {
+    "type": "label",
+    "layer": 2,
+    "offset": [ -12, -3 ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "text": "$container_title",
+    "color": "$title_text_color",
+    "localize": "$localize_title"
+  },
+  "screen_stack_panel/recipe_book_panel": {
+    "ignored": true
+  },
+  "screen_stack_panel/center_fold": {
+    "ignored": true
+  }
+}

@@ -1,25 +1,7 @@
 {
   "namespace": "server_form",
 
-  // Wholesale replacement rather than a `modifications` patch: a modification's values resolve before
-  // cross-namespace `@` symbols, so patching vanilla's dialog that way throws "Type not specified (or
-  // @-base not found)". Redefining the screen also drops the engine's own dialog frame and its
-  // transitions, both of which Beta's screen has to be without.
-  //
-  // The engine's copy of this screen (`common.base_screen`, read out of the shipped UI archive) sets
-  // three things that are restated here because a redefinition replaces rather than merges: the
-  // content, Esc closing the form, and the two animation lists. `$screen_animations` defaults to the
-  // eight entrance/exit push/pop and fade animations and `$background_animations` to four alpha
-  // fades; both are emptied because `GuiGameOver` had no transition at all - the screen was simply
-  // there when the player died and gone the instant `respawnPlayer` ran. The engine also only waits
-  // for a close transition when the screen has one registered, so an empty list is what makes the
-  // respawn exit instant rather than a slide.
-  //
-  // This screen is the one the engine draws _every_ server form on, this pack's and every other
-  // pack's, so each slot it fills here routes itself: where vanilla's own copy of the screen set
-  // nothing for the background slot and `common.base_screen` defaults it to an empty panel, this copy
-  // serves the death wash and the redrawn HUD from that slot for the death form's own title only -
-  // see `screen_underlay`.
+  // Wholesale replacement (a modifications patch throws "Type not specified"); animations emptied for the instant exit, shared background slot routed by title.
   "third_party_server_screen@common.base_screen": {
     "$screen_content": "server_form.main_screen_content",
     "$screen_bg_content": "bfui-death_screen.screen_underlay",
@@ -35,21 +17,7 @@
     ]
   },
 
-  // The factory is kept and only the tree behind it is replaced, because the factory is what
-  // instantiates the form's control tree together with its data context: a screen mounted beside it
-  // gets the form title and its buttons but no body. Vanilla sizes this panel [0, 0] because its
-  // dialogs are a fixed size; a full-screen screen needs real bounds.
-  //
-  // What it instantiates is the pack's own `form_root` rather than `@server_form.long_form`, because
-  // `long_form` is the engine's name for the tree *every* ActionFormData in the game is drawn
-  // through. Another pack is free to own that name - a router of its own, a restyled dialog - and a
-  // control this file left there would be what that pack's forms were drawn with instead. `form_root`
-  // draws the death screen for the death form's title and hands every other title on to
-  // `@server_form.long_form`, which is the engine's copy or whichever pack claimed it. The pack
-  // defines neither of the engine's two form names, so this file cannot take either away.
-  //
-  // `custom_form` is restated at its own value for the same reason: ModalFormData is not this
-  // screen's business, and the name is left to the engine or to whoever else defines it.
+  // Keeps the factory (it carries the form's data context) and swaps the tree for form_root, so other packs keep server_form.long_form.
   "main_screen_content": {
     "type": "panel",
     "size": [ "100%", "100%" ],
