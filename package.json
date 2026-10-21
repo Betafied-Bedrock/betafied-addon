@@ -14,6 +14,7 @@
     "push": "npm --prefix betafied-manager run push",
     "release": "node scripts/release.mjs",
     "release:prepare": "node scripts/prepareRelease.mjs",
+    "release:inventory": "node scripts/releaseInventory.mjs",
     "stats": "node scripts/statistics.mjs",
     "watch": "node scripts/watch.mjs",
     "logs:prune": "node scripts/pruneContentLogs.mjs",
