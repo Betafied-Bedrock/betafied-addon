@@ -1,0 +1,27 @@
+{
+  "panel_top_half": {
+    "type": "panel",
+    "size": "$container_top_half_size",
+    "offset": [ 0, 6 ],
+    "anchor_to": "top_left",
+    "anchor_from": "top_left",
+    "controls": [
+      { "container_label@data_driven_container.container_label": {} },
+      {
+        "item_grid@data_driven_container.item_grid": {
+          "offset": [ 7, 10 ]
+        }
+      }
+    ]
+  },
+  "desktop_panel": {
+    "$show_close_button": false,
+    "modifications": [
+      { "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          { "close_button_element@bfui:common.touch_close_button": {}}
+      ]}
+    ]
+  }
+}

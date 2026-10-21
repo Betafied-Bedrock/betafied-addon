@@ -1,0 +1,51 @@
+{
+  "small_chest_panel_top_half": {
+    "type": "panel",
+    "size": [ "100%", "50%" ],
+    "offset": [ 0, 6 ],
+    "anchor_to": "top_left",
+    "anchor_from": "top_left",
+    "controls": [
+      { "chest_label@chest.chest_label": {} },
+      {
+        "small_chest_grid@chest.small_chest_grid": {
+          "offset": [ 7, 9 ]
+        }
+      }
+    ]
+  },
+  "small_chest_panel": {
+    "$show_close_button": false,
+    "modifications": [
+      { "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          { "close_button_element@bfui:common.touch_close_button": {}}
+      ]}
+    ]
+  },
+  "large_chest_panel": {
+    "$show_close_button": false,
+    "modifications": [
+      { "array_name": "controls",
+        "operation": "insert_front",
+        "value": [
+          { "close_button_element@bfui:common.touch_close_button": {}}
+      ]}
+    ]
+  },
+  "large_chest_panel_top_half": {
+    "type": "panel",
+    "size": [ "100%", 132 ],
+    "offset": [ 0, 6 ],
+    "anchor_to": "top_left",
+    "anchor_from": "top_left",
+    "controls": [
+      { "chest_label@chest.chest_label": {} },
+      { "large_chest_grid@chest.large_chest_grid": {
+          "offset": [ 7, 10 ]
+        }
+      }
+    ]
+  }
+}
