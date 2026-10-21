@@ -17,6 +17,7 @@ import type {
     ItemUseBeforeEvent,
     PlayerBreakBlockAfterEvent,
     PlayerBreakBlockBeforeEvent,
+    PlayerCancelBreakingBlockAfterEvent,
     PlayerDimensionChangeAfterEvent,
     PlayerGameModeChangeAfterEvent,
     PlayerInteractWithBlockBeforeEvent,
@@ -25,7 +26,8 @@ import type {
     PlayerLeaveAfterEvent,
     PlayerPlaceBlockAfterEvent,
     PlayerPlaceBlockBeforeEvent,
-    PlayerSpawnAfterEvent
+    PlayerSpawnAfterEvent,
+    PlayerStartBreakingBlockAfterEvent
 } from "@minecraft/server";
 import { runCatching } from "./errorReporter.js";
 import type { ErrorContext } from "./errorReporter.js";
@@ -163,6 +165,20 @@ class EventBus {
         return this.subscribe("playerBreakBlockBefore", callback, priority);
     }
 
+    onPlayerStartBreakingBlock(
+        callback: (event: PlayerStartBreakingBlockAfterEvent) => void,
+        priority: number = 0
+    ): () => void {
+        return this.subscribe("playerStartBreakingBlock", callback, priority);
+    }
+
+    onPlayerCancelBreakingBlock(
+        callback: (event: PlayerCancelBreakingBlockAfterEvent) => void,
+        priority: number = 0
+    ): () => void {
+        return this.subscribe("playerCancelBreakingBlock", callback, priority);
+    }
+
     onPlayerDimensionChange(callback: (event: PlayerDimensionChangeAfterEvent) => void, priority: number = 0): () => void {
         return this.subscribe("playerDimensionChange", callback, priority);
     }
@@ -227,6 +243,8 @@ class EventBus {
         world.afterEvents.entityHitBlock.subscribe((e) => this.dispatch("entityHitBlock", e));
         world.afterEvents.playerPlaceBlock.subscribe((e) => this.dispatch("playerPlaceBlock", e));
         world.afterEvents.playerBreakBlock.subscribe((e) => this.dispatch("playerBreakBlock", e));
+        world.afterEvents.playerStartBreakingBlock.subscribe((e) => this.dispatch("playerStartBreakingBlock", e));
+        world.afterEvents.playerCancelBreakingBlock.subscribe((e) => this.dispatch("playerCancelBreakingBlock", e));
         world.afterEvents.playerDimensionChange.subscribe((e) => this.dispatch("playerDimensionChange", e));
         world.afterEvents.playerSpawn.subscribe((e) => this.dispatch("playerSpawn", e));
         world.afterEvents.playerLeave.subscribe((e) => this.dispatch("playerLeave", e));

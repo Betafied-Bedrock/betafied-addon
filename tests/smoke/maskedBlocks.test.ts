@@ -12,6 +12,29 @@ import { resolve } from "node:path";
 const MASKED_PATH = "textures/blocks/invisible";
 const MASKED_SHORTNAME = "invisible";
 
+// The Overworld ships pre-generated and is never swept (the scrubber is Nether-only), so a post-Beta
+// block the template carries keeps its id there. Its appearance is a texture decision instead, and
+// the era has a close material for each of these: stone bricks arrived after 1.7.3 and cobblestone
+// is the block they read as, while packed ice is just ice. The aliases point at shortnames the pack
+// ships its own art for, so a template block draws Beta material rather than its modern texture.
+const ERA_ART_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+    stonebrick: "cobblestone",
+    stone_bricks: "cobblestone",
+    stone_brick_stairs: "cobblestone",
+    stone_brick_slab: "cobblestone",
+    stone_brick_double_slab: "cobblestone",
+    stone_brick_wall: "cobblestone",
+    cracked_stone_bricks: "cobblestone",
+    chiseled_stone_bricks: "cobblestone",
+    mossy_stone_bricks: "cobblestone_mossy",
+    mossy_stone_brick_stairs: "cobblestone_mossy",
+    mossy_stone_brick_slab: "cobblestone_mossy",
+    mossy_stone_brick_double_slab: "cobblestone_mossy",
+    mossy_stone_brick_wall: "cobblestone_mossy",
+    packed_ice: "ice",
+    blue_ice: "ice"
+});
+
 // Shortnames the pack's own blocks.json asks the atlas to resolve for Beta materials. Each one has
 // to be declared here: an undeclared shortname falls back to resolution behaviour the pack does not
 // control, which is how netherrack and soul sand became hard to tell apart.
@@ -77,6 +100,27 @@ const declaredNames = (definition: any): string[] => {
     }
     return names;
 };
+
+describe("Block Appearance - post-Beta families draw an era material", () => {
+    const root = process.cwd();
+    const blocks = readJson(resolve(root, "packs/RP/blocks.json"));
+
+    it("maps stone bricks and packed ice onto art the pack ships", () => {
+        for (const [name, shortname] of Object.entries(ERA_ART_ALIASES)) {
+            const definition = blocks[name];
+            assert.ok(definition, `blocks.json must define '${name}' so it can draw ${shortname}`);
+            assert.equal(
+                definition.textures,
+                shortname,
+                `'${name}' must draw ${shortname}, its era material, not its own post-Beta texture`
+            );
+            assert.ok(
+                existsSync(resolve(root, "packs/RP/textures/blocks", `${shortname}.png`)),
+                `the pack must ship ${shortname}.png; a vanilla art file would leave the block modern`
+            );
+        }
+    });
+});
 
 describe("Block Appearance - nothing is masked", () => {
     const root = process.cwd();

@@ -211,6 +211,23 @@ export const WOOL_BY_COLOR: readonly string[] = Object.freeze([
     "minecraft:black_wool"
 ]);
 
+/**
+ * Ticks a sword needs to break each block, from Beta's own swing: `ItemSword.func_79_a` answers 15
+ * against the web and 1.5 against everything else, and a break takes `hardness * 30 / speed` ticks at
+ * 20 ticks a second. Only the wood-class blocks are listed, which is the set the pack lets a sword
+ * shorten; `minecraft:wooden_slab` is left out on purpose because it is the stone-backed slab.
+ */
+export const SWORD_MINING_TICKS: ReadonlyMap<string, number> = Object.freeze(new Map<string, number>([
+    ["minecraft:cobweb", 8], ["minecraft:web", 8],
+    ["minecraft:oak_leaves", 4], ["minecraft:spruce_leaves", 4], ["minecraft:birch_leaves", 4],
+    ["minecraft:oak_planks", 40], ["minecraft:spruce_planks", 40], ["minecraft:birch_planks", 40],
+    ["minecraft:planks", 40],
+    ["minecraft:oak_stairs", 40],
+    ["bh:oak_stairs", 40],
+    ["minecraft:pumpkin", 20], ["minecraft:carved_pumpkin", 20], ["minecraft:lit_pumpkin", 20],
+    ...WOOL_BY_COLOR.map((woolId): [string, number] => [woolId, 16])
+]));
+
 export const BETA_WOOD_SPECIES: ReadonlySet<string> = Object.freeze(new Set([
     "oak", "birch", "spruce"
 ]));

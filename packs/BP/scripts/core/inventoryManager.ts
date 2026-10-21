@@ -76,7 +76,7 @@ function inventorySlots(player: Player): SlotAccessor<number> | undefined {
         label: "INV: Removed",
         get: (key) => container.getItem(key),
         set: (key, item) => container.setItem(key, item),
-        split: (key, targetId, amount) => unstackItem(player, container, key, targetId, amount)
+        split: (key, targetId, amount) => unstackItem(container, key, targetId, amount)
     };
 }
 
@@ -310,26 +310,35 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         ?? evaluateNormalizedItem(id, item);
 }
 
-function unstackItem(player: Player, inv: Container, slotIndex: number, targetId: string, amount: number): void {
+function freeSlots(inv: Container, slotIndex: number): number {
+    let free = 0;
+    for (let slot = 0; slot < inv.size; slot++) {
+        if (slot !== slotIndex && !inv.getItem(slot)) free++;
+    }
+    return free;
+}
+
+/**
+ * Splits an over-cap stack one piece per slot. The spill is never dropped at the player: the engine's
+ * own stack limit for these ids is higher than the era's, so it merges a drop straight back into the
+ * slot this sweep just capped and the next sweep evicts it again — a loop the player sees as items
+ * stuck at their feet. With no room for every piece, the stack waits in its slot until one frees up.
+ */
+function unstackItem(inv: Container, slotIndex: number, targetId: string, amount: number): void {
     const maxStack = maxBetaStackSize(targetId);
     const slotAmount = Math.min(amount, maxStack);
+    const spill = amount - slotAmount;
+
+    if (spill > maxStack * freeSlots(inv, slotIndex)) return;
+
     inv.setItem(slotIndex, new ItemStack(targetId, slotAmount));
-    if (amount <= slotAmount) return;
 
-    let remaining = amount - slotAmount;
-    const size = inv.size;
-    for (let s = 0; s < size && remaining > 0; s++) {
-        if (!inv.getItem(s)) {
-            const place = Math.min(remaining, maxStack);
-            inv.setItem(s, new ItemStack(targetId, place));
-            remaining -= place;
-        }
-    }
-
-    while (remaining > 0) {
-        const dropAmount = Math.min(remaining, maxStack);
-        player.dimension.spawnItem(new ItemStack(targetId, dropAmount), player.location);
-        remaining -= dropAmount;
+    let remaining = spill;
+    for (let slot = 0; slot < inv.size && remaining > 0; slot++) {
+        if (inv.getItem(slot)) continue;
+        const place = Math.min(remaining, maxStack);
+        inv.setItem(slot, new ItemStack(targetId, place));
+        remaining -= place;
     }
 }
 

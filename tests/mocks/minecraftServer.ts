@@ -33,6 +33,7 @@ export function resetMocks(): void {
         dim.blocks.clear();
         dim.particles.length = 0;
         dim.soundsPlayed.length = 0;
+        dim.commandsRun.length = 0;
     }
     nextRunId = 1;
 }
@@ -277,7 +278,10 @@ export class MockDimension {
         this.soundsPlayed.push({ soundId, location, options });
     }
 
-    runCommand(_command: string) {
+    commandsRun: string[] = [];
+
+    runCommand(command: string) {
+        this.commandsRun.push(command);
         return { successCount: 1 };
     }
 }
@@ -375,6 +379,8 @@ export const world = {
         playerLeave: createEventSignal(registeredAfterEvents, "playerLeave"),
         playerPlaceBlock: createEventSignal(registeredAfterEvents, "playerPlaceBlock"),
         playerBreakBlock: createEventSignal(registeredAfterEvents, "playerBreakBlock"),
+        playerStartBreakingBlock: createEventSignal(registeredAfterEvents, "playerStartBreakingBlock"),
+        playerCancelBreakingBlock: createEventSignal(registeredAfterEvents, "playerCancelBreakingBlock"),
         blockContainerOpened: createEventSignal(registeredAfterEvents, "blockContainerOpened"),
         blockContainerClosed: createEventSignal(registeredAfterEvents, "blockContainerClosed"),
         playerDimensionChange: createEventSignal(registeredAfterEvents, "playerDimensionChange"),

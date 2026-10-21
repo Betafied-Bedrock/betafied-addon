@@ -89,6 +89,37 @@ export const POST_BETA_TALL_PLANTS: readonly string[] = Object.freeze([
     "minecraft:large_fern"
 ]);
 
+/**
+ * Two-block flowers that post-date 1.7.3. Both halves carry the same id, so a rewrite has to clear
+ * the whole plant rather than set a flower into each half.
+ */
+export const POST_BETA_TALL_FLOWERS: readonly string[] = Object.freeze([
+    "minecraft:lilac",
+    "minecraft:peony",
+    "minecraft:rose_bush",
+    "minecraft:sunflower",
+    "minecraft:pitcher_plant"
+]);
+
+/**
+ * Flowers that post-date 1.7.3. The era grew only the rose (today's poppy) and the yellow flower
+ * (today's dandelion), so bone meal's modern palette is rewritten to those two.
+ */
+export const POST_BETA_FLOWERS: readonly string[] = Object.freeze([
+    "minecraft:azure_bluet",
+    "minecraft:oxeye_daisy",
+    "minecraft:cornflower",
+    "minecraft:lily_of_the_valley",
+    "minecraft:allium",
+    "minecraft:blue_orchid",
+    "minecraft:red_tulip",
+    "minecraft:orange_tulip",
+    "minecraft:white_tulip",
+    "minecraft:pink_tulip",
+    "minecraft:torchflower",
+    ...POST_BETA_TALL_FLOWERS
+]);
+
 export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     ...Object.fromEntries(POST_BETA_TALL_PLANTS.map((id): [string, string] => [id, "minecraft:air"])),
     "minecraft:cake": BH_CAKE_ID,
@@ -131,18 +162,7 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     "minecraft:torchflower_crop": "minecraft:air",
     "minecraft:pink_petals": "minecraft:air",
 
-    "minecraft:lilac": "minecraft:air",
-    "minecraft:peony": "minecraft:air",
-    "minecraft:rose_bush": "minecraft:air",
-    "minecraft:sunflower": "minecraft:air",
-    "minecraft:cornflower": "minecraft:air",
-    "minecraft:lily_of_the_valley": "minecraft:air",
-    "minecraft:azure_bluet": "minecraft:air",
-    "minecraft:oxeye_daisy": "minecraft:air",
-    "minecraft:allium": "minecraft:air",
-    "minecraft:blue_orchid": "minecraft:air",
-    "minecraft:pitcher_plant": "minecraft:air",
-    "minecraft:torchflower": "minecraft:air",
+    ...Object.fromEntries(POST_BETA_FLOWERS.map((id): [string, string] => [id, "minecraft:air"])),
     "minecraft:hanging_roots": "minecraft:air",
 
     "minecraft:leaf_litter": "minecraft:air",
