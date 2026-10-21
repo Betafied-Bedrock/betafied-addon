@@ -2,7 +2,7 @@ import { system } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 
 const CONFIG = Object.freeze({
-    VERSION: "5.13",
+    VERSION: "5.14",
     DELAY_TICKS: 70
 });
 

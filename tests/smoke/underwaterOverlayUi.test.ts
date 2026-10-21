@@ -9,10 +9,10 @@ import {
 
 const root = process.cwd();
 const HUD_SCREEN_PATH = "packs/RP/ui/hud_screen.json";
+const HUD_DEFS_PATH = "packs/RP/ui/.bfui/screens/hud_screen.json";
 
-function readHudScreen(): any {
-    const raw = readFileSync(resolve(root, HUD_SCREEN_PATH), "utf-8");
-    const withoutComments = raw
+function readUiJson(path: string): any {
+    const withoutComments = readFileSync(resolve(root, path), "utf-8")
         .split(/\r?\n/)
         .filter((line) => !line.trim().startsWith("//"))
         .join("\n");
@@ -21,12 +21,13 @@ function readHudScreen(): any {
 }
 
 describe("Beta Water Screen Tint - resource pack contract", () => {
-    const hud = readHudScreen();
+    const hud = readUiJson(HUD_SCREEN_PATH);
+    const defs = readUiJson(HUD_DEFS_PATH);
 
     it("keys the tint gate off the title string the script sends", () => {
         // The title binding is global, so the tint reads it directly instead of riding a factory
         // child. That is what lets "titleraw @s clear" take the tint down in a single message.
-        const tint = hud.underwater_tint;
+        const tint = defs.underwater_tint;
         assert.equal(tint.type, "image");
         assert.equal(
             tint.bindings[0].binding_name,
@@ -42,19 +43,14 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
         assert.equal(tint.bindings[1].target_property_name, "#visible");
     });
 
-    it("mounts the tint on the sized content panel and leaves every engine channel it replaced alone", () => {
-        // root_panel declares no size in vanilla, so a "100%" image laid out as one of its children
-        // resolves against nothing and falls back to the texture's native 32x32.
-        const onContent = (hud.hud_content?.modifications ?? []).some((modification: any) =>
-            modification.value.some((control: any) => "underwater_tint@hud.underwater_tint" in control)
-        );
-        assert.ok(onContent, "an unmounted tint would leave the sentinel with nothing to show");
-
+    it("mounts the tint on root_panel and leaves every engine channel it replaced alone", () => {
+        // Vanilla hangs its own 200% full-screen overlay off root_panel, so percentages resolve there.
         const onRoot = (hud.root_panel?.modifications ?? []).some((modification: any) =>
-            modification.value.some((control: any) => "underwater_tint@hud.underwater_tint" in control)
+            modification.value.some((control: any) => "underwater_tint@bfui:hud_screen.underwater_tint" in control)
         );
-        assert.equal(onRoot, false, "root_panel has no size for a percentage to resolve against");
+        assert.ok(onRoot, "an unmounted tint would leave the sentinel with nothing to show");
 
+        assert.equal(hud.underwater_tint, undefined, "the tint itself lives in the bfui defs file");
         assert.equal(
             hud.underwater_overlay,
             undefined,
@@ -92,7 +88,7 @@ describe("Beta Water Screen Tint - resource pack contract", () => {
     });
 
     it("zooms the tint to cover the screen instead of stretching it", () => {
-        const tint = hud.underwater_tint;
+        const tint = defs.underwater_tint;
         assert.equal(tint.texture, "textures/ui/underwater");
         assert.equal(tint.keep_ratio, true, "keep_ratio off would stretch the texture");
         assert.equal(tint.anchor_from, "center");

@@ -4,7 +4,6 @@
         "ui/.bfui/anim.json",
         "ui/.bfui/button.json",
         "ui/.bfui/common.json",
-        "ui/.bfui/misc.json",
         "ui/.bfui/screens/chat_screen.json",
         "ui/.bfui/screens/death_screen.json",
         "ui/.bfui/screens/hud_screen.json",

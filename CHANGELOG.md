@@ -2,6 +2,33 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.14 — 2026-10-21
+
+5.14 redraws the game's screens on Beta 1.7.3's layouts and adds pocket versions of the chat, pause and inventory screens.
+
+### Screens
+
+- Changed the chat screen to the era's layout, with a classic and a pocket variant.
+- Added keyboard and send buttons to the pocket chat box.
+- Changed the pause menu to the era's button stack.
+- Added a player list panel to the pocket pause menu.
+- Changed the furnace's top half to the era's label, arrow and flame.
+- Changed the loading screen to the era's dirt backdrop and progress bar.
+- Changed the inventory's layout toggle and container slots to the era's art.
+- Added a warning to pocket screens that pocket UI is in development.
+
+### HUD
+
+- Moved the chat panel to the bottom left of the HUD.
+- Added a player-list button to the HUD for touch.
+- Changed the crosshair to the engine's own.
+
+### Tooling
+
+- Changed the comment lint's ceiling from twelve lines to one.
+- Removed the multi-line comments from the scripts and the UI sources.
+- Moved the UI sources into .bfui/screens beside shared anim, button and common definitions.
+
 ## 5.13 — 2026-10-21
 
 5.13 adds the era's sword break times and bone meal that grows only Beta's two flowers. Capped stacks no longer spill at a player's feet.

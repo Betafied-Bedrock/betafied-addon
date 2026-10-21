@@ -6,7 +6,7 @@ import { decodePng } from "../../scripts/lib/betaColorizer.mjs";
 import { DEATH_SCREEN_COPY } from "../../packs/BP/scripts/player/deathScreen.js";
 
 const root = process.cwd();
-const DEATH_SCREEN_PATH = "packs/RP/ui/.bfui/death_screen.json";
+const DEATH_SCREEN_PATH = "packs/RP/ui/.bfui/screens/death_screen.json";
 const SERVER_FORM_PATH = "packs/RP/ui/server_form.json";
 
 function readUiJson(path: string): any {
@@ -142,7 +142,7 @@ describe("Beta death screen - resource pack contract", () => {
 
     it("registers the skin, since a custom tree is not loaded by name alone", () => {
         const defs = readUiJson("packs/RP/ui/_ui_defs.json");
-        assert.ok(defs.ui_defs.includes("ui/.bfui/death_screen.json"));
+        assert.ok(defs.ui_defs.includes("ui/.bfui/screens/death_screen.json"));
         assert.ok(existsSync(resolve(root, DEATH_SCREEN_PATH)));
     });
 
