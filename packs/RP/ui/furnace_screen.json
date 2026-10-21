@@ -36,5 +36,38 @@
   },
   "screen_stack_panel/center_fold": {
     "ignored": true
+  },
+  "furnace_panel": {
+    "type": "panel",
+    "controls": [
+      { "close_button_element@bfui:common.pocket_close_button": {}},
+      { "screen_stack_panel@furnace.screen_stack_panel": {} },
+      { "selected_item_details_factory@common.selected_item_details_factory": {} },
+      { "controller_gamepad_helpers_stack_panel": {
+          "type": "stack_panel",
+          "anchor_from": "bottom_middle",
+          "anchor_to": "bottom_middle",
+          "controls": [
+            { "container_gamepad_helpers_second_row@furnace.container_gamepad_helpers_second_row": {} },
+            {
+              "container_gamepad_helpers@common.container_gamepad_helpers": {
+                "$helper_x_control": "furnace.inventory_x_gamepad_helper",
+                "$helper_y_control": "furnace.inventory_y_gamepad_helper",
+                "$helper_a_control": "furnace.inventory_a_gamepad_helper"
+              }
+            }
+          ],
+          "bindings": [
+            {
+              "binding_name": "#gamepad_helper_visible",
+              "binding_name_override": "#visible"
+            }
+          ]
+        }
+      },
+      { "item_lock_notification_factory@common.item_lock_notification_factory": {} },
+      { "inventory_selected_icon_button@common.inventory_selected_icon_button": {} },
+      { "inventory_take_progress_icon_button@common.inventory_take_progress_icon_button": {} }
+    ]
   }
 }
