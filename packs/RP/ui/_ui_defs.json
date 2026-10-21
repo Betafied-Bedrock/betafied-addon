@@ -1,6 +1,5 @@
 {
     "ui_defs": [
-        "ui/debug_screen.json",
         "ui/.bfui/anim.json",
         "ui/.bfui/button.json",
         "ui/.bfui/common.json",

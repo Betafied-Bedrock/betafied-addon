@@ -2,6 +2,14 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.15.1 — 2026-10-21
+
+5.15.1 removes the in-development notice 5.15 left on the debug screen.
+
+### Screens
+
+- Removed the in-development notice from the debug screen.
+
 ## 5.15 — 2026-10-21
 
 5.15 adds the era's chest and container screens and puts the classic chat prompt back.
