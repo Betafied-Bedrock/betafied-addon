@@ -1,0 +1,68 @@
+{ "namespace": "bfui:common",
+  "touch_close_button": {
+    "ignored": "(not $touch)",
+    "type": "image",
+    "texture": "textures/ui/Black",
+    "size": [ 45, 20 ],
+    "anchor_from": "top_right",
+    "anchor_to": "top_right",
+    "offset": [ -4, 4 ],
+    "alpha": 0.7,
+    "controls": [
+      { "close_button@common.button": {
+          "$pressed_button_name": "button.menu_exit",
+          "size": [ 45, 20 ],
+          "focus_enabled": false,
+          "controls": [
+            { "default@bfui:common.close_button_default": {} },
+            { "hover@bfui:common.close_button_pressed": {} },
+            { "pressed@bfui:common.close_button_pressed": {} }
+      ]}}
+  ]},
+  "close_button_default": {
+    "type": "label",
+    "text": "Close"
+  },
+  "close_button_pressed@bfui:common.close_button_default": {
+    "text": "§eClose"
+  },
+  "screen_background": {
+    "type": "image",
+    "texture": "textures/ui/Black",
+    "alpha": 0.7
+  },
+  "screen_pocket_background": {
+    "ignored": "(not $pocket_screen)",
+    "type": "image",
+    "texture": "textures/ui/Black",
+    "alpha": 0.5
+  },
+  "classic_close_button": {
+    "ignored": "(not $touch)",
+    "type": "image",
+    "texture": "textures/ui/Black",
+    "size": [ 45, 20 ],
+    "anchor_from": "top_right",
+    "anchor_to": "top_right",
+    "offset": [ -4, 4 ],
+    "alpha": 0.7,
+    "controls": [
+      { "close_button@common.button": {
+          "$pressed_button_name": "button.menu_exit",
+          "size": [ 45, 20 ],
+          "focus_enabled": false,
+          "controls": [
+            { "default@bfui:common.close_button_default": {} },
+            { "hover@bfui:common.close_button_pressed": {} },
+            { "pressed@bfui:common.close_button_pressed": {} }
+      ]}}
+  ]},
+  "pocket_close_button@bfui:button_common.button_pocket_template": {
+    "size": [ 45, 20 ],
+    "$pressed_button_name": "button.menu_exit",
+    "$button_text": "Close",
+    "anchor_from": "top_right",
+    "anchor_to": "top_right",
+    "offset": [ -4, 4 ]
+  }
+}

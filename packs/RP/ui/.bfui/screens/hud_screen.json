@@ -1,0 +1,224 @@
+{ "namespace": "bfui:hud_screen",
+  "chat_panel_bottom": {
+    "type": "panel",
+    "anchor_from": "bottom_left",
+    "anchor_to": "bottom_left",
+    "size": [ "50%", "100%c" ],
+    "max_size": [ "50%", 200 ],
+    "offset": [ 2, -43 ],
+    "bindings": [
+      { "binding_name": "#hud_visible_centered_touch",
+        "binding_type": "global"
+      },
+      { "binding_type": "view",
+        "source_property_name": "(not #hud_visible_centered_touch)",
+        "target_property_name": "#visible"
+    }],
+    "controls": [
+      { "stack_panel": {
+          "type": "stack_panel",
+          "anchor_from": "bottom_left",
+          "anchor_to": "bottom_left",
+          "size": ["100%", "100%c"],
+          "factory": {
+            "name": "chat_item_factory",
+            "max_children_size": 15,
+            "control_ids": {
+              "chat_item": "chat_item@bfui:hud_screen.chat_grid_item_bottom_core"
+          }}
+      }}
+  ]},
+  "chat_grid_item_bottom_core": {
+    "type": "stack_panel",
+    "size": [ "100%", "100%cm" ],
+    "layer": 5,
+    "orientation": "vertical",
+    "controls": [
+      { "text_wrapper": {
+          "type": "image",
+          "texture": "textures/ui/Black",
+          "size": [ "100%", "100%c" ],
+          "alpha": 0.5,
+          "layer": -10,
+          "offset": [ 0, 0 ],
+          "anims": [
+            "@bfui:anims.anim_chat_bg_wait_bottom"
+          ],
+          "controls": [
+            { "text": {
+                "type": "label",
+                "text": "#text",
+                "anchor_from": "bottom_left",
+                "anchor_to": "bottom_left",
+                "shadow": true,
+                "localize": false,
+                "size": [ "100%", "default" ],
+                "font_scale_factor": 1.0,
+                "line_padding": -1.0,
+                "offset": [ 0, 0.669 ],
+                "enable_profanity_filter": false,
+                "anims": [
+                  "@hud.anim_chat_txt_wait"
+                ],
+                "bindings": [
+                  { "binding_name": "#text",
+                    "binding_type": "collection",
+                    "binding_collection_name": "chat_text_grid"
+                  },
+                  { "binding_type": "view",
+                    "source_property_name": "#text",
+                    "target_property_name": "#chat_text"
+                }]
+            }}
+      ]}}
+  ]},
+  "crosshair_pixel": {
+    "ignored": "($touch)",
+    "type": "custom",
+    "renderer": "gradient_renderer",
+    "color1": [ 1, 1, 1, 1 ],
+    "color2": [ 1, 1, 1, 1 ],
+    "size": [ 1, 1 ]
+  },
+  "custom_crosshair": {
+    "type": "panel",
+    "size": [ 16, 16 ],
+    "controls": [
+      { "horizontal@bfui:hud_screen.crosshair_pixel": { "size": [ 9, 1 ]}},
+      { "vertical@bfui:hud_screen.crosshair_pixel": { "size": [ 1, 9 ]}},
+      { "dot@bfui:hud_screen.crosshair_pixel": { "size": [ 1, 1 ]}}
+  ]},
+  "player_list": {
+    "type": "button",
+    "size": [ "100%", "100%" ],
+    "default_control": "default",
+    "hover_control": "hover",
+    "pressed_control": "pressed",
+    "button_mappings": [
+      { "from_button_id": "button.scoreboard",
+        "to_button_id": "button.scoreboard",
+        "mapping_type": "global"
+    }],
+    "controls": [
+      { "pressed": {
+          "type": "panel",
+          "size": [ "100%", "100%" ],
+          "controls": [
+            { "pressed@common.scrolling_panel": {
+                "size": [ 124, "100%" ],
+                "offset": [ 0, 20 ],
+                "anchor_from": "top_middle",
+                "anchor_to": "top_middle",
+                "$scrolling_content": "bfui:hud_screen.player_list_grid",
+                "$show_background": false,
+                "$always_handle_scrolling": true
+            }}
+      ]}}
+  ]},
+  "player_list_grid": {
+    "type": "grid",
+    "size": ["100%c", "100%c"],
+    "grid_item_template": "bfui:hud_screen.player_list_grid_core",
+    "grid_dimension_binding": "#players_grid_dimension",
+    "collection_name": "players_collection",
+    "anchor_to": "top_middle",
+    "anchor_from": "top_middle",
+    "bindings": [
+      { "binding_name": "#players_grid_dimension"}
+  ]},
+  "player_list_grid_core": {
+    "type": "panel",
+    "size": [ 120, 9 ],
+    "controls": [
+      { "background": {
+          "type": "panel",
+          "size": [ "100%", 10 ],
+          "anchor_from": "top_middle",
+          "anchor_to": "top_middle",
+          "controls": [
+            { "outline": {
+                "type": "image",
+                "texture": "textures/ui/background_with_border",
+                "alpha": 0.5
+            }}
+      ]}},
+      { "player_profile_core": {
+          "type": "stack_panel",
+          "size": [ "100%", "100%" ],
+          "orientation": "horizontal",
+          "controls": [
+            { "player_profile_panel": {
+                "type": "panel",
+                "size": [ 8, 8 ],
+                "layer": 1,
+                "controls": [
+                  { "player_profile": {
+                      "type": "image",
+                      "texture": "#texture",
+                      "texture_file_system": "#texture_source",
+                      "size": [ 8, 8 ],
+                      "offset": [ 1, 1 ],
+                      "bindings": [
+                        { "binding_name": "#texture",
+                          "binding_type": "collection",
+                          "binding_collection_name": "players_collection"
+                        },
+                        { "binding_name": "#texture_source",
+                          "binding_name_override": "#texture_file_system",
+                          "binding_type": "collection",
+                          "binding_collection_name": "players_collection"
+                        },
+                        { "binding_name": "#gamerpic_visible",
+                          "binding_type": "collection",
+                          "binding_collection_name": "players_collection",
+                          "binding_name_override": "#visible"
+                      }]
+                  }},
+                  { "player_profile_offline": {
+                      "type": "image",
+                      "texture": "textures/ui/lan_icon",
+                      "size": [ 8, 8 ],
+                      "offset": [ 1, 1 ],
+                      "bindings": [
+                        { "binding_name": "(not #gamerpic_visible)",
+                          "binding_type": "collection",
+                          "binding_collection_name": "players_collection",
+                          "binding_name_override": "#visible"
+                      }]
+                  }}
+            ]}},
+            { "padding_nametag": { "type": "panel", "size": [ 2, 2 ]}},
+            { "player_name": {
+                "type": "label",
+                "text": "#gamertag",
+                "size": [ "fill", "default" ],
+                "text_alignment": "left",
+                "shadow": true,
+                "layer": 1,
+                "bindings": [
+                  { "binding_name": "#gamertag",
+                    "binding_type": "collection",
+                    "binding_collection_name": "players_collection"
+                }]
+            }}
+      ]}}
+  ]},
+  "underwater_tint": {
+    "type": "image",
+    "texture": "textures/ui/underwater",
+    "anchor_from": "center",
+    "anchor_to": "center",
+    "size": [ "400%", "400%" ],
+    "layer": 100,
+    "keep_ratio": true,
+    "bilinear": true,
+    "bindings": [
+      { "binding_name": "#hud_title_text_string",
+        "binding_name_override": "#tint_text"
+      },
+      { "binding_type": "view",
+        "source_property_name": "(#tint_text = '_w')",
+        "target_property_name": "#visible"
+      }
+  ]}
+}
