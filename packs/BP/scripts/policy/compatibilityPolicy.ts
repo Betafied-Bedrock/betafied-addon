@@ -89,10 +89,7 @@ export const POST_BETA_TALL_PLANTS: readonly string[] = Object.freeze([
     "minecraft:large_fern"
 ]);
 
-/**
- * Two-block flowers that post-date 1.7.3. Both halves carry the same id, so a rewrite has to clear
- * the whole plant rather than set a flower into each half.
- */
+// Both halves carry one id, so a rewrite has to clear the plant, not set a flower in each half.
 export const POST_BETA_TALL_FLOWERS: readonly string[] = Object.freeze([
     "minecraft:lilac",
     "minecraft:peony",
@@ -101,10 +98,7 @@ export const POST_BETA_TALL_FLOWERS: readonly string[] = Object.freeze([
     "minecraft:pitcher_plant"
 ]);
 
-/**
- * Flowers that post-date 1.7.3. The era grew only the rose (today's poppy) and the yellow flower
- * (today's dandelion), so bone meal's modern palette is rewritten to those two.
- */
+// The era grew only the poppy and the dandelion; bone meal's modern palette rewrites to those two.
 export const POST_BETA_FLOWERS: readonly string[] = Object.freeze([
     "minecraft:azure_bluet",
     "minecraft:oxeye_daisy",
@@ -182,9 +176,7 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
 
     "minecraft:basalt": "minecraft:air",
     "minecraft:polished_basalt": "minecraft:air",
-    // Nether brick arrived after 1.7.3 and the only thing that generates it is a fortress, which the
-    // era never had. Left to the suffix rules its trim came back as a wooden fence and cobblestone
-    // stairs, so the shape of a fortress stood in cleared ground.
+    // Post-1.7.3, and no era fortress generates it: the suffix rules turned its trim into wood and cobble.
     "minecraft:nether_brick": "minecraft:air",
     "minecraft:nether_brick_fence": "minecraft:air",
     "minecraft:nether_brick_stairs": "minecraft:air",

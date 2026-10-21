@@ -1,11 +1,4 @@
-/**
- * Which module owns which era table, so a rule has one home instead of three: this file owns the era's
- * id sets (the blocks, items and entities 1.7.3 had, plus the pack's own ids); `normalizer.ts` owns the
- * translations between eras (what a post-Beta id becomes at each boundary, and no id set of its own);
- * `compatibilityPolicy.ts` owns policy across addons (foreign entities and blocks the pack leaves alone,
- * and the bulk and fine terrain tables). A rule spanning two belongs to the table the boundary reads,
- * with the other importing it; `BETA_POLICY_GAPS.md` records the decisions still open across the split.
- */
+// This file owns era id sets; normalizer.ts owns era translations, compatibilityPolicy.ts cross-addon policy.
 export const BH_FENCE_ID = "bh:fence";
 export const BH_CHEST_ID = "bh:chest";
 export const BH_BOW_ID = "bh:bow";
@@ -23,19 +16,13 @@ export const BETA_DOOR_BLOCK_IDS: ReadonlySet<string> = Object.freeze(
     new Set(Object.values(BETA_DOOR_BLOCK_OF))
 );
 
-/**
- * A click on either of these is how the engine writes a sign's text, so no handler of the pack's may
- * cancel one: the editor has no script equivalent to put in its place.
- */
+// A click writes sign text and has no script equivalent, so no handler may cancel one.
 export const BETA_SIGN_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:standing_sign",
     "minecraft:wall_sign"
 ]));
 
-/**
- * A click on one of these is the era's own sleep-and-set-spawn use, never a placement, and the
- * engine keeps the only sleep the era had — so no handler of the pack's may cancel one.
- */
+// A bed click is the era's sleep-and-set-spawn use, never a placement: no handler may cancel it.
 export const BETA_BED_BLOCK_IDS: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:bed"
 ]));
@@ -70,7 +57,7 @@ export const BETA_PASSIVE_TYPES: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:wolf"
 ]));
 
-/** Zombie pigman exists under two IDs across Bedrock versions. */
+// Zombie pigman exists under two IDs across Bedrock versions.
 export const BETA_PIGMAN_TYPES: ReadonlySet<string> = Object.freeze(new Set([
     "minecraft:zombie_pigman",
     "minecraft:zombified_piglin"
@@ -149,9 +136,7 @@ export const BETA_ITEM_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:coal", "minecraft:charcoal", "minecraft:diamond", "minecraft:iron_ingot", "minecraft:gold_ingot",
     "minecraft:stick", "minecraft:bowl", "minecraft:string", "minecraft:feather", "minecraft:gunpowder",
     "minecraft:wheat_seeds", "minecraft:wheat", "minecraft:flint", "minecraft:leather", "minecraft:brick",
-    // Cane is one plant under two ids on this engine: `minecraft:reeds` is the block (see
-    // BETA_BLOCK_IDS) and `minecraft:sugar_cane` is the item a broken cane pays. Naming the item after
-    // the block asked the engine for an id it does not hold, and the drop went with it.
+    // `reeds` is the block, `sugar_cane` the item it drops; naming the item after the block lost the drop.
     "minecraft:clay_ball", "minecraft:sugar_cane", "minecraft:paper", "minecraft:book", "minecraft:slime_ball",
     "minecraft:egg", "minecraft:glowstone_dust", "minecraft:bone", "minecraft:sugar", "minecraft:redstone",
     "minecraft:lapis_lazuli", "minecraft:ink_sac", "minecraft:cocoa_beans", "minecraft:bone_meal",
@@ -166,7 +151,7 @@ export const BETA_ITEM_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:empty_map", "minecraft:filled_map"
 ]));
 
-/** Addon-owned namespaces exempt from modern-item filtering. */
+// Addon-owned namespaces exempt from modern-item filtering.
 export const MOD_NAMESPACES: ReadonlySet<string> = Object.freeze(new Set([
     "bh",
     "ubd",
@@ -191,7 +176,7 @@ export function isVanillaId(typeId: string): boolean {
     return getNamespace(typeId) === VANILLA_NAMESPACE;
 }
 
-/** Bedrock color-component index order matching sheep dye values. */
+// Bedrock color-component index order matching sheep dye values.
 export const WOOL_BY_COLOR: readonly string[] = Object.freeze([
     "minecraft:white_wool",
     "minecraft:orange_wool",
@@ -211,12 +196,7 @@ export const WOOL_BY_COLOR: readonly string[] = Object.freeze([
     "minecraft:black_wool"
 ]);
 
-/**
- * Ticks a sword needs to break each block, from Beta's own swing: `ItemSword.func_79_a` answers 15
- * against the web and 1.5 against everything else, and a break takes `hardness * 30 / speed` ticks at
- * 20 ticks a second. Only the wood-class blocks are listed, which is the set the pack lets a sword
- * shorten; `minecraft:wooden_slab` is left out on purpose because it is the stone-backed slab.
- */
+// Beta ItemSword.func_79_a: 1.5 (15 vs web), so ticks = hardness * 30 / speed; wood-class blocks only.
 export const SWORD_MINING_TICKS: ReadonlyMap<string, number> = Object.freeze(new Map<string, number>([
     ["minecraft:cobweb", 8], ["minecraft:web", 8],
     ["minecraft:oak_leaves", 4], ["minecraft:spruce_leaves", 4], ["minecraft:birch_leaves", 4],
@@ -277,21 +257,14 @@ export const BETA_BLOCK_IDS: Readonly<Set<string>> = Object.freeze(new Set([
     "minecraft:lever", "minecraft:stone_button", "minecraft:stone_pressure_plate", "minecraft:wooden_pressure_plate",
     "minecraft:redstone_torch", "minecraft:unlit_redstone_torch", "minecraft:redstone_wire", "minecraft:repeater",
     "minecraft:piston", "minecraft:sticky_piston", "minecraft:rail", "minecraft:golden_rail", "minecraft:detector_rail",
-    // Beta's piston extension (block 34) is its own block on this engine, so a base without its arm
-    // is a broken piston. Both heads belong to the era even though neither has an item form.
+    // The piston arm is its own block (34) here, so a base without it is broken; neither head has an item.
     "minecraft:piston_arm_collision", "minecraft:sticky_piston_arm_collision",
     "minecraft:trapdoor", "minecraft:bed", "minecraft:wooden_door", "minecraft:iron_door",
     "minecraft:standing_sign", "minecraft:wall_sign",
-    // Six era blocks whose engine id is the legacy Bedrock spelling of the id the era used, and both
-    // spellings resolve on this build. Listing the engine's spelling here is what keeps the two
-    // boundaries agreeing: the scrubber preserves the block, and the drop boundary keeps the item the
-    // block pays. A private list in either pass is how the block came to survive while its drop did not.
+    // Legacy engine spelling of era ids: the scrubber and the drop boundary both read this list, so they agree.
     "minecraft:deadbush", "minecraft:web", "minecraft:mob_spawner",
     "minecraft:unpowered_repeater", "minecraft:powered_repeater", "minecraft:stone_block_slab",
-    // Three era blocks with no item form and no other owner in the pack, so a missing entry is
-    // silent: only the world pass notices. The portal (block 90), fire (51) and farmland (60) were
-    // all read as modern terrain and erased by the sweep — a lit portal died with its obsidian frame
-    // still standing, which is what players reported as a portal that keeps breaking.
+    // No item form and no other owner, so a missing entry is silent: the sweep erased portal, fire, farmland.
     "minecraft:portal", "minecraft:fire", "minecraft:farmland"
 ]));
 

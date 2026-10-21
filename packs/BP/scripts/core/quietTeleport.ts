@@ -4,7 +4,7 @@ import { reportError, runCatching } from "./errorReporter.js";
 
 const MUTE_TICKS = 20;
 
-/** The gamerule write lands a tick after the call, so the move has to follow it rather than precede it. */
+// The gamerule write lands a tick after the call, so the move has to follow it rather than precede it.
 export const TELEPORT_DELAY_TICKS = 2;
 
 let mutedByUs = false;
@@ -15,8 +15,7 @@ type MuteState = "ours" | "external";
 function muteCommandFeedback(): MuteState {
     const rules = world.gameRules;
 
-    // Feedback was already disabled by something else.
-    // Don't touch it and don't restore it later.
+    // Already muted externally: leave it alone and do not restore it.
     if (!rules.sendCommandFeedback && !mutedByUs) {
         return "external";
     }
@@ -76,8 +75,7 @@ export function teleportQuietly(
         );
     };
 
-    // If feedback was already disabled externally, there is no synchronization
-    // problem and we can teleport immediately.
+    // When someone else owns the mute there is nothing to wait for, so teleport now.
     if (mute === "external") {
         move();
         return;

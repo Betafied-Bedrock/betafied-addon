@@ -20,9 +20,6 @@
   "hunger_renderer": {
     "ignored": true
   },
-  // "cursor_renderer": {
-  //   "ignored": true
-  // },
   "crosshair_pixel": {
     "ignored": true,
     "type": "custom",
@@ -77,22 +74,7 @@
       }
     ]
   },
-  // Beta 1.7.3 tinted the whole screen while the camera was under water. The tint hangs off the
-  // title string rather than the actionbar: the engine keeps the last actionbar in its factory
-  // binding after the fade, so the actionbar could only be talked out of a tint by pushing a decoy
-  // string, and both edges of the dive paid the actionbar's fade. The title binding is global, so
-  // this control reads it directly.
-  //
-  // It hangs off hud_content, the screen's own $screen_content panel, rather than root_panel: the
-  // vanilla root_panel declares no size, so a percentage image laid out as one of its children
-  // resolves against nothing and falls back to the texture's native 32x32. hud_content is the panel
-  // the screen itself sizes, which is where a percentage can actually resolve to the window.
-  //
-  // The tint zooms rather than stretches: keep_ratio lets the engine scale the 32x32 texture
-  // uniformly (and centers it), and the oversized frame is the cover trick. keep_ratio fits the
-  // draw inside the control, so the control has to oversize the window for that uniform draw to
-  // still reach every edge; 400% clears the widest aspect worth supporting (4:1), and the overflow
-  // simply falls off the screen.
+  // Dive tint keyed on the '_w' title (the actionbar binding sticks after its fade); mounted on hud_content, since root_panel has no size for a percentage.
   "underwater_tint": {
     "type": "image",
     "texture": "textures/ui/underwater",
@@ -539,8 +521,7 @@
   "hotbar_elipses_button": {
     "prevent_touch_input": true
   },
-  // The armor icons and the water tint both address the HUD through the title string, so any title
-  // starting with an underscore is ours and none of it may reach the player's screen.
+  // Armor icons and the dive tint both ride the title, so underscore-prefixed titles never draw.
   "hud_title_text/title_frame": {
     "bindings": [
       {

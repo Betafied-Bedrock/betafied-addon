@@ -142,9 +142,7 @@
             {
               "chat_textbox@chat.chat_textbox": {}
             },
-            // FIX: This thing screams orientation errors for some weird reason.
-            //      Maybe this might be that the parent element is a stack and this button element
-            //      attempt to be an stack panel.
+            // Not a stack panel: the parent stack throws orientation errors.
             {
               "chat_send_btn@common_buttons.light_text_button": {
                 "ignored": true,

@@ -31,8 +31,7 @@ function hasBetaTreeAround(dim: Dimension, x: number, y: number, z: number): boo
                     const block = dim.getBlock({ x: x + dx, y: y + dy, z: z + dz });
                     if (block && (block.typeId.includes("leaves") || block.typeId.includes("log"))) return true;
                 } catch {
-                    // getBlock throws for a cell outside the loaded range, which is simply a cell with
-                    // no tree in it.
+                    // A cell outside the loaded range simply has no tree in it.
                 }
             }
         }
@@ -127,8 +126,7 @@ function sanitizeItemDrop(entity: Entity, options: SanitizationOptions): void {
     } else if (resolution.action === "convert") {
         const stacks = planStackedDrops(resolution.targetId, ORE_DROP_AMOUNT[itemId] ?? amount);
 
-        // The entity holds the only copy of the item, so a target this engine cannot build leaves the
-        // drop as the engine spawned it rather than removing it for a replacement that never lands.
+        // The entity holds the only copy, so an unbuildable target leaves the engine's drop in place.
         if (stacks === undefined) return;
 
         const loc = entity.location;
@@ -150,9 +148,7 @@ function planStackedDrops(itemId: string, amount: number): ItemStack[] | undefin
             remaining -= stackSize;
         }
     } catch (err) {
-        // Reaching here means a conversion target our own tables name is not an item this engine can
-        // build, so the caller keeps the engine's own drop. That is a data defect rather than an
-        // ordinary condition, and it repeats on every such drop until someone fixes the table.
+        // A target our own tables name but this engine cannot build is a data defect; keep the drop.
         reportError({
             system: "entitySpawnHandler",
             operation: "planConvertedDropStacks",

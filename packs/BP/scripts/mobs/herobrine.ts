@@ -72,7 +72,7 @@ export function pickRollDelayTicks(first: boolean): number {
     return min + Math.floor(Math.random() * (max - min));
 }
 
-/** Bedrock yaw pointing `from` at `to`: yaw 0 faces +Z, 90 faces -X. */
+// Bedrock yaw pointing at `to`: yaw 0 faces +Z, 90 faces -X.
 export function facingYaw(from: Vector3, to: Vector3): number {
     return Math.atan2(-(to.x - from.x), to.z - from.z) * (180 / Math.PI);
 }
@@ -102,9 +102,7 @@ function isFooting(dimension: Dimension, x: number, y: number, z: number): boole
         if (!ground.isSolid || ground.isLiquid) return false;
         return feet.isAir && head.isAir;
     } catch {
-        // A cell outside the loaded chunk makes the read throw, and "no footing here" is the honest
-        // answer for one: the picker moves on to its next candidate, so this is a normal outcome of
-        // the search rather than a failure to report.
+        // Unloaded cells have no footing; the picker moves on to its next candidate.
         return false;
     }
 }

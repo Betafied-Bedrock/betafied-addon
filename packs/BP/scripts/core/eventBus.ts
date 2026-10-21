@@ -32,11 +32,7 @@ import type {
 import { runCatching } from "./errorReporter.js";
 import type { ErrorContext } from "./errorReporter.js";
 
-/**
- * Wraps a handler in its own error envelope, so a registration reports a failure with the same
- * system/operation shape everywhere instead of hand-rolling a try/catch per call site. Pass a
- * function for the context when the report needs a target that only exists once the event is in.
- */
+// The one error envelope for handlers: pass a function when the context needs a target from the event.
 export function guarded<T>(
     context: ErrorContext | ((event: T) => ErrorContext),
     callback: (event: T) => void
@@ -47,16 +43,11 @@ export function guarded<T>(
     };
 }
 
-/**
- * Precedence for the handlers that share a cancellable event. Dispatch runs the highest priority first
- * and stops at the first cancel, so a rule that answers a click has to be placed against the broad
- * vetoes it shares the event with. The values live here rather than at the registration order in
- * `main.ts`, which is otherwise the only tie-break and would let a reordered import change gameplay.
- */
+// Highest priority first, first cancel stops dispatch, so this order (not main.ts import order) decides the click.
 export const InteractPriority = Object.freeze({
-    /** A rule that answers this click itself: cake, slabs, chests, bonemeal, placement, sleep. */
+    // A rule that answers this click itself: cake, slabs, chests, bonemeal, placement, sleep.
     RULE: 10,
-    /** A veto over an area rather than the click: the era's build ceiling, applied to what no rule claimed. */
+    // A veto over an area, applied to what no rule claimed: the era's build ceiling.
     AREA_VETO: -10
 } as const);
 
@@ -71,8 +62,7 @@ class EventBus {
     private initialized = false;
     private nextId = 1;
 
-    // Private: the typed on* methods below are the module's subscription surface, so the string keys
-    // exist only inside this file and cannot drift from a caller's guess at an event name.
+    // Private: the typed on* methods are the only subscription surface, so string keys cannot drift.
     private subscribe<T>(eventName: string, callback: (event: T) => void, priority: number = 0): () => void {
         const id = this.nextId++;
         const list = this.handlers.get(eventName) ?? [];

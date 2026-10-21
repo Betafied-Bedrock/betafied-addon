@@ -31,11 +31,9 @@ const BAND_HEIGHT = 128;
 const CHUNK_SIZE = 16;
 const REVERIFY_INTERVAL_TICKS = 2400;
 const REVERIFY_SPREAD_TICKS = 600;
-// A pass that ends unfinished comes back on this clock instead of the re-verify one: the chunk is
-// still dirty, and the long window is what hid a patch a player had walked back to.
+// An unfinished pass retries here, not on the long window that hid a patch a player had walked back to.
 const RETRY_INTERVAL_TICKS = 120;
-// One read batch is one tick's slice of the fine pass: it ends in a yield, and the band is asked
-// whether anything unclassified is left once it has classified a type.
+// One read batch is one tick's fine-pass slice, and ends in the yield below.
 const FINE_READ_BATCH = 512;
 const MAX_FINE_READS_PER_BAND = 1024;
 
@@ -47,10 +45,7 @@ function reverifyOffset(key: string): number {
     return (hash >>> 0) % REVERIFY_SPREAD_TICKS;
 }
 
-/**
- * Filter for authentic Beta blocks preserved by fine pass volume queries. Only air is added here: the
- * registry already carries the era's ids in every spelling the engine answers to.
- */
+// Fine-pass filter: air plus the era's registered ids, which already cover every spelling the engine answers.
 function buildUntouchedTypes(): string[] {
     const excludeTypes: string[] = [];
     const candidates = new Set<string>([
@@ -70,11 +65,7 @@ function buildUntouchedTypes(): string[] {
     return excludeTypes;
 }
 
-/**
- * Both tables resolve block ids, and this module's top level runs in early execution: a lookup there
- * throws, so a table built at load time came out empty and stayed empty for the session. Built on
- * first use instead, which is a tick, in default execution.
- */
+// Built on first use: block-id lookups at this module's top level run in early execution and throw.
 let untouchedTypesCache: string[] | undefined;
 
 function untouchedTypes(): string[] {
@@ -123,14 +114,7 @@ function buildPostBetaWoodTargets(): readonly (readonly [string, string])[] {
     return targets;
 }
 
-/**
- * The probe list. An id this engine build cannot resolve has no block to find in the world, and a
- * probe or fill that names it throws - a refused probe reads as "present", so the fill built for it
- * is refused too and the band ends before a real target is reached. The tables are hand-written, so
- * this is also what keeps one stale spelling from taking the whole sweep down.
- *
- * Exported with the resolver injectable so a test can stand in for a build that lacks an id.
- */
+// Resolvable ids only: an unresolvable probe is refused, reads as present, and its fill ends the band; resolver injectable for tests.
 export function buildScrubTargets(
     isRegistered: (id: string) => boolean = engineRegistersBlock
 ): readonly (readonly [string, string])[] {
@@ -214,10 +198,7 @@ function isInFlight(key: string, tick: number): boolean {
     return claimedAt !== undefined && tick - claimedAt < IN_FLIGHT_STALE_TICKS;
 }
 
-// Uses native fillBlocks directly to bypass command parsing and the 32,768 block command volume cap.
-// Answers the engine's refusal, or `undefined` when the write was accepted: the fill is the only
-// proof a band was actually written, and a chunk that keeps its success mark after a refused one
-// stays dirty for the whole re-verify window.
+// fillBlocks skips command parsing and the 32,768-block command cap; a non-undefined answer is the engine refusing the write.
 function fill(dim: Dimension, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, block: string, filter?: BlockFilter): unknown {
     try {
         dim.fillBlocks(
@@ -231,15 +212,10 @@ function fill(dim: Dimension, x1: number, y1: number, z1: number, x2: number, y2
     }
 }
 
-/**
- * What one block type becomes, from its id alone. The consolidated Bedrock planks block is the one
- * exception: its wood species lives in a block state, and a fill sets a type without touching states,
- * so it keeps the per-block path. Every other id answers for itself, which is what lets a whole type
- * be written by one filtered fill instead of one write per block.
- */
+// The consolidated planks block carries its species in a state a fill cannot set, so it keeps the per-block path.
 const PLANKS_RETYPE = "planks:retype";
 
-/** A target a fill can write, unless it is the consolidated planks block a fill cannot restate. */
+// A target a fill can write, unless it is the consolidated planks block a fill cannot restate.
 function toFillTarget(target: string): string {
     return target === PLANKS_TARGET ? PLANKS_RETYPE : target;
 }
@@ -263,11 +239,7 @@ function retypePlanks(block: Block): void {
     block.setPermutation(BlockPermutation.resolve(PLANKS_TARGET).withState("wood_type", "oak"));
 }
 
-/**
- * The types a band's read batch has already classified, so the volume can be asked whether anything
- * it would still return is of a type no fill covers yet. A refused query falls back to `true`, which
- * keeps the answer on the conservative side: keep reading.
- */
+// Types the band already classified; a refused query answers true, which keeps the pass reading.
 function unclassifiedFilter(classified: ReadonlyMap<string, string>): BlockFilter {
     return { excludeTypes: [...untouchedTypes(), ...classified.keys()] };
 }
@@ -280,12 +252,7 @@ function containsBlocksIn(dimension: Dimension, volume: BlockVolume, filter: Blo
     }
 }
 
-/**
- * Binary search to find which scrub target types exist in volume with minimal containsBlock calls.
- *
- * Exported so a test can pin the inverted-range case: an empty table asks for `0..-1`, and an
- * unbounded recursion there is a stack overflow the watchdog answers by killing the whole pack.
- */
+// Binary search for the targets present; a test pins the empty-table `0..-1` case, whose unbounded recursion overflows the stack.
 export function collectBulkTargets(dimension: Dimension, volume: BlockVolume, lo: number, hi: number, present: number[]): void {
     if (lo > hi) return;
     if (!containsBlocksIn(dimension, volume, bulkRangeFilter(lo, hi))) return;
@@ -321,18 +288,7 @@ function runBulkReplacements(dimension: Dimension, volume: BlockVolume, cx: numb
     return undefined;
 }
 
-/**
- * Structure blocks the era had no way to reach. A chest carries loot the Nether Update added and the
- * pack's own chest is `bh:chest`, so a `minecraft:chest` in a swept chunk is a ruined portal's. A
- * spawner is a fortress's blaze spawner, and fortresses arrived after 1.7.3 — a spawner is unobtainable
- * (a player can neither place nor break one), so any in the Nether is vanilla generation too.
- *
- * Both are deleted rather than retyped: opening a chest would run the pack's container screen over
- * the structure's loot, and the spawner block has no era behaviour to become. The ids stay in
- * `BETA_BLOCK_IDS` for the drop boundary, so this cannot live in the compatibility tables — which is
- * also what keeps the untouched-terrain filter from preserving them as Beta terrain. One probe
- * covers both, to keep the cost of the pass flat: it is one native volume scan per band.
- */
+// Post-Beta generation (ruined-portal chest, fortress spawner): deleted, since neither has era behaviour; the drop boundary keeps their ids.
 const GENERATED_STRUCTURE_TYPES: readonly string[] = Object.freeze(["minecraft:chest", "minecraft:mob_spawner"]);
 const GENERATED_STRUCTURE_FILTER: BlockFilter = Object.freeze({ includeTypes: [...GENERATED_STRUCTURE_TYPES] });
 
@@ -349,12 +305,7 @@ function clearGeneratedStructures(dimension: Dimension, volume: BlockVolume, x1:
 // Dimension.getBlocks may throw unhandled native errors on certain engine builds; latch to avoid log spam.
 let fineQueryRefusalReported = false;
 
-/**
- * The pass the tables did not claim: what the bulk replacements leave behind, classified by id. A type
- * is written once for the whole band rather than once per block, and an id that answers for itself stops
- * being read as soon as the band holds nothing else - the old shape paid one native read and one native
- * write per block, which is thousands of calls for a chunk made of one modern rock type.
- */
+// The leftovers: each type is written once for the whole band, and reading stops once nothing unclassified remains.
 export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number): Generator<void, boolean, unknown> {
     const { min: yMin, max: yMax } = dimension.heightRange;
     const x1 = cx * CHUNK_SIZE;
@@ -370,8 +321,7 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
     let firstError: unknown;
 
     for (let y = yMin; y <= yMax; y += BAND_HEIGHT) {
-        // The pass spans ticks, so the chunk can leave the player's loaded set between bands. A write
-        // there is refused, and a chunk must never take its success mark for a band it never wrote.
+        // The pass spans ticks, so the chunk can unload between bands; a refused write must not take the success mark.
         if (!dimension.isChunkLoaded({ x: x1, y, z: z1 })) return false;
 
         const bandTop = Math.min(y + BAND_HEIGHT - 1, yMax);
@@ -446,17 +396,14 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
 
                     if (totalBandReads >= MAX_FINE_READS_PER_BAND) {
                         exhausted = true;
-                        // The cap ends this pass's reads, not the band's work: a type this pass never
-                        // classified is still standing, so the chunk has to come back for it.
+                        // The cap ends the reads, not the band's work: unclassified types are still standing.
                         truncated = containsBlocksIn(dimension, volume, unclassifiedFilter(classified));
                     }
 
-                    // A batch that ran the band out is followed by the band's own yield, so yielding here
-                    // too would spend a whole tick on nothing.
+                    // A batch that ran the band out is followed by the band's yield; another here would burn a tick.
                     if (reads > 0 && !exhausted) yield;
 
-                    // When all remaining blocks in the volume belong to types already covered by fills,
-                    // end the pass without reading every duplicate coordinate across the native bridge.
+                    // Nothing unclassified left: stop rather than read every duplicate coordinate across the bridge.
                     if ((classifiedAnything || reads === FINE_READ_BATCH) && !exhausted && !containsBlocksIn(dimension, volume, unclassifiedFilter(classified))) {
                         exhausted = true;
                     }
@@ -489,17 +436,13 @@ export function* scrubFineDetails(dimension: Dimension, cx: number, cz: number):
         );
     }
 
-    // Only a chunk that was read to the end and written is clean. A refused fill, or a band whose read
-    // cap cut it short, leaves ground standing that the re-verify window would hide for two minutes.
+    // Only a fully read and written chunk is clean; the re-verify window would hide whatever is left.
     return refusedWrites === 0 && !incomplete;
 }
 
 let playerCursor = 0;
 
-/**
- * The Overworld ships pre-generated in the world template, so the sweep is Nether-only: new Overworld
- * chunks are left to Bedrock's own generation the way the template world is.
- */
+// Nether-only: the template's Overworld is pre-generated, so new chunks stay Bedrock's own.
 export function* chunkScanJob(): Generator<void, void, unknown> {
     let scrubbed = 0;
 
@@ -539,8 +482,7 @@ export function* chunkScanJob(): Generator<void, void, unknown> {
             const clean = yield* scrubFineDetails(dimension, chunkX, chunkZ);
             SCRUB_IN_FLIGHT.delete(key);
 
-            // Every chunk takes a mark, so one that keeps failing cannot hold the front of the queue
-            // and starve the rest of the neighbourhood; only a finished pass earns the long window.
+            // Every chunk is marked so a failing one cannot starve the neighbourhood; only a clean pass earns the long window.
             markScrubbed(key, tick, clean ? REVERIFY_INTERVAL_TICKS + reverifyOffset(key) : RETRY_INTERVAL_TICKS);
 
             if (!clean) continue;

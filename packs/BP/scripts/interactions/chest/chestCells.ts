@@ -17,12 +17,7 @@ import {
 
 export const AIR_ID = "minecraft:air";
 
-/**
- * The module's one failure shape. `ok: false` means the engine refused or could not answer the call;
- * it is never the same as a successful read whose value happens to be empty. A caller that learns
- * about a container only through this envelope therefore cannot mistake "unreadable" — a state the
- * sweep retries — for "holds nothing", which is what an item-losing early return would do.
- */
+// ok: false is a refused or unanswerable call, never an empty success: unreadable must not read as empty.
 export type Guarded<T> = { ok: true; value: T } | { ok: false };
 
 export function guard<T>(operation: string, fn: () => T): Guarded<T> {
@@ -33,7 +28,6 @@ export function guard<T>(operation: string, fn: () => T): Guarded<T> {
     return outcome;
 }
 
-/** The value of a successful call, or the caller's own fallback. */
 export function valueOr<T>(guarded: Guarded<T>, fallback: T): T {
     return guarded.ok ? guarded.value : fallback;
 }
@@ -59,7 +53,7 @@ export function directionStateOf(block: Block): Guarded<CardinalDirection | unde
     return { ok: true, value: isCardinalDirection(state.value) ? state.value : undefined };
 }
 
-/** The latch a chest wears: the one place an unreadable direction state folds down to `undefined`. */
+// The one place an unreadable direction state folds down to undefined.
 export function readLatch(block: Block): CardinalDirection | undefined {
     const state = directionStateOf(block);
     return state.ok ? state.value : undefined;
@@ -122,10 +116,7 @@ export function containerHasItems(dimensionId: string, location: ChestLocation):
     return contents.ok ? { ok: true, value: hasAnyItem(contents.value) } : { ok: false };
 }
 
-/**
- * Writes what fits and hands back the stacks it could not place, so the caller — not this module —
- * decides where an unplaceable stack goes.
- */
+// Writes what fits and returns the rest, so the caller decides where an unplaced stack goes.
 export function writeSlots(container: Container, contents: readonly (ItemStack | undefined)[]): ItemStack[] {
     const unplaced: ItemStack[] = [];
     const capacity = slotCapacity(container, contents.length);

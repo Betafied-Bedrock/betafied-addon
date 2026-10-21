@@ -44,12 +44,7 @@ const EQUIPMENT_SLOTS: readonly EquipmentSlot[] = Object.freeze([
 
 type SlotKey = number | EquipmentSlot;
 
-/**
- * Each accessor's key domain is known exactly where it is built, so the interface is parameterised
- * over it: the container accessor takes slot indices and the equipment accessor takes
- * `EquipmentSlot`s, and neither has to assert a key back down to the type it actually needs. Only
- * keys from that accessor's own `keys` array are valid, which the type now enforces.
- */
+// Key domain is fixed at construction: container slots are numbers, equipment slots are EquipmentSlot.
 interface SlotAccessor<K extends SlotKey> {
     readonly keys: readonly K[];
     readonly label: string;
@@ -172,8 +167,7 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
 export function sweepPlayers(): void {
     const job = inventorySweepJob();
     while (!job.next().done) {
-        // This wrapper exists for callers that need the whole sweep finished before they continue,
-        // unlike the time-sliced registration below.
+        // Runs the sweep to completion, unlike the time-sliced registration above.
     }
 }
 
@@ -318,12 +312,7 @@ function freeSlots(inv: Container, slotIndex: number): number {
     return free;
 }
 
-/**
- * Splits an over-cap stack one piece per slot. The spill is never dropped at the player: the engine's
- * own stack limit for these ids is higher than the era's, so it merges a drop straight back into the
- * slot this sweep just capped and the next sweep evicts it again — a loop the player sees as items
- * stuck at their feet. With no room for every piece, the stack waits in its slot until one frees up.
- */
+// Never drop the spill: the engine merges a drop back into the capped slot and the next sweep evicts it again.
 function unstackItem(inv: Container, slotIndex: number, targetId: string, amount: number): void {
     const maxStack = maxBetaStackSize(targetId);
     const slotAmount = Math.min(amount, maxStack);

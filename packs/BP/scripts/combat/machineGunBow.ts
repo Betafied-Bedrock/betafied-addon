@@ -18,7 +18,7 @@ const CONFIG = Object.freeze({
 
 const lastFireTime = new Map<string, number>();
 
-/** The tick manager owns the hold loop's schedule; this id is what starts and stops it. */
+// The tick manager owns the hold loop's schedule; this id is what starts and stops it.
 function holdTaskId(playerId: string): string {
     return `machineGunBow:hold:${playerId}`;
 }
@@ -40,14 +40,13 @@ function takeArrowFrom(inv: Container): boolean {
     return false;
 }
 
-/** The hold loop outlives the event that started it, so the held item is re-read from the engine. */
+// The hold loop outlives the event that started it, so the held item is re-read from the engine.
 function holdingBetaBow(player: Player): boolean {
     const inv = player.getComponent(EntityComponentTypes.Inventory)?.container;
     return inv?.getItem(player.selectedSlotIndex)?.typeId === BH_BOW_ID;
 }
 
-// A spent cooldown, an empty quiver and a mob's own projectile are ordinary outcomes of holding the
-// bow and go unreported; only a failure the player never asked for is reported.
+// A spent cooldown and an empty quiver are ordinary outcomes of holding the bow; only unasked-for failures are reported.
 function fireArrow(player: Player): void {
     const now = system.currentTick;
     const lastFire = lastFireTime.get(player.id) ?? 0;
@@ -69,8 +68,7 @@ function fireArrow(player: Player): void {
     const freeArrows = getPrivilegeReason(player) === "creative";
     if (!freeArrows && !takeArrowFrom(inv)) return;
 
-    // Stamped on the firing path only: a shot the guards refused must not spend the cooldown the
-    // next legal shot needs.
+    // Stamped on the firing path only: a refused shot must not spend the cooldown the next legal one needs.
     lastFireTime.set(player.id, now);
 
     const dir = player.getViewDirection();

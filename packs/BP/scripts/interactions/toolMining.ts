@@ -43,11 +43,7 @@ const REDSTONE_BONUS: ToolBonus = {
 
 const activeRedstone = new Set<string>();
 
-/**
- * One swing of a sword at a block. `ticks` counts the ticks the block has actually spent under the
- * sword, so letting go, looking away or changing cell starts the next swing from zero the way the era
- * did — the engine's own progress is invisible to scripts, so this counter is the whole clock.
- */
+// ticks counts the ticks the block spent under the sword; release, look-away or a new cell resets it.
 interface SwordSwing {
     readonly dimensionId: string;
     readonly cell: Vector3;
@@ -141,9 +137,7 @@ function forgetSwing(event: PlayerCancelBreakingBlockAfterEvent): void {
 function breakSwordBlock(dimension: Dimension, swing: SwordSwing): void {
     const { x, y, z } = swing.cell;
     runCatching({ system: "swordMining", operation: "breakBlock", target: swing.blockTypeId }, () => {
-        // The script API has no equivalent of `setblock … destroy` — it can place a block, but not
-        // destroy one and pay its loot table — and spawning the drop by hand here would be a second
-        // copy of every loot rule the block already declares.
+        // No script API for destroy-with-loot, and hand-spawning drops would duplicate every loot rule.
         dimension.runCommand(`setblock ${x} ${y} ${z} air destroy`);
     });
 }
@@ -171,8 +165,7 @@ export function swordMiningJob(): void {
                 return;
             }
 
-            // A web is a passable block, so the default raycast passes straight through it and the
-            // swing would never clock the one block the sword is fifteen times faster at.
+            // Webs are passable, so only includePassableBlocks lets the raycast find the sword's fast block.
             const hit = player.getBlockFromViewDirection({
                 maxDistance: MAX_DISTANCE,
                 includePassableBlocks: true

@@ -10,18 +10,7 @@ const CONFIG = Object.freeze({
     STACK_TAG: "beta"
 });
 
-/**
- * The Overworld's fog is not pushed: every Overworld biome's client biome file names the era's air
- * fog, and a fog pushed with `/fog` outranks the one a biome names, so a push there would pin one
- * entry over the whole biome layer. What is left is the Nether's red fog.
- *
- * The command layer is saved per player and restored on world load, but the engine exposes it
- * (`player.fogSettings`) and nothing else does: an in-memory record of "what this sweep pushed" is
- * lost to every reload and blind to whatever an earlier build left on the stack. So the sweep reads
- * the real stack and reconciles against it. The tag is the pack's handle on its own entries, and
- * removing all of them before a push is what recovers a stack a previous build filled to the
- * engine's 16-entry limit — at which point a push is rejected and the old fog stays on screen.
- */
+// Nether red fog only: a push outranks biome fog, and an in-memory record dies on reload, so reconcile the live stack.
 const ERA_FOG_BY_DIMENSION: Readonly<Record<string, string>> = Object.freeze({
     [NETHER_ID]: "mgg:fog_hell"
 });
@@ -34,8 +23,7 @@ function syncPlayerFog(player: Player): void {
 
     const own = stack.filter((_, index) => tags[index] === CONFIG.STACK_TAG);
 
-    // One entry of ours, holding this dimension's fog: settled. Pushing again would add an entry
-    // every pass until the stack limit refused it.
+    // Already holding this dimension's fog: pushing again adds an entry every pass until the limit refuses it.
     if (wanted !== undefined && own.length === 1 && own[0] === wanted) return;
 
     if (own.length > 0) fog.remove(CONFIG.STACK_TAG);

@@ -64,8 +64,7 @@ eventBus.onPlayerBreakBlock((ev) => {
             const nb = dim.getBlock(pos);
             if (nb?.typeId === CONFIG.FENCE_ID) updateFenceBlock(nb);
         } catch (e) {
-            // An unloaded neighbour is not an answer about connectivity, so report it rather than
-            // leaving the fence silently holding a stale connection mask.
+            // An unloaded neighbour is not an answer, so report rather than keep a stale mask.
             reportError({
                 system: "fenceConnectivity",
                 operation: "updateNeighbour",

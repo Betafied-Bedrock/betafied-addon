@@ -10,12 +10,7 @@ const UPPER_BIT = "upper_block_bit";
 
 const lastToggledTicks = new Map<string, number>();
 
-/**
- * A `[Private]` sign beside a door, as the server's lockette signs write it:
- * owner on line 2, guest names on lines 3-4. Clan tags are left out of `guests`
- * because the addon has no clan index, which keeps a clan member's punch refused
- * rather than letting a stranger through on a line the addon cannot resolve.
- */
+// [Private] sign: owner on line 2, guests on 3-4; clan tags stay unresolved, so a clan member is refused.
 interface DoorLock {
     owner: string;
     guests: string[];
@@ -82,9 +77,7 @@ function parsePrivateSign(text: string): DoorLock | undefined {
     if (marker !== "[private]" && marker !== "private") return undefined;
 
     const owner = (lines[1] ?? "").trim().toLowerCase();
-    // An owner line that is still blank parses as unclaimed everywhere else in
-    // far.land, and the first interaction claims it. Refusing the punch here
-    // would make a sign nobody owns punish the player about to own it.
+    // A blank owner line is unclaimed, and the first interaction claims it.
     if (!owner) return undefined;
 
     const guests: string[] = [];
@@ -106,11 +99,7 @@ function signLock(block: Block): DoorLock | undefined {
     return text ? parsePrivateSign(text) : undefined;
 }
 
-/**
- * Whether a sign really governs `anchor`, rather than merely sitting beside it.
- * A wall sign names the block it is mounted on through its facing state; a
- * standing sign has no facing and is attached to whatever it stands against.
- */
+// A wall sign's facing names the block it hangs on; a standing sign has no facing.
 function isSignMountedOn(sign: Block, anchor: Cell): boolean {
     const facingKey = findStateKey(sign.permutation.getAllStates(), "facing_direction");
     if (facingKey === undefined) return true;
@@ -131,7 +120,6 @@ function isSignMountedOn(sign: Block, anchor: Cell): boolean {
     }
 }
 
-/** The `[Private]` lock governing the door, found from either half. */
 function findDoorLock(door: Block, plan: DoorTogglePlan): DoorLock | undefined {
     const dimension = door.dimension;
 

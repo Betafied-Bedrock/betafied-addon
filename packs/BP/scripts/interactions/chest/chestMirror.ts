@@ -43,21 +43,10 @@ export interface PairSession {
     shadowViewers: Set<string>;
 }
 
-/**
- * This module owns the pair-session lifecycle. It holds the sessions, the sweep schedule and the
- * viewer-count invariant, and every event handler in `doubleChest.ts` goes through the operations
- * below rather than touching session state itself:
- *
- * - A session is created by `openPair`/`closePair` resolving a block, and deleted only here, always
- *   through `dropIfIdle`, which is the one place the "no viewers and nothing left to drain" rule and
- *   the per-tick sweep budget live.
- * - Viewer counts move only through `openPair` (add), `closePair` (remove) and `releaseViewer`
- *   (a player left), so a new event path cannot reproduce the bookkeeping by hand and get it wrong.
- * - The sessions themselves are private; the schedule shares only `sweepBatches`, its cadence.
- */
+// Sessions are private: viewers move only through openPair/closePair/releaseViewer, and dropIfIdle is the one reap path.
 const sessions = new Map<string, PairSession>();
 
-/** How a mirror attempt ended: nothing to do, moved a count, or unreadable and left for a retry. */
+// none: nothing to do; moved: a count moved; unreadable: retry on the next sweep.
 export type MirrorOutcome = { kind: "none" } | { kind: "moved"; count: number } | { kind: "unreadable" };
 
 function sessionFor(key: string, dimensionId: string, resolution: PairResolution): PairSession {
@@ -92,8 +81,7 @@ export function applyMove(move: MirrorMove, session: PairSession): MirrorOutcome
 
 export function dropIfIdle(session: PairSession, key: string, outcome: MirrorOutcome): void {
     if (session.masterViewers.size > 0 || session.shadowViewers.size > 0) return;
-    // An unreadable mirror keeps the session so the sweep retries; anything else means the pair
-    // holds nothing and nobody is watching it.
+    // An unreadable mirror stays so the sweep retries; otherwise the pair is empty and unwatched.
     if (outcome.kind === "unreadable") return;
     if (outcome.kind === "moved" && outcome.count > 0) return;
 
@@ -113,8 +101,7 @@ function resolvePairRef(block: Block): { key: string; dimensionId: string; resol
     const state = readLatch(block);
     const partValue = part.ok ? part.value : undefined;
 
-    // The engine is the one that places the halves, so when the world does not match the layout the
-    // state promised, the mirrored layout is the one that does.
+    // The engine places the halves, so when the world contradicts the latch the inverse layout is what it built.
     let resolution = resolveHalf(partValue, block.location, state);
     if (!resolution || !spansCells(dimensionId, resolution)) {
         resolution = resolveHalf(partValue, block.location, state ? INVERSE_DIRECTION[state] : undefined);
@@ -141,7 +128,7 @@ export function viewerIdOf(source: ContainerAccessSource | undefined): string | 
     return entity?.typeId === "minecraft:player" ? entity.id : undefined;
 }
 
-/** The open handler: record the viewer, then hand the pair's items to the half they can see. */
+// The open handler: record the viewer, then hand the pair's items to the half they can see.
 export function openPair(block: Block, viewerId: string | undefined): void {
     const resolved = sessionForBlock(block);
     if (!resolved) return;
@@ -155,8 +142,7 @@ export function openPair(block: Block, viewerId: string | undefined): void {
 
     const masterHasItems = containerHasItems(session.dimensionId, session.master);
     const shadowHasItems = containerHasItems(session.dimensionId, session.shadow);
-    // An unreadable half is not an empty one. Deciding on a failed read could drain the half a
-    // player is looking at, so the pair is left untouched and the sweep retries the move later.
+    // An unreadable half is not empty: deciding on a failed read could drain the half the player sees.
     if (!masterHasItems.ok || !shadowHasItems.ok) return;
 
     const input: OpenDecisionInput = {
@@ -171,7 +157,7 @@ export function openPair(block: Block, viewerId: string | undefined): void {
     dropIfIdle(session, key, applyMove(move, session));
 }
 
-/** The close handler: drop the viewer, then return the shadow half's leftovers to the master. */
+// The close handler: drop the viewer, then return the shadow half's leftovers to the master.
 export function closePair(block: Block, viewerId: string | undefined): void {
     const resolved = sessionForBlock(block);
     if (!resolved) return;
@@ -193,7 +179,7 @@ export function closePair(block: Block, viewerId: string | undefined): void {
     dropIfIdle(session, key, applyMove(move, session));
 }
 
-/** The leave handler: a disconnected viewer can never close a chest, so release it here. */
+// The leave handler: a disconnected viewer can never close a chest, so release it here.
 export function releaseViewer(playerId: string): void {
     for (const [key, session] of sessions) {
         const leftMaster = session.masterViewers.delete(playerId);
@@ -204,7 +190,7 @@ export function releaseViewer(playerId: string): void {
     }
 }
 
-/** Whether the other half is already on someone's screen, so this open must be refused. */
+// Whether the other half is already on someone's screen, so this open must be refused.
 export function pairInUse(block: Block): boolean {
     const ref = resolvePairRef(block);
     if (!ref) return false;
@@ -235,8 +221,7 @@ function sweepSession(key: string, session: PairSession): void {
 
     const master = blockAt(session.dimensionId, session.master);
     const shadow = blockAt(session.dimensionId, session.shadow);
-    // A read that failed is not a broken pair: keeping the session lets a later sweep drain it,
-    // where deleting here would strand whatever the shadow half still holds.
+    // A failed read is not a broken pair: keeping the session lets a later sweep drain it.
     if (!master.ok || !shadow.ok) return;
 
     if (!isHalf(master.value) || !isHalf(shadow.value)) {
@@ -258,11 +243,7 @@ function sweepSession(key: string, session: PairSession): void {
     dropIfIdle(session, key, applyMove(planSweep(input), session));
 }
 
-/**
- * The sweep's per-tick budget, over whatever collection of sessions it is handed. The cadence is the
- * part of the schedule a caller can hold on its own: `sweepPairsJob` supplies this module's sessions
- * and the default step, and the map stays unreachable.
- */
+// Per-tick budget over any session map; the default step is this module's own sweep.
 export function* sweepBatches(
     entries: Iterable<readonly [string, PairSession]>,
     step: (key: string, session: PairSession) => void = sweepSession

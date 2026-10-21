@@ -5,11 +5,7 @@ import {
 
 export type NormalizationAction = "keep" | "convert" | "remove";
 
-/**
- * One answer shape for every translation this module makes. A `convert` always carries its target,
- * so no caller re-checks a field before it can act on the decision. The id-producing entry points
- * answer `undefined` — never a fourth action — when their boundary has nothing to say about an id.
- */
+// One answer shape: a convert always carries its target, so callers never re-check a field.
 export type NormalizationResult =
     | { readonly action: "keep" }
     | { readonly action: "convert"; readonly targetId: string }
@@ -69,9 +65,7 @@ export function isStoneCompound(bareId: string): boolean {
     return bareId.includes("stone") || bareId.includes("cobble") || bareId.includes("deepslate") || bareId.includes("brick");
 }
 
-// The suffix classes both boundaries classify. Only the classification is shared: a world block is
-// replaced with a vanilla id while a placed or held one becomes the pack's own item, so each
-// boundary keeps its own target for a class.
+// Only the classification is shared; each boundary keeps its own target for a class.
 const isPlanksSuffix = (bareId: string): boolean => bareId.endsWith("_planks");
 const isFenceSuffix = (bareId: string): boolean => bareId.endsWith("_fence") || bareId.endsWith("_fence_gate");
 const isStairsSuffix = (bareId: string): boolean => bareId.endsWith("_stairs");
@@ -141,8 +135,7 @@ export function normalizeBlock(blockId: string): NormalizationResult {
     return normalizeItem(blockId);
 }
 
-// The three ids the era spelled without a suffix. They are logs of the one wood it shipped, so they
-// are answered before the suffix rule that reads the species out of a modern id.
+// The era's unsuffixed log ids, answered before the suffix rule that reads a species.
 const BARE_LOG_IDS: ReadonlySet<string> = Object.freeze(new Set(["wood", "log", "log2"]));
 
 const isLogClassId = (bareId: string): boolean =>
@@ -153,10 +146,7 @@ const isLogClassId = (bareId: string): boolean =>
     bareId.endsWith("_hyphae") ||
     bareId.startsWith("stripped_");
 
-/**
- * The era kept one log per wood, and the two woods the pack ships its own block for are named in the
- * id while every other species collapses onto oak.
- */
+// The era kept one log per wood: spruce and birch map to the pack blocks, every other species to oak.
 function placerLogTarget(bareId: string): NormalizationResult | undefined {
     if (!isLogClassId(bareId)) return undefined;
 
@@ -165,7 +155,7 @@ function placerLogTarget(bareId: string): NormalizationResult | undefined {
     return { action: "convert", targetId: "bh:oak_log" };
 }
 
-/** The ids with one pack block apiece, by name or through the era's capped-item table. */
+// The ids with one pack block apiece, by name or through the era's capped-item table.
 function placerSingleTarget(id: string, bareId: string): NormalizationResult | undefined {
     if (bareId === "chest") {
         return { action: "convert", targetId: BH_CHEST_ID };
@@ -182,11 +172,7 @@ function placerSingleTarget(id: string, bareId: string): NormalizationResult | u
     return undefined;
 }
 
-/**
- * A stair keeps its species only where the pack ships a wooden stair for it; every other stair is
- * stone. The mosaic spelling carries the species inside a compound suffix, so the prefix is read
- * with it stripped rather than off the full id.
- */
+// A stair keeps its species only where the pack ships one; mosaic spells it inside a compound suffix.
 function placerStairsTarget(bareId: string): NormalizationResult {
     const prefix = bareId.replace(/_mosaic_stairs|_stairs/, "");
     return {
@@ -195,7 +181,7 @@ function placerStairsTarget(bareId: string): NormalizationResult {
     };
 }
 
-/** Cobblestone and sandstone keep a slab of their own; the rest split on whether the id names stone. */
+// Cobblestone and sandstone keep a slab of their own; the rest split on whether the id names stone.
 function placerSlabTarget(bareId: string): NormalizationResult {
     if (bareId.includes("cobble")) return { action: "convert", targetId: "bh:cobblestone_slab" };
     if (bareId.includes("sandstone")) return { action: "convert", targetId: "bh:sandstone_slab" };
@@ -206,7 +192,7 @@ function placerSlabTarget(bareId: string): NormalizationResult {
     };
 }
 
-/** The building classes the placer retypes: fences collapse to one block, stairs and slabs to a family. */
+// The building classes the placer retypes: fences collapse to one block, stairs and slabs to a family.
 function placerBuildingTarget(bareId: string): NormalizationResult | undefined {
     if (isFenceSuffix(bareId)) return { action: "convert", targetId: BH_FENCE_ID };
     if (isStairsSuffix(bareId)) return placerStairsTarget(bareId);
@@ -215,10 +201,7 @@ function placerBuildingTarget(bareId: string): NormalizationResult | undefined {
     return undefined;
 }
 
-/**
- * The placement boundary: the pack id a block or item becomes when it is placed or held. Answers
- * `undefined` for an id this boundary does not retype.
- */
+// Placement boundary: the pack id a block or item becomes when placed or held.
 export function resolvePlacerTarget(id: string): NormalizationResult | undefined {
     if (!id.startsWith("minecraft:")) {
         return undefined;
@@ -226,9 +209,7 @@ export function resolvePlacerTarget(id: string): NormalizationResult | undefined
 
     const bareId = id.slice(10);
 
-    // First class to claim the id answers it, so the order is the table: the log class reads the
-    // species out of an id the suffix classes would not, and the ids that answer by name are tried
-    // before the classes that answer by suffix.
+    // First class to claim the id answers it: logs, then by-name ids, then the suffix classes.
     return placerLogTarget(bareId)
         ?? placerSingleTarget(id, bareId)
         ?? placerBuildingTarget(bareId);
@@ -249,10 +230,7 @@ export const FOOD_CONVERSIONS: Readonly<Record<string, string>> = Object.freeze(
     "minecraft:cooked_fish": "bh:cooked_cod"
 });
 
-/**
- * The held-item boundary: what a player's own inventory item is retyped to, or `undefined` when no
- * table here has an opinion and the item keeps its id.
- */
+// Held-item boundary: the pack id an inventory item becomes, or undefined when it keeps its own.
 export function resolveHeldItem(id: string): NormalizationResult | undefined {
     if (id === "minecraft:bow") {
         return { action: "convert", targetId: BH_BOW_ID };
@@ -268,11 +246,7 @@ export function resolveHeldItem(id: string): NormalizationResult | undefined {
     return capped === undefined ? undefined : { action: "convert", targetId: capped };
 }
 
-/**
- * The drop boundary: an entity's drop is retyped to the pack item the player holds first, and only
- * then handed to the vanilla drop normalizer. Both answers are the module's one result shape, which
- * is what lets the caller act on the decision without decoding it first.
- */
+// Drop boundary: the pack's own retyping first, then the vanilla drop normalizer.
 export function resolveDropTarget(itemId: string): NormalizationResult {
     const retyped = resolveHeldItem(itemId);
     if (!retyped) return normalizeEntityDrop(itemId);

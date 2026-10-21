@@ -19,13 +19,11 @@ const SAPLING_TARGETS = Object.freeze(new Set([
     "minecraft:spruce_sapling"
 ]));
 
-// Bone meal on grass spreads across the clicked block's neighbourhood, so the sweep covers the
-// same 15x5x15 volume the vanilla feature reaches into.
+// The same 15x5x15 volume the vanilla grass feature reaches into.
 const SPREAD_RADIUS = 7;
 const SPREAD_VERTICAL = 2;
 
-// A sapling grown within two blocks of a flower can carry a bee nest into the tree, and the era has
-// neither bees nor nests. The sweep is taller than it is wide because the nest rides the trunk.
+// The era has no bees: a tree grown near a flower can carry a nest, so the sweep runs tall.
 const NEST_RADIUS = 4;
 const NEST_HEIGHT = 16;
 
@@ -59,11 +57,7 @@ function clearPostBetaTallPlants(dimension: Dimension, volume: BlockVolume): voi
     });
 }
 
-/**
- * Vanilla bone meal draws its flowers from the modern palette. The era's ItemDye grew only the rose
- * and the yellow flower, choosing the yellow one twice as often, so every modern flower the spread
- * left in the patch is replanted at those odds.
- */
+// The era's ItemDye grew only rose and dandelion, the yellow one twice as often.
 function replantBetaFlowers(dimension: Dimension, volume: BlockVolume): void {
     const flowers = dimension.getBlocks(volume, { includeTypes: [...POST_BETA_FLOWERS] }, true);
 
