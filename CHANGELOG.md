@@ -2,26 +2,47 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
-## 5.14 — 2026-10-21
+## 5.15 — 2026-10-21
 
-5.14 redraws the game's screens on Beta 1.7.3's layouts and adds pocket versions of the chat, pause and inventory screens.
+5.15 adds the era's chest and container screens and puts the classic chat prompt back.
 
 ### Screens
 
-- Changed the chat screen to the era's layout, with a classic and a pocket variant.
-- Added keyboard and send buttons to the pocket chat box.
-- Changed the pause menu to the era's button stack.
-- Added a player list panel to the pocket pause menu.
-- Changed the furnace's top half to the era's label, arrow and flame.
-- Changed the loading screen to the era's dirt backdrop and progress bar.
-- Changed the inventory's layout toggle and container slots to the era's art.
-- Added a warning to pocket screens that pocket UI is in development.
+- Added the era's chest layout, with a touch close button on both chest sizes.
+- Added a close button and the era's label and grid to container screens.
+- Added the furnace's close button.
+- Added the selected item details and gamepad helpers to the furnace screen.
+- Changed the classic chat box to show its > prompt again.
+- Changed the chat send button to appear only on touch.
+- Changed the debug screen to show the in-development notice.
+
+### Tooling
+
+- Added a release inventory that compares packaged builds before notes are written.
+
+## 5.14 — 2026-10-21
+
+5.14 adds pocket chat and pause layouts, redraws the furnace and inventory screens, and shifts the HUD chat panel.
+
+### Screens
+
+- Added a pocket chat layout with its own keyboard and send buttons.
+- Changed the chat box's send control to the era's Send label and removed its > prompt.
+- Changed the chat and inventory close buttons to the pack's shared touch Close button.
+- Added a pocket pause menu with a button column and a player list.
+- Changed the classic pause menu's buttons to sit a quarter of the way down the screen.
+- Changed the pocket-UI warning to read as in development and sit in the bottom left.
+- Added the era's label, arrow and flame to the furnace's top half.
+- Removed the furnace's recipe book and toolbar.
+- Added the era's crafting label to the inventory's 2x2 crafting panel.
+- Changed the inventory's slot highlight to the era's white overlay and removed the slot borders.
+- Changed the selected item icon and durability bar to the era's sizes.
+- Changed the inventory and crafting screens to draw over the world on the pack's own background.
+- Changed the loading screens to the era's backdrops and removed the modern gradient.
 
 ### HUD
 
-- Moved the chat panel to the bottom left of the HUD.
-- Added a player-list button to the HUD for touch.
-- Changed the crosshair to the engine's own.
+- Changed the chat panel from a fixed 312 pixels to half the screen's width.
 
 ### Tooling
 
