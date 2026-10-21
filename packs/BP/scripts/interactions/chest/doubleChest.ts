@@ -17,8 +17,7 @@ import { mergeChestAt } from "./chestMerge.js";
 
 const MERGE_DELAY_TICKS = 1;
 
-// Every handler below is event wiring only: the pair's session state, viewer counts and mirror
-// decisions belong to chestMirror, and the structural conversion belongs to chestMerge.
+// Event wiring only: session state lives in chestMirror, structural conversion in chestMerge.
 function handleContainerOpened(event: BlockContainerOpenedAfterEvent): void {
     openPair(event.block, viewerIdOf(event.openSource));
 }

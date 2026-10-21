@@ -1,6 +1,6 @@
 import { Player, GameMode } from "@minecraft/server";
 
-/** Every player tag the pack reads, so a gate in another module cannot drift from its writer. */
+// Every player tag the pack reads, so a gate in another module cannot drift from its writer.
 export const PLAYER_TAGS = Object.freeze({
     BUILDER_EXEMPT: "builder_exempt"
 } as const);
@@ -12,8 +12,7 @@ const AUDIT_LOG_INTERVAL_MS = 60_000;
 const AUDIT_LOG_MAX_ENTRIES = 256;
 
 function rememberAuditLog(playerId: string, now: number): void {
-    // Re-inserting on refresh keeps the map ordered least-recently-seen first, which is the entry the
-    // bound below is meant to drop.
+    // Re-inserting keeps the map least-recently-seen first, so the bound below drops the right entry.
     auditLogCooldowns.delete(playerId);
 
     if (auditLogCooldowns.size >= AUDIT_LOG_MAX_ENTRIES) {
@@ -33,19 +32,12 @@ function auditBypass(player: Player, reason: "creative" | "tag"): void {
     rememberAuditLog(player.id, now);
 }
 
-/**
- * Whether a game mode is one the era's survival rules do not reach. An absent mode — a mob, or a
- * handle that answers none — reads as a survival player.
- */
+// Survival rules apply to anything not Creative or Spectator; an absent mode reads as survival.
 export function eraRulesApply(mode: GameMode | undefined): boolean {
     return mode !== GameMode.Creative && mode !== GameMode.Spectator;
 }
 
-/**
- * The privileged question in one place: which reason puts this player outside a rule the survival
- * player is held to, or null when it does not. A caller honours only the reasons its own rule
- * exempts — a placed item's cost ignores the builder tag, the inventory sweep honours it.
- */
+// One privileged-bypass question; a caller honours only the reasons its own rule exempts.
 export function getPrivilegeReason(player: Player): PrivilegeReason | null {
     const mode = typeof player.getGameMode === "function" ? player.getGameMode() : undefined;
 
@@ -56,7 +48,7 @@ export function getPrivilegeReason(player: Player): PrivilegeReason | null {
     return player.hasTag(PLAYER_TAGS.BUILDER_EXEMPT) ? "tag" : null;
 }
 
-/** Whether the inventory sweep leaves this player alone, and records the bypass it granted. */
+// Whether the inventory sweep leaves this player alone, and records the bypass it granted.
 export function isInventoryExempt(player: Player): boolean {
     const reason = getPrivilegeReason(player);
     if (reason !== "creative" && reason !== "tag") return false;

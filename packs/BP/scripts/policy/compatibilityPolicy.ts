@@ -89,6 +89,31 @@ export const POST_BETA_TALL_PLANTS: readonly string[] = Object.freeze([
     "minecraft:large_fern"
 ]);
 
+// Both halves carry one id, so a rewrite has to clear the plant, not set a flower in each half.
+export const POST_BETA_TALL_FLOWERS: readonly string[] = Object.freeze([
+    "minecraft:lilac",
+    "minecraft:peony",
+    "minecraft:rose_bush",
+    "minecraft:sunflower",
+    "minecraft:pitcher_plant"
+]);
+
+// The era grew only the poppy and the dandelion; bone meal's modern palette rewrites to those two.
+export const POST_BETA_FLOWERS: readonly string[] = Object.freeze([
+    "minecraft:azure_bluet",
+    "minecraft:oxeye_daisy",
+    "minecraft:cornflower",
+    "minecraft:lily_of_the_valley",
+    "minecraft:allium",
+    "minecraft:blue_orchid",
+    "minecraft:red_tulip",
+    "minecraft:orange_tulip",
+    "minecraft:white_tulip",
+    "minecraft:pink_tulip",
+    "minecraft:torchflower",
+    ...POST_BETA_TALL_FLOWERS
+]);
+
 export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     ...Object.fromEntries(POST_BETA_TALL_PLANTS.map((id): [string, string] => [id, "minecraft:air"])),
     "minecraft:cake": BH_CAKE_ID,
@@ -131,18 +156,7 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
     "minecraft:torchflower_crop": "minecraft:air",
     "minecraft:pink_petals": "minecraft:air",
 
-    "minecraft:lilac": "minecraft:air",
-    "minecraft:peony": "minecraft:air",
-    "minecraft:rose_bush": "minecraft:air",
-    "minecraft:sunflower": "minecraft:air",
-    "minecraft:cornflower": "minecraft:air",
-    "minecraft:lily_of_the_valley": "minecraft:air",
-    "minecraft:azure_bluet": "minecraft:air",
-    "minecraft:oxeye_daisy": "minecraft:air",
-    "minecraft:allium": "minecraft:air",
-    "minecraft:blue_orchid": "minecraft:air",
-    "minecraft:pitcher_plant": "minecraft:air",
-    "minecraft:torchflower": "minecraft:air",
+    ...Object.fromEntries(POST_BETA_FLOWERS.map((id): [string, string] => [id, "minecraft:air"])),
     "minecraft:hanging_roots": "minecraft:air",
 
     "minecraft:leaf_litter": "minecraft:air",
@@ -162,9 +176,7 @@ export const BLOCK_FINE_REPLACEMENTS: Readonly<Record<string, string>> = {
 
     "minecraft:basalt": "minecraft:air",
     "minecraft:polished_basalt": "minecraft:air",
-    // Nether brick arrived after 1.7.3 and the only thing that generates it is a fortress, which the
-    // era never had. Left to the suffix rules its trim came back as a wooden fence and cobblestone
-    // stairs, so the shape of a fortress stood in cleared ground.
+    // Post-1.7.3, and no era fortress generates it: the suffix rules turned its trim into wood and cobble.
     "minecraft:nether_brick": "minecraft:air",
     "minecraft:nether_brick_fence": "minecraft:air",
     "minecraft:nether_brick_stairs": "minecraft:air",

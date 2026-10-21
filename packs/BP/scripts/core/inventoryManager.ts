@@ -44,12 +44,7 @@ const EQUIPMENT_SLOTS: readonly EquipmentSlot[] = Object.freeze([
 
 type SlotKey = number | EquipmentSlot;
 
-/**
- * Each accessor's key domain is known exactly where it is built, so the interface is parameterised
- * over it: the container accessor takes slot indices and the equipment accessor takes
- * `EquipmentSlot`s, and neither has to assert a key back down to the type it actually needs. Only
- * keys from that accessor's own `keys` array are valid, which the type now enforces.
- */
+// Key domain is fixed at construction: container slots are numbers, equipment slots are EquipmentSlot.
 interface SlotAccessor<K extends SlotKey> {
     readonly keys: readonly K[];
     readonly label: string;
@@ -76,7 +71,7 @@ function inventorySlots(player: Player): SlotAccessor<number> | undefined {
         label: "INV: Removed",
         get: (key) => container.getItem(key),
         set: (key, item) => container.setItem(key, item),
-        split: (key, targetId, amount) => unstackItem(player, container, key, targetId, amount)
+        split: (key, targetId, amount) => unstackItem(container, key, targetId, amount)
     };
 }
 
@@ -172,8 +167,7 @@ export function* inventorySweepJob(): Generator<void, void, unknown> {
 export function sweepPlayers(): void {
     const job = inventorySweepJob();
     while (!job.next().done) {
-        // This wrapper exists for callers that need the whole sweep finished before they continue,
-        // unlike the time-sliced registration below.
+        // Runs the sweep to completion, unlike the time-sliced registration above.
     }
 }
 
@@ -310,26 +304,30 @@ export function evaluateItemAction(item: ItemStack): ItemNormalizationAction {
         ?? evaluateNormalizedItem(id, item);
 }
 
-function unstackItem(player: Player, inv: Container, slotIndex: number, targetId: string, amount: number): void {
+function freeSlots(inv: Container, slotIndex: number): number {
+    let free = 0;
+    for (let slot = 0; slot < inv.size; slot++) {
+        if (slot !== slotIndex && !inv.getItem(slot)) free++;
+    }
+    return free;
+}
+
+// Never drop the spill: the engine merges a drop back into the capped slot and the next sweep evicts it again.
+function unstackItem(inv: Container, slotIndex: number, targetId: string, amount: number): void {
     const maxStack = maxBetaStackSize(targetId);
     const slotAmount = Math.min(amount, maxStack);
+    const spill = amount - slotAmount;
+
+    if (spill > maxStack * freeSlots(inv, slotIndex)) return;
+
     inv.setItem(slotIndex, new ItemStack(targetId, slotAmount));
-    if (amount <= slotAmount) return;
 
-    let remaining = amount - slotAmount;
-    const size = inv.size;
-    for (let s = 0; s < size && remaining > 0; s++) {
-        if (!inv.getItem(s)) {
-            const place = Math.min(remaining, maxStack);
-            inv.setItem(s, new ItemStack(targetId, place));
-            remaining -= place;
-        }
-    }
-
-    while (remaining > 0) {
-        const dropAmount = Math.min(remaining, maxStack);
-        player.dimension.spawnItem(new ItemStack(targetId, dropAmount), player.location);
-        remaining -= dropAmount;
+    let remaining = spill;
+    for (let slot = 0; slot < inv.size && remaining > 0; slot++) {
+        if (inv.getItem(slot)) continue;
+        const place = Math.min(remaining, maxStack);
+        inv.setItem(slot, new ItemStack(targetId, place));
+        remaining -= place;
     }
 }
 

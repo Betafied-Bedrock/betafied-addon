@@ -69,10 +69,12 @@ describe("The comment budget rule", () => {
         assert.equal(messages[0].ruleId, null, "and being unneeded is the proof this rule never merged the directive into the block");
     });
 
-    it("flags the thirteenth line and not the twelfth when nothing overrides the cap", () => {
-        const block = (lines: number) => `/**\n${" * x\n".repeat(lines - 2)} */\nconst x = 1;\n`;
-
-        assert.deepEqual(findings(block(12)), [], "twelve lines is the ceiling the config sets");
-        assert.equal(findings(block(13)).length, 1, "and the line past it is the finding");
+    it("allows one line and flags the second when nothing overrides the cap", () => {
+        assert.deepEqual(findings("// one\nconst x = 1;\n"), [], "one line is the ceiling the config sets");
+        assert.equal(
+            findings("// one\n// two\nconst x = 1;\n").length,
+            1,
+            "a second line is a block, and the block is the finding"
+        );
     });
 });

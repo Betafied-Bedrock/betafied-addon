@@ -15,18 +15,14 @@ eventBus.onPlayerBreakBlockBefore(guarded({ system: "buildHeightLimit", operatio
 eventBus.onPlayerInteractWithBlock(guarded({ system: "buildHeightLimit", operation: "ceilingVeto" }, (event) => {
     const { player, block, blockFace, itemStack } = event;
 
-    // The ceiling is a veto on building, and neither an empty hand, a sign already standing nor
-    // a bed builds anything: cancelling a sign's click would swallow the text editor, and a
-    // bed's is the sleep that sets the spawn.
+    // An empty hand, a standing sign or a bed builds nothing; cancelling a sign's click would swallow the editor.
     if (
         !itemStack ||
         BETA_SIGN_BLOCK_IDS.has(block.typeId) ||
         BETA_BED_BLOCK_IDS.has(block.typeId)
     ) return;
 
-    // The block lands in the clicked cell for a side face, one above for the top face and one below
-    // for the bottom face: judging every face by the clicked cell itself refused legal placements
-    // under the ceiling.
+    // A side face places in the clicked cell, top one above, bottom one below; judging by the cell alone refused legal placements.
     let targetY = block.location.y;
     if (blockFace === Direction.Up) {
         targetY++;

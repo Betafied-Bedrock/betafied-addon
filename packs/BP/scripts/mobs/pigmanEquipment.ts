@@ -16,9 +16,7 @@ eventBus.onEntitySpawn((event) => {
             equippable.setEquipment(EquipmentSlot.Mainhand, new ItemStack("minecraft:golden_sword"));
         }
     } catch (err) {
-        // A pigman can despawn between the spawn event and this read, so the component lookup and the
-        // equipment write throw on a dead handle. The pigman is then left unarmed, which is worth a
-        // line in the log rather than silence.
+        // A despawn between the spawn event and this read throws; the pigman stays unarmed.
         reportError({
             system: "pigmanEquipment",
             operation: "equipGoldenSword"

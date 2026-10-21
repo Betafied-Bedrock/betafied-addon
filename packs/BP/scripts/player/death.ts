@@ -25,23 +25,14 @@ import type { DeathScreenHandlers } from "./deathScreen.js";
 export const DEAD_PROPERTY = "bh:dead";
 export const PRE_DEATH_GAMEMODE_PROPERTY = "bh:pre_death_gamemode";
 
-/**
- * The modes a death can hand back. Spectator is excluded because it is the pack's own park for the
- * dead, and the rest are checked as members rather than trusted: a property written by an older
- * build, or edited by hand, otherwise reaches setGameMode as a mode that does not exist.
- */
+// Spectator is the pack's own death park; a stale or hand-edited property must not reach setGameMode as a mode that does not exist.
 const RESTORABLE_MODES: ReadonlySet<string> = Object.freeze(new Set([
     GameMode.Survival,
     GameMode.Creative,
     GameMode.Adventure
 ]));
 
-/**
- * The respawn's destination for a player without a bed, recorded once per world. Bedrock reports the
- * world spawn's height as the unresolved 32767 sentinel — "the height is determined by surrounding
- * blocks" — and only its own spawn pass resolves it, so a teleport to that value drops the player above
- * the world. The first join stores where the engine actually put the player instead.
- */
+// Bedrock reports the unresolved world spawn as height 32767, so store where the engine actually put the first player.
 const WORLD_SPAWN_PROPERTY = "betafied:world_spawn";
 
 export const LOCKED_INPUT_CATEGORIES: readonly InputPermissionCategory[] = Object.freeze([
@@ -131,12 +122,7 @@ function playDeathSound(player: Player): void {
     player.dimension.playSound("random.hurt", player.location, { volume: 1, pitch });
 }
 
-/**
- * `EntityLiving.tick` scatters twenty `explode` particles through the entity's box on the tick
- * `deathTime` passes 20, and removes it in the same pass (`EntityLiving.java:152-167`). Its client
- * player has already shrunk to a 0.2 box by then (`EntityPlayer.onDeath`), which is smaller than the
- * corpse being marked, so this scatters through the era's standing player box instead.
- */
+// The era scatters twenty particles through the standing player box; the client corpse has already shrunk to 0.2 by then.
 function puffDeathCorpse(player: Player): void {
     const { x, y, z } = player.location;
     const dimension = player.dimension;
@@ -150,7 +136,7 @@ function puffDeathCorpse(player: Player): void {
     }
 }
 
-/** The corpse puff, on the tick the era removed the body; the player can respawn inside the delay. */
+// The corpse puff, on the tick the era removed the body; the player can respawn inside the delay.
 function puffCorpseAfterFlop(player: Player): void {
     if (!player.isValid || !isDead(player)) return;
     runCatching({ system: "death", operation: "puffDeathCorpse", target: player.name }, () => {
@@ -158,12 +144,7 @@ function puffCorpseAfterFlop(player: Player): void {
     });
 }
 
-/**
- * `RenderLiving.rotateCorpse` turns a corpse `getDeathMaxRotation` degrees about Z over its first ~0.7s
- * (`RenderLiving.java:120-132`; 90 for a player, which `RenderPlayer` does not override for a dead one).
- * The animation carries the era's sqrt curve on the entity's `root` bone, whose pivot is the origin the
- * era rotated around. The puff follows the flop because the era removes the body as it puffs.
- */
+// RenderLiving turns a corpse 90 degrees over ~0.7s; the puff rides the same tick because the era removes the body as it puffs.
 function playDeathFlop(player: Player): void {
     runCatching({ system: "death", operation: "playDeathFlop", target: player.name }, () => {
         player.playAnimation(DEATH_FLOP_ANIMATION);
@@ -211,7 +192,7 @@ function recordWorldSpawn(player: Player): void {
     world.setDynamicProperty(WORLD_SPAWN_PROPERTY, { x, y, z });
 }
 
-/** A bed or anchor outranks the world spawn, as it did in the era. */
+// A bed or anchor outranks the world spawn, as it did in the era.
 function respawnTarget(player: Player): DimensionLocation | undefined {
     const spawnPoint = player.getSpawnPoint();
     if (spawnPoint) return spawnPoint;
@@ -305,8 +286,7 @@ eventBus.onEntityHurtBefore((ev) => {
     system.run(() => enterDeathState(player));
 }, DEATH_VERDICT_PRIORITY);
 
-// No API returns a player to the title screen, so the era's second button takes the same way out as
-// the first rather than leaving a dead player holding a button that does nothing.
+// No API returns a player to the title screen, so the era's second button takes the respawn path instead of doing nothing.
 const DEATH_SCREEN_HANDLERS: DeathScreenHandlers = {
     onRespawn: (player) => respawnPlayer(player),
     onTitleMenu: (player) => respawnPlayer(player)

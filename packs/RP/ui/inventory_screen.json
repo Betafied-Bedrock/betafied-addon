@@ -6,7 +6,6 @@
     "size": [ 29, 25 ],
     "$tab_content": "crafting.empty_tab_panel",
     "$toggle_name": "layout_toggle",
-    //"$template_toggle": "crafting.layout_template_toggle",
     "$allow_controller_back_button_mapping": "$is_ps4"
   },
 
@@ -316,9 +315,7 @@
           "orientation": "horizontal",
 
           "controls": [
-            // ## FIX:
-            //    This thing does not go well with both layout bindings in the same operator.
-            //    ** THIS WILL CRASH THE GAME **
+            // Two layout bindings in one operator crash the game.
             {
               "survival_padding": {
                 "type": "panel",

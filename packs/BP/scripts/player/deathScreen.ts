@@ -23,10 +23,7 @@ export function isDeathScreenPending(playerId: string): boolean {
     return pendingScreens.has(playerId);
 }
 
-/**
- * Releasing is generation-guarded: a form that resolves after its player died again, left, or respawned
- * through another path belongs to a screen nobody is looking at any more, and nothing may act on it.
- */
+// Generation-guarded: a form resolving after a re-death, leave or respawn belongs to a screen nobody is looking at.
 function releasePendingScreen(playerId: string, generation: number): boolean {
     if (pendingScreens.get(playerId) !== generation) return false;
     pendingScreens.delete(playerId);

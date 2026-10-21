@@ -1,4 +1,4 @@
-import { Block, system } from "@minecraft/server";
+import { Block, Player, system } from "@minecraft/server";
 import { eventBus } from "../core/eventBus.js";
 import type { Cell } from "./cell.js";
 import { reportError } from "../core/errorReporter.js";
@@ -9,6 +9,21 @@ const OPEN_BIT = "open_bit";
 const UPPER_BIT = "upper_block_bit";
 
 const lastToggledTicks = new Map<string, number>();
+
+// [Private] sign: owner on line 2, guests on 3-4; clan tags stay unresolved, so a clan member is refused.
+interface DoorLock {
+    owner: string;
+    guests: string[];
+}
+
+const SIGN_OFFSETS: readonly Cell[] = [
+    { x: 1, y: 0, z: 0 },
+    { x: -1, y: 0, z: 0 },
+    { x: 0, y: 0, z: 1 },
+    { x: 0, y: 0, z: -1 },
+    { x: 0, y: 1, z: 0 },
+    { x: 0, y: -1, z: 0 }
+];
 
 export interface DoorTogglePlan {
     readonly lowerCell: Cell;
@@ -56,6 +71,80 @@ export function planDoorToggle(
     };
 }
 
+function parsePrivateSign(text: string): DoorLock | undefined {
+    const lines = text.split("\n");
+    const marker = (lines[0] ?? "").trim().toLowerCase();
+    if (marker !== "[private]" && marker !== "private") return undefined;
+
+    const owner = (lines[1] ?? "").trim().toLowerCase();
+    // A blank owner line is unclaimed, and the first interaction claims it.
+    if (!owner) return undefined;
+
+    const guests: string[] = [];
+    for (let i = 2; i < lines.length; i++) {
+        const line = (lines[i] ?? "").trim().toLowerCase();
+        if (!line) continue;
+        if (line.startsWith("[") && line.endsWith("]")) continue;
+        guests.push(line);
+    }
+
+    return { owner, guests };
+}
+
+function signLock(block: Block): DoorLock | undefined {
+    if (!block.typeId.includes("sign")) return undefined;
+
+    const sign = block.getComponent("minecraft:sign");
+    const text = sign?.getText();
+    return text ? parsePrivateSign(text) : undefined;
+}
+
+// A wall sign's facing names the block it hangs on; a standing sign has no facing.
+function isSignMountedOn(sign: Block, anchor: Cell): boolean {
+    const facingKey = findStateKey(sign.permutation.getAllStates(), "facing_direction");
+    if (facingKey === undefined) return true;
+
+    const facing = sign.permutation.getState(facingKey as "facing_direction");
+    const { x, y, z } = sign.location;
+    switch (facing) {
+        case 2:
+            return anchor.x === x && anchor.y === y && anchor.z === z + 1;
+        case 3:
+            return anchor.x === x && anchor.y === y && anchor.z === z - 1;
+        case 4:
+            return anchor.x === x + 1 && anchor.y === y && anchor.z === z;
+        case 5:
+            return anchor.x === x - 1 && anchor.y === y && anchor.z === z;
+        default:
+            return false;
+    }
+}
+
+function findDoorLock(door: Block, plan: DoorTogglePlan): DoorLock | undefined {
+    const dimension = door.dimension;
+
+    for (const anchor of [plan.lowerCell, plan.upperCell]) {
+        for (const offset of SIGN_OFFSETS) {
+            const neighbor = dimension.getBlock({
+                x: anchor.x + offset.x,
+                y: anchor.y + offset.y,
+                z: anchor.z + offset.z
+            });
+            if (!neighbor?.isValid) continue;
+
+            const lock = signLock(neighbor);
+            if (lock && isSignMountedOn(neighbor, anchor)) return lock;
+        }
+    }
+
+    return undefined;
+}
+
+function isLockedAgainst(lock: DoorLock, player: Player): boolean {
+    const name = player.name.toLowerCase();
+    return name !== lock.owner && !lock.guests.includes(name);
+}
+
 function isDebounced(key: string, currentTick: number): boolean {
     const lastTick = lastToggledTicks.get(key);
     if (lastTick !== undefined && currentTick - lastTick < PUNCH_COOLDOWN_TICKS) {
@@ -73,7 +162,7 @@ function isDebounced(key: string, currentTick: number): boolean {
     return false;
 }
 
-function toggleDoor(hitBlock: Block): void {
+function toggleDoor(hitBlock: Block, player: Player): void {
     const states = hitBlock.permutation.getAllStates();
     const cell: Cell = {
         x: hitBlock.location.x,
@@ -87,6 +176,12 @@ function toggleDoor(hitBlock: Block): void {
     const dim = hitBlock.dimension;
     const cooldownKey = `${dim.id}:${plan.lowerCell.x},${plan.lowerCell.y},${plan.lowerCell.z}`;
     if (isDebounced(cooldownKey, system.currentTick)) return;
+
+    const lock = findDoorLock(hitBlock, plan);
+    if (lock && isLockedAgainst(lock, player)) {
+        player.sendMessage("§cThis door is locked by a private sign.");
+        return;
+    }
 
     const lower = dim.getBlock(plan.lowerCell);
     const upper = dim.getBlock(plan.upperCell);
@@ -120,7 +215,7 @@ eventBus.onEntityHitBlock((event) => {
     if (!event.hitBlock) return;
 
     try {
-        toggleDoor(event.hitBlock);
+        toggleDoor(event.hitBlock, event.damagingEntity as Player);
     } catch (e) {
         reportError(
             {

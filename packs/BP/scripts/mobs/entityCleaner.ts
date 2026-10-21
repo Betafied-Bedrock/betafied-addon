@@ -26,8 +26,7 @@ export function* cleanerJob(): Generator<void, void, unknown> {
             for (const ent of entities) {
                 if (!ent.isValid) continue;
 
-                // The sweep is the backstop for entities that were already resident before this pass
-                // could see them spawn, so it runs the same policy rather than a second copy of it.
+                // Backstop for entities resident before their spawn event: same policy, not a copy.
                 sanitizeWorldEntity(ent, SWEEP_SANITIZATION);
                 migrateEntity(ent);
 

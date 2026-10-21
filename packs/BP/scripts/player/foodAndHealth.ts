@@ -38,9 +38,7 @@ function buildFoodItems(): Record<string, FoodConfig> {
     for (const convertedId of Object.values(FOOD_CONVERSIONS)) {
         const config = FOOD_HEALTH[convertedId];
         if (!config) {
-            // This runs at import, so a missing entry is reported rather than thrown: a throw would
-            // abort the script before any handler exists to report it. The food then simply keeps
-            // whatever the engine does with it natively.
+            // Runs at import, so report instead of throw: the food then keeps whatever the engine does natively.
             reportError(
                 { system: "foodAndHealth", operation: "buildFoodItems", target: convertedId },
                 "converted food has no configured health"
@@ -110,9 +108,7 @@ class FoodAndHealth {
                 const selectedSlot = player.selectedSlotIndex;
                 const slotItem = inventory.getItem(selectedSlot);
 
-                // Writing to the inventory is not legal inside the before-event, so the use is
-                // cancelled one tick before the write. That is the whole revalidation window: if the
-                // slot moved on in it, the cancelled use is reported rather than dropped.
+                // Inventory writes are illegal in the before-event, so the use is cancelled a tick early; a slot that moved on is reported.
                 if (slotItem?.typeId !== foodId) {
                     reportError(
                         { system: "foodAndHealth", operation: "consumeFoodDeferred", target: player.name },
@@ -173,8 +169,7 @@ class FoodAndHealth {
             }
             return false;
         } catch (err) {
-            // The bowl is already spent from the stack by the time this runs, so a failure here loses
-            // it with no other trace: that is worth a report even though the eat itself succeeded.
+            // The bowl is already spent from the stack, so a failed return loses it without any other trace.
             reportError(
                 { system: "foodAndHealth", operation: "returnContainer", target: itemStack.typeId },
                 err
