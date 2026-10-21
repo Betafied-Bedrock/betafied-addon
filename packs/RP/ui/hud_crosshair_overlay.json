@@ -1,0 +1,40 @@
+{
+  "namespace": "hud_crosshair",
+
+  "cursor_renderer": {
+    // "ignored": "(not $touch)",
+    "type": "custom",
+    "size": [ 16, 16 ],
+    "renderer": "cursor_renderer",
+    "layer": 4
+  },
+  "crosshair_pixel": {
+    // "ignored": "($touch)",
+    "type": "custom",
+    "renderer": "gradient_renderer",
+    "color1": [ 1, 1, 1, 1 ],
+    "color2": [ 1, 1, 1, 1 ],
+    "size": [ 1, 1 ]
+  },
+  "custom_crosshair": {
+    "type": "panel",
+    "size": [ 16, 16 ],
+    "controls": [
+      { "horizontal@hud_crosshair.crosshair_pixel": { "size": [ 9, 1 ]}},
+      { "vertical@hud_crosshair.crosshair_pixel": { "size": [ 1, 4 ], "offset": [ 0, -3 ]}},
+      { "vertical_2@hud_crosshair.crosshair_pixel": { "size": [ 1, 4 ], "offset": [ 0, 3 ]}}
+  ]},
+  "hud_crosshair_screen": {
+    "type": "screen",
+    "render_game_behind": true,
+    "render_only_when_topmost": false,
+    "should_steal_mouse": false,
+    "is_showing_menu": false,
+    "is_modal": false,
+    "absorbs_input": false,
+    "low_frequency_rendering": false,
+    "controls": [
+      { "cursor@hud_crosshair.cursor_renderer": {}}
+    ]
+  }
+}

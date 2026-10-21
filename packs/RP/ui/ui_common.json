@@ -1,0 +1,121 @@
+{
+  "highlight_slot": {
+    "texture": "textures/ui/White",
+    "alpha": 0.5,
+    "layer": 22
+  },
+  "white_border_slot": {
+    "ignored": true
+  },
+  "screen_background": {
+    "texture": "textures/ui/Black"
+  },
+  "inventory_panel_bottom_half_with_label/inventory_label": {
+    "offset": [ 8, -2 ]
+  },
+//   "selected_item_details": {
+//     "type": "panel",
+//     "anchor_to": "bottom_middle",
+//     "anchor_from": "bottom_middle",
+//     "size": [ "100%c", "100%c" ],
+//     "offset": "$offset",
+//     "layer": 30,
+//
+//     "$offset|default": [ 0, "-16px" ],
+//     "$alpha_anim|default": "@common.anim_item_details_alpha",
+//
+//     "controls": [
+//       {
+//         "item_panel_image@common.item_panel_image_bf": {}
+//       }
+//     ],
+//     "bindings": [
+//       {
+//         "binding_name": "#recipe_details_label",
+//         "binding_name_override": "#visible"
+//       }
+//     ]
+//   },
+//   "item_panel_image_bf": {
+//     "type": "image",
+//     "size": [ "100%c", "100%c" ],
+//     "layer": 30,
+//     "visible": "#visible",
+//     "alpha": "$alpha_anim",
+//     "texture": "textures/ui/Black",
+//     "controls": [
+//       {
+//         "item_text_label@common.item_text_label": {}
+//       }
+//     ]
+//   },
+//   "anim_item_details_alpha": {
+//     "duration": 2,
+//     "from": 0.5,
+//     "to": 0
+//   },
+//   "inventory_icon_panel": {
+//     "type": "panel",
+//     "controls": [
+//       { "selected_item_icon@common.inventory_selected_icon": {} },
+//       { "selected_stack_size_text@common.inventory_selected_stack_size_text": {} },
+//       { "selected_item_lock_overlay@common.inventory_selected_item_lock_overlay": {} },
+//       {
+//         "hover_text@common.hover_text": {
+//           "layer": 59,
+//           "bindings": [
+//             {
+//               "binding_name": "#using_touch",
+//               "binding_name_override": "#visible"
+//             }
+//           ]
+//         }
+//       }
+//     ]
+//   },
+  "inventory_selected_icon": {
+    "size": [ 16, 16 ],
+    "offset": [ 0, 0 ]
+  },
+  "inventory_selected_stack_size_text": {
+    "offset": [ 1, 2 ]
+  },
+  "durability_bar_grabbed": {
+    "size": [ 12, 1 ],
+    "offset": [ 0, 5 ]
+  },
+  "flying_item_renderer": {
+    "property_bag": {
+      "#flying_item_renderer": false
+    }
+  },
+  "hotbar_grid_template": {
+    "type": "grid",
+    "size": [ 162, 18 ],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle",
+    "offset": [ 0, -7 ],
+    "grid_dimensions": [ 9, 1 ],
+    "grid_item_template": "common.grid_item_for_hotbar",
+    "collection_name": "hotbar_items"
+  },
+  "inventory_panel": {
+    "type": "panel",
+    "size": [ 88, 83 ],
+    "anchor_from": "bottom_middle",
+    "anchor_to": "bottom_middle",
+    "controls": [
+      { "inventory_grid": {
+          "type": "grid",
+          "size": [ 162, 54 ],
+          "anchor_from": "bottom_middle",
+          "anchor_to": "bottom_middle",
+          "offset": [ 0, -29 ],
+          "grid_dimensions": [ 9, 3 ],
+          "grid_item_template": "common.grid_item_for_inventory",
+          "collection_name": "inventory_items"
+        }
+      }
+    ]
+  }
+}

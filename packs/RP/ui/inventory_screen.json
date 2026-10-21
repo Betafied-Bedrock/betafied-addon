@@ -1,4 +1,23 @@
 {
+  "player_armor_panel/player_bg": {
+    "texture": ""
+  },
+  "player_armor_panel/player_bg/player_renderer_panel": {
+    "offset": [ 0, -10 ]
+  },
+  "work_bench_panel_3x3/inventory_label": {
+    "offset": [ -21, 71 ]
+  },
+  "crafting_label": {
+    "type": "label",
+    "anchor_from": "top_left",
+    "anchor_to": "top_left",
+    "text": "#crafting_label_text",
+    "color": "$title_text_color",
+    "layer": 2,
+    "bindings": [
+      { "binding_name": "#crafting_label_text" }
+  ]},
   "creative_label": {
     "text_alignment": "left"
   },
@@ -153,7 +172,7 @@
                 "controls": [
                   { "survival_layout_toggle@crafting.survival_layout_toggle": {
                       "bindings": [
-                        
+
                       ]
                     }
                   }
@@ -280,7 +299,7 @@
           "size": [ "100% - 8px", "default" ],
           "layer": 80,
           "shadow": true,
-          "text": "Recipe is not available on survival...",
+          "text": "Recipe is not available on survival...\n\nComing soon!",
           "bindings": [
             { "binding_type": "global",
               "binding_name": "(not #is_creative_mode)",
@@ -307,7 +326,7 @@
   "recipe_inventory_screen_content_betafied": {
     "type": "panel",
     "controls": [
-      { "close_button_element@crafting.close_button_element": {}},
+      { "close_button_element@bfui:common.touch_close_button": {}},
       {
         "content_stack_panel": {
           "type": "stack_panel",
@@ -397,7 +416,8 @@
         }
       },
       { "selected_item_details_factory@common.selected_item_details_factory": {} },
-      { "item_lock_notification_factory@common.item_lock_notification_factory": {} }
+      { "item_lock_notification_factory@common.item_lock_notification_factory": {} },
+      { "flying_item_renderer@common.flying_item_renderer": { "layer": 15 } }
     ]
   },
   "inventory_container_slot_button@common.container_slot_button_prototype": {
@@ -433,16 +453,19 @@
         "mapping_type": "pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "from_button_id": "button.controller_select",
         "to_button_id": "$button_take_half_place_one",
         "mapping_type": "pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "from_button_id": "button.menu_auto_place",
         "to_button_id": "$button_auto_place",
         "mapping_type": "pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "from_button_id": "button.controller_secondary_select",
         "to_button_id": "$button_auto_place",
         "mapping_type": "pressed"
@@ -458,20 +481,24 @@
         "mapping_type": "pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "from_button_id": "button.menu_select",
         "to_button_id": "$coalesce_button",
         "mapping_type": "double_pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "from_button_id": "button.menu_ok",
         "to_button_id": "$coalesce_button",
         "mapping_type": "double_pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "to_button_id": "button.shape_drawing",
         "mapping_type": "pressed"
       },
       {
+        "ignored": "$bfgv_without_bedrock_QOL",
         "to_button_id": "button.container_slot_hovered",
         "mapping_type": "pressed"
       }
@@ -543,36 +570,29 @@
   "player_armor_panel/offhand_grid": {
     "ignored": true
   },
-  "close_button_default": {
-    "type": "label",
-    "text": "X"
-  },
-  "close_button_pressed": {
-    "type": "label",
-    "text": "§eX"
-  },
-  "close_button@common.button": {
-    "$pressed_button_name": "button.menu_exit",
-    "size": [ 27, 27 ],
-    "focus_enabled": false,
+
+
+  "crafting_grid_2x2_with_label": {
+    "type": "panel",
+    "size": [ "default", 47 ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "$grid_label_alignment|default": "center",
     "controls": [
-      { "default@close_button_default": {} },
-      { "hover@close_button_pressed": {} },
-      { "pressed@close_button_pressed": {} }
-  ]},
-  "close_button_element": {
-    "type": "image",
-    "texture": "textures/ui/hud_tip_text_background",
-    "size": [ 27, 27 ],
-    "anchor_from": "top_right",
-    "anchor_to": "top_right",
-    "offset": [ -8, 8 ],
-    "alpha": 0.7,
-    "controls": [
-      { "close_button@close_button": {
-          "layer": 2
-      }}
-  ]},
+      {
+        "crafting_label@crafting.crafting_label": {
+          "size": [ 66, 10 ],
+          "offset": [ -14, 1 ],
+          "text_alignment": "$grid_label_alignment"
+        }
+      },
+      {
+        "crafting_grid_2x2@crafting.crafting_grid_2x2": {
+          "offset": [ 0, 11 ]
+        }
+      }
+    ]
+  },
   "crafting_panel_2x2": {
     "type": "panel",
     "size": [ 88, 83 ],
@@ -582,7 +602,7 @@
     "controls": [
       {
         "crafting_arrow@crafting_arrow": {
-          "offset": [ 46, 29 ],
+          "offset": [ 44, 28 ],
           "bindings": [
             {
               "binding_type": "view",
@@ -613,12 +633,12 @@
       },
       {
         "crafting_grid_2x2@crafting.crafting_grid_2x2_with_label": {
-          "offset": [ 8, 7 ]
+          "offset": [ 6, 5 ]
         }
       },
       {
         "survival_crafting_output_grid@crafting.output_grid_2x2": {
-          "offset": [ 64, 26 ]
+          "offset": [ 62, 26 ]
         }
       }
     ],
@@ -630,9 +650,13 @@
     ]
   },
   "crafting_screen@crafting.inventory_screen_base": {
-    "$screen_content": "crafting.recipe_inventory_screen_content_betafied"
+    "force_render_below": true,
+    "$screen_content": "crafting.recipe_inventory_screen_content_betafied",
+    "$screen_bg_content": "bfui:common.screen_background"
   },
   "inventory_screen@crafting.inventory_screen_base": {
-    "$screen_content": "crafting.recipe_inventory_screen_content_betafied"
+    "force_render_below": true,
+    "$screen_content": "crafting.recipe_inventory_screen_content_betafied",
+    "$screen_bg_content": "bfui:common.screen_background"
   }
 }
