@@ -1,0 +1,64 @@
+{ "namespace": "bfui:anims",
+  // Pause screen saving world text.
+  "saving_world_anim_01": {
+    "anim_type": "alpha",
+    "easing": "out_quart",
+    "duration": 0.5,
+    "from": 0.25,
+    "to": 1,
+    "next": "@bfui:anims.saving_world_anim_02"
+  },
+  "saving_world_anim_02": {
+    "anim_type": "alpha",
+    "easing": "in_quart",
+    "duration": 0.5,
+    "from": 1,
+    "to": 0.25,
+    "next": "@bfui:anims.saving_world_anim_03"
+  },
+  "saving_world_anim_03": {
+    "anim_type": "alpha",
+    "easing": "out_quart",
+    "duration": 0.5,
+    "from": 0.25,
+    "to": 1,
+    "next": "@bfui:anims.saving_world_anim_04"
+  },
+ "saving_world_anim_04": {
+    "anim_type": "alpha",
+    "easing": "in_quart",
+    "duration": 0.5,
+    "from": 1,
+    "to": 0.25,
+    "next": "@bfui:anims.saving_world_anim_05"
+  },
+  "saving_world_anim_05": {
+    "anim_type": "alpha",
+    "easing": "out_quart",
+    "duration": 0.5,
+    "from": 0.25,
+    "to": 1,
+    "next": "@bfui:anims.saving_world_anim_06"
+  },
+  "saving_world_anim_06": {
+    "anim_type": "alpha",
+    "easing": "in_quart",
+    "duration": 0.5,
+    "from": 1,
+    "to": 0
+  },
+  // Hud
+  "anim_chat_bg_wait_bottom": {
+    "anim_type": "wait",
+    "duration": "$chat_item_lifetime",
+    "next": "@bfui:anims.anim_chat_bg_alpha_bottom"
+  },
+  "anim_chat_bg_alpha_bottom": {
+    "anim_type": "alpha",
+    "easing": "in_quart",
+    "destroy_at_end": "chat_grid_item_bottom_core",
+    "duration": 1,
+    "from": 0.5,
+    "to": 0
+  }
+}

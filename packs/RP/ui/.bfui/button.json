@@ -1,0 +1,43 @@
+{ "namespace": "bfui:button_common",
+  "new_ui_binding_button_label_classic@common_buttons.new_ui_binding_button_label": {
+    "shadow": true
+  },
+  "button_pocket_template@common_buttons.light_text_button": {
+    "$button_type_panel": "bfui:button_common.new_ui_binding_button_label_classic",
+    "$default_button_texture": "textures/ui/betafied/pocket_regular_button",
+    "$default_text_color": "$light_button_hover_text_color",
+    "$hover_button_texture": "textures/ui/betafied/pocket_regular_button_hover",
+    "$hover_text_color": [ 1, 0.9607, 0.8117 ],
+    "$pressed_button_texture": "textures/ui/betafied/pocket_regular_button_pressed",
+    "$pressed_text_color": [ 1, 0.9607, 0.8117 ],
+    "$locked_button_texture": "textures/ui/betafied/pocket_regular_button_pressed",
+    "$locked_text_color": "$light_button_hover_text_color",
+    "size": [ 200, 20 ],
+    "$button_image_size": [ "100%", "100%" ],
+    "$border_visible": false,
+    "$border_alpha": 0,
+    "$button_pressed_offset": [ 0, 0 ],
+    "focus_identifier": "$pressed_button_name",
+    "focus_change_right": "$focus_override_right",
+    "focus_change_left": "$pressed_button_name"
+  },
+  "button_classic_template@common_buttons.light_text_button": {
+    "$button_type_panel": "bfui:button_common.new_ui_binding_button_label_classic",
+    "$default_button_texture": "textures/ui/vanilla_default",
+    "$default_text_color": "$light_button_hover_text_color",
+    "$hover_button_texture": "textures/ui/vanilla_pressed",
+    "$hover_text_color": [ 1, 0.9607, 0.8117 ],
+    "$pressed_button_texture": "textures/ui/vanilla_pressed",
+    "$pressed_text_color": [ 1, 0.9607, 0.8117 ],
+    "$locked_button_texture": "textures/ui/vanilla_locked",
+    "$locked_text_color": "$light_button_hover_text_color",
+    "size": [ 200, 20 ],
+    "$button_image_size": [ "100%", "100%" ],
+    "$border_visible": false,
+    "$border_alpha": 0,
+    "$button_pressed_offset": [ 0, 0 ],
+    "focus_identifier": "$pressed_button_name",
+    "focus_change_right": "$focus_override_right",
+    "focus_change_left": "$pressed_button_name"
+  }
+}

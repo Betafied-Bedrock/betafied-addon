@@ -1,0 +1,369 @@
+{ "namespace": "bfui:pause_screen",
+  "root_panel": {
+    "type": "panel",
+    "controls": [
+      { "classic_element@bfui:pause_screen.main_classic_element": { "ignored": "$pocket_screen" }},
+      { "pocket_element@bfui:pause_screen.main_pocket_element": { "ignored": "(not $pocket_screen)" }},
+      { "saving_world_element@bfui:pause_screen.saving_world_element": {}},
+      { "pocketui_warning@bfui:pause_screen.pocketui_warning": {}}
+  ]},
+  "saving_world_element": {
+    "type": "label",
+    "text": "§7Saving World...",
+    "anchor_from": "bottom_left",
+    "anchor_to": "bottom_left",
+    "offset": [ 8, -8 ],
+    "alpha": 0.5,
+    "anims": [
+      "@bfui:anims.saving_world_anim_01"
+    ]
+  },
+  "pocketui_warning": {
+    "ignored": "(not $pocket_screen)",
+    "type": "label",
+    "text": "Pocket UI are currently in development! for now, the best experience remains to Classic UI. which can be changed in - \n\n§7Options... > Video > \"UI Profile\" > Select 'Classic'",
+    "anchor_to": "bottom_left",
+    "anchor_from": "bottom_left",
+    "offset": [ 10, -20 ],
+    "size": [ "50%", "default" ],
+    "alpha": 0.5
+  },
+
+
+  "main_classic_element": {
+    "type": "panel",
+    "focus_container": true,
+    "use_last_focus": true,
+    "controls": [
+      { "pause_menu_label@pause_menu_label": {}},
+      { "button_panel": {
+          "type": "stack_panel",
+          "size": [ 200, "100%c" ],
+          "anchor_from": "top_middle",
+          "anchor_to": "top_middle",
+          "offset": [ 0, "25%" ],
+          "use_child_anchors": true,
+          "controls": [
+            { "return_to_game_button@bfui:button_common.button_classic_template": {
+                "$pressed_button_name": "button.menu_continue",
+                "$button_text": "Back to game",
+                "anchor_to": "top_middle",
+                "anchor_from": "top_middle",
+                "$button_focus_precedence": 1,
+                "focus_identifier": "return_to_game",
+                "$focus_override_up": "icon_panel_main_focus",
+                "focus_change_right": "friendsdrawer_button",
+                "focus_change_left": "FOCUS_OVERRIDE_STOP",
+                "variables": [
+                  { "requires": "$is_editor_playtest_roundtrip",
+                    "$button_text": "pauseScreen.editor.returnToTesting"
+                  },
+                  { "requires": "$is_editor_mode_enabled",
+                    "$button_text": "pauseScreen.editor.returnToEditing"
+                }]
+            }},
+            { "vertical_padding_00": { "type": "panel", "size": [ 0, 4 ] }},
+            { "sub_button_00": {
+                "type": "stack_panel",
+                "orientation": "horizontal",
+                "size": [ 200, 20 ],
+                "controls": [
+                  { "dressing_room_button_own@bfui:button_common.button_classic_template": {
+                      "size": [ 98, 20 ],
+                      "$pressed_button_name": "button.to_profile_or_skins_screen",
+                      "$button_text": "profileScreen.header",
+                      "$focus_id": "profile_button"
+                  }},
+                  { "padding": {
+                      "type": "panel",
+                      "size": [ 4, 4 ]
+                  }},
+                  { "more_player@bfui:button_common.button_classic_template": {
+                      "size": [ 98, 20 ],
+                      "$pressed_button_name": "button.friends_drawer",
+                      "$button_text": "Player(s)",
+                      "$focus_id": "profile_button",
+                      "property_bag": {
+                        "#context": "ingame"
+                      }
+                  }}
+            ]}},
+            { "large_padding": { "type": "panel", "size": [ "100%", 30 ]}},
+            { "settings_button@bfui:button_common.button_classic_template": {
+                "$pressed_button_name": "button.menu_settings",
+                "$button_text": "Options...",
+                "anchor_to": "top_middle",
+                "anchor_from": "top_middle"
+            }},
+            { "vertical_padding_01": { "type": "panel", "size": [ 0, 4 ] }},
+            { "quit_button@bfui:button_common.button_classic_template": {
+                "$pressed_button_name": "button.menu_quit",
+                "$button_text": "Save and quit to title",
+                "anchor_to": "top_middle",
+                "anchor_from": "top_middle",
+                "$focus_override_down": "icon_panel_main_focus",
+                "variables": [
+                  { "requires": "($is_secondary_client and not $is_editor_playtest_roundtrip)",
+                    "$button_text": "pauseScreen.secondaryClientLeave"
+                  },
+                  { "requires": "$is_editor_playtest_roundtrip",
+                    "$button_text": "pauseScreen.editor.quit"
+                }]
+            }},
+            { "vertical_padding_01": { "type": "panel", "size": [ 0, 20 ] }}
+      ]}}
+  ]},
+  "main_pocket_element": {
+    "type": "panel",
+    "focus_container": true,
+    "use_last_focus": true,
+    "controls": [
+      { "button_panel": {
+          "type": "stack_panel",
+          "orientation": "vertical",
+          "size": [ "50%", "100%c" ],
+          "anchor_from": "top_left",
+          "anchor_to": "top_left",
+          "use_child_anchors": true,
+          "controls": [
+            { "vertical_padding_00": { "type": "panel", "size": [ 0, 30 ] }},
+            { "pause_menu_label@pause_menu_label": {}},
+            { "vertical_padding_01": { "type": "panel", "size": [ 0, 15 ] }},
+            { "return_to_game_button@bfui:button_common.button_pocket_template": {
+                "size": [ "80%", 30 ],
+                "$pressed_button_name": "button.menu_continue",
+                "$button_text": "Back to game",
+                "anchor_to": "top_middle",
+                "anchor_from": "top_middle",
+                "$button_focus_precedence": 1,
+                "focus_identifier": "return_to_game",
+                "$focus_override_up": "icon_panel_main_focus",
+                "focus_change_right": "friendsdrawer_button",
+                "focus_change_left": "FOCUS_OVERRIDE_STOP",
+                "variables": [
+                  { "requires": "$is_editor_playtest_roundtrip",
+                    "$button_text": "pauseScreen.editor.returnToTesting"
+                  },
+                  { "requires": "$is_editor_mode_enabled",
+                    "$button_text": "pauseScreen.editor.returnToEditing"
+                }]
+            }},
+            { "vertical_padding_02": { "type": "panel", "size": [ 0, 6 ] }},
+            { "dressing_room_button_own@bfui:button_common.button_pocket_template": {
+                "size": [ "80%", 30 ],
+                "$pressed_button_name": "button.to_profile_or_skins_screen",
+                "$button_text": "profileScreen.header",
+                "$focus_id": "profile_button"
+            }},
+            { "vertical_padding_03": { "type": "panel", "size": [ 0, 6 ] }},
+            { "settings_button@bfui:button_common.button_pocket_template": {
+                "size": [ "80%", 30 ],
+                "$pressed_button_name": "button.menu_settings",
+                "$button_text": "Options",
+                "anchor_to": "top_middle",
+                "anchor_from": "top_middle"
+            }},
+            { "vertical_padding_04": { "type": "panel", "size": [ 0, 6 ] }},
+            { "quit_button@bfui:button_common.button_pocket_template": {
+                "size": [ "80%", 30 ],
+                "$pressed_button_name": "button.menu_quit",
+                "$button_text": "Quit to title",
+                "anchor_to": "top_middle",
+                "anchor_from": "top_middle",
+                "$focus_override_down": "icon_panel_main_focus",
+                "variables": [
+                  { "requires": "($is_secondary_client and not $is_editor_playtest_roundtrip)",
+                    "$button_text": "pauseScreen.secondaryClientLeave"
+                  },
+                  { "requires": "$is_editor_playtest_roundtrip",
+                    "$button_text": "pauseScreen.editor.quit"
+                }]
+            }}
+      ]}},
+      { "playerlist_panel": {
+          "type": "panel",
+          "size": [ "50%", "100%" ],
+          "anchor_from": "top_right",
+          "anchor_to": "top_right",
+          "controls": [
+            { "player_background": {
+                "type": "image",
+                "texture": "textures/ui/background_with_border",
+                "size": [ "60%", "80%" ],
+                "offset": [ 15, 0 ],
+                "alpha": 0.5,
+                "controls": [
+                  { "player_list@bfui:pause_screen.player_list": {}}
+            ]}},
+            { "social@bfui:button_common.button_pocket_template": {
+                "size": [ "50%", 16 ],
+                "offset": [ 15, -8 ],
+                "anchor_from": "bottom_middle",
+                "anchor_to": "bottom_middle",
+                "$pressed_button_name": "button.friends_drawer",
+                "$button_text": "Player(s)",
+                "$focus_id": "profile_button",
+                "property_bag": {
+                  "#context": "ingame"
+                }
+            }}
+      ]}}
+  ]},
+  "pause_menu_label": {
+    "type": "panel",
+    "size": [ "100%", 12 ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "offset": [ 0, 30 ],
+    "controls": [
+      { "paused_label_without": {
+          "type": "label",
+          "text_alignment": "center",
+          "text": "Game menu",
+          "shadow": true,
+          "bindings": [
+            { "binding_name": "(not #pause_annoucement_visible)",
+              "binding_name_override": "#visible",
+              "binding_type": "global"
+          }]
+      }},
+      { "paused_label_with": {
+          "type": "label",
+          "text_alignment": "center",
+          "text": "Game menu §7§o(Paused)",
+          "shadow": true,
+          "bindings": [
+            { "binding_name": "#pause_annoucement_visible",
+              "binding_name_override": "#visible",
+              "binding_type": "global"
+          }]
+      }}
+  ]},
+  "more_player_toggle@common_toggles.light_ui_toggle": {
+    "$template_toggle": "pause.dark_template_toggle",
+    "size": [ 98, 20 ],
+    "$button_text": "Player(s)",
+    "$toggle_name": "pause_more_player",
+    "$toggle_view_binding_name": "pause_more_player",
+    "$button_mappings": [
+      { "from_button_id": "button.controller_start",
+        "to_button_id": "button.controller_start",
+        "mapping_type": "global"
+      },
+      { "from_button_id": "button.scoreboard",
+        "to_button_id": "button.scoreboard",
+        "mapping_type": "global"
+      },
+      { "from_button_id": "button.menu_select",
+        "to_button_id": "button.menu_select",
+        "mapping_type": "pressed"
+      },
+      { "from_button_id": "button.menu_ok",
+        "to_button_id": "button.menu_ok",
+        "mapping_type": "focused"
+  }]},
+  "dark_template_toggle@common_toggles.light_template_toggle": {
+    "$button_type_panel": "bfui:pause_screen.new_ui_binding_button_label_classic",
+    "$button_text_binding_type|default": "none",
+    "$button_text_grid_collection_name|default": "",
+    "$button_binding_condition|default": "none",
+    "$default_texture": "textures/ui/vanilla_default",
+    "$hover_texture": "textures/ui/vanilla_default",
+    "$pressed_texture": "textures/ui/vanilla_pressed",
+    "$pressed_no_hover_texture": "textures/ui/vanilla_pressed",
+    "$border_alpha": 0,
+    "$button_image_size": [ "100%", "100%" ],
+    "$button_offset": [ 0, 0 ],
+    "$default_text_color": "$light_button_hover_text_color",
+    "$hover_text_color": [ 1, 0.9607, 0.8117 ],
+    "$default_checked_text_color": "$light_button_hover_text_color",
+    "$hover_checked_text_color": [ 1, 0.9607, 0.8117 ],
+    "$default_border_visible": false,
+    "$hover_border_visible": false
+  },
+  "player_list@common.scrolling_panel": {
+    "size": [ "100%", "100%" ],
+    "anchor_from": "top_middle",
+    "anchor_to": "top_middle",
+    "$scrolling_content": "bfui:pause_screen.player_list_grid",
+    "$show_background": false,
+    "$always_handle_scrolling": true
+  },
+  "player_list_grid": {
+    "type": "grid",
+    "size": [ "100%", "100%c" ],
+    "grid_item_template": "bfui:pause_screen.player_list_grid_core",
+    "grid_dimension_binding": "#players_grid_dimension",
+    "collection_name": "players_collection",
+    "anchor_to": "top_middle",
+    "anchor_from": "top_middle",
+    "bindings": [
+      { "binding_name": "#players_grid_dimension"}
+  ]},
+  "player_list_grid_core": {
+    "type": "panel",
+    "size": [ "100%", 16 ],
+    "controls": [
+      { "background": {
+          "type": "image",
+          "size": [ "100%", "100%" ],
+          "texture": "textures/ui/background_with_border",
+          "alpha": 0.25
+      }},
+      { "player_profile_panel": {
+          "type": "panel",
+          "size": [ 16, 16 ],
+          "layer": 1,
+          "anchor_to": "top_left",
+          "anchor_from": "top_left",
+          "controls": [
+            { "player_profile": {
+                "type": "image",
+                "texture": "#texture",
+                "texture_file_system": "#texture_source",
+                "size": [ 16, 16 ],
+                "bindings": [
+                  { "binding_name": "#texture",
+                    "binding_type": "collection",
+                    "binding_collection_name": "players_collection"
+                  },
+                  { "binding_name": "#texture_source",
+                    "binding_name_override": "#texture_file_system",
+                    "binding_type": "collection",
+                    "binding_collection_name": "players_collection"
+                  },
+                  { "binding_name": "#gamerpic_visible",
+                    "binding_type": "collection",
+                    "binding_collection_name": "players_collection",
+                    "binding_name_override": "#visible"
+                }]
+            }},
+            { "player_profile_offline": {
+                "type": "image",
+                "texture": "textures/ui/lan_icon",
+                "size": [ 16, 16 ],
+                "bindings": [
+                  { "binding_name": "(not #gamerpic_visible)",
+                    "binding_type": "collection",
+                    "binding_collection_name": "players_collection",
+                    "binding_name_override": "#visible"
+                }]
+            }}
+      ]}},
+      { "player_name": {
+          "type": "label",
+          "text": "#gamertag",
+          "text_alignment": "left",
+          "shadow": true,
+          "layer": 1,
+          "anchor_to": "left_middle",
+          "anchor_from": "left_middle",
+          "offset": [ 20, 0 ],
+          "bindings": [
+            { "binding_name": "#gamertag",
+              "binding_type": "collection",
+              "binding_collection_name": "players_collection"
+          }]
+      }}
+  ]}
+}
