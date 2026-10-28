@@ -3,7 +3,6 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:chicken",
-            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "min_engine_version": "1.12.0",
             "materials": {
                 "default": "chicken",
@@ -16,7 +15,6 @@
                 "default": "geometry.chicken.v1.12"
             },
             "animations": {
-                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "move": "animation.chicken.move",
                 "general": "animation.chicken.general",
                 "look_at_target": "animation.common.look_at_target",
@@ -31,8 +29,7 @@
                     "look_at_target",
                     {
                         "baby_transform": "query.is_baby"
-                    },
-                    "bh_entity_shadow"
+                    }
                 ]
             },
             "render_controllers": [

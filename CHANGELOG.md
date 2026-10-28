@@ -2,6 +2,28 @@
 
 Notable changes in each Betafied release. Version numbers match the behavior and resource pack manifests.
 
+## 5.16 — 2026-10-28
+
+5.16 adds support for Bedrock 1.26.60 and removes the pack's custom mob shadows and invisibility.
+
+### Compatibility
+
+- Changed the packs to require Bedrock 1.26.60 and Script API 2.12.0-beta.
+
+### HUD
+
+- Fixed the hotbar disappearing on Bedrock 1.26.60.
+
+### Screens
+
+- Fixed the retired debug screen notice surviving an in-place update.
+
+### Mobs
+
+- Removed the pack's custom shadow decals and the material that hid Bedrock's shadows.
+- Removed the permanent invisibility that stopped mobs targeting each other and the player.
+- Changed chickens, cows, pigs and wolves to keep vanilla's sound variants.
+
 ## 5.15.1 — 2026-10-21
 
 5.15.1 removes the in-development notice 5.15 left on the debug screen.

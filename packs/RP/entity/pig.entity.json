@@ -3,7 +3,6 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:pig",
-            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "min_engine_version": "1.8.0",
             "materials": {
                 "default": "pig"
@@ -16,7 +15,6 @@
                 "default": "geometry.pig.v1.8"
             },
             "animations": {
-                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "setup": "animation.pig.setup",
                 "walk": "animation.quadruped.walk",
                 "look_at_target": "animation.common.look_at_target",
@@ -31,8 +29,7 @@
                     "look_at_target",
                     {
                         "baby_transform": "query.is_baby"
-                    },
-                    "bh_entity_shadow"
+                    }
                 ]
             },
             "render_controllers": [

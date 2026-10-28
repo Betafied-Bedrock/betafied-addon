@@ -3,7 +3,6 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:spider",
-            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "min_engine_version": "1.8.0",
             "materials": {
                 "default": "spider",
@@ -23,8 +22,7 @@
             "animation_controllers": [
                 {
                     "move": "controller.animation.spider.move"
-                },
-                { "bh_entity_shadow": "controller.animation.betarock.entity_shadow" }
+                }
             ],
             "render_controllers": [
                 "controller.render.spider"

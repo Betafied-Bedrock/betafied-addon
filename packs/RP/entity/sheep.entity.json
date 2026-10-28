@@ -3,7 +3,6 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:sheep",
-            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "min_engine_version": "1.8.0",
             "materials": {
                 "default": "sheep"
@@ -16,7 +15,6 @@
                 "sheared": "geometry.sheep.sheared.v1.8"
             },
             "animations": {
-                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "setup": "animation.sheep.setup",
                 "grazing": "animation.sheep.grazing",
                 "walk": "animation.quadruped.walk",
@@ -31,8 +29,7 @@
                     "move",
                     {
                         "baby_transform": "query.is_baby"
-                    },
-                    "bh_entity_shadow"
+                    }
                 ]
             },
             "render_controllers": [

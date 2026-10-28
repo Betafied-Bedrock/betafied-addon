@@ -3,7 +3,6 @@
   "minecraft:client_entity": {
     "description": {
       "identifier": "minecraft:wolf",
-      "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
       "materials": {
         "default": "wolf"
       },
@@ -63,8 +62,7 @@
         },
         {
           "wolf_shaking": "controller.animation.wolf.shaking"
-        },
-        { "bh_entity_shadow": "controller.animation.betarock.entity_shadow" }
+        }
       ],
       "render_controllers": [
         "controller.render.wolf"

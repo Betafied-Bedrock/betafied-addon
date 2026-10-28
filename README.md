@@ -17,7 +17,7 @@
   <a href="https://discord.gg/BxD7jKs2Rb"><img src="https://img.shields.io/badge/discord-join%20community-5865F2?logo=discord&logoColor=white&style=flat-square" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="License: GNU AGPLv3"></a>
   <a href="https://github.com/retrofit-studios/betafied/actions"><img src="https://img.shields.io/badge/tests-555%20passed-brightgreen?style=flat-square" alt="Tests"></a>
-  <a href="#install"><img src="https://img.shields.io/badge/bedrock-1.26.51+-green?style=flat-square" alt="Bedrock Edition 1.26.51+"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/bedrock-1.26.60+-green?style=flat-square" alt="Bedrock Edition 1.26.60+"></a>
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
 
 ## About
 
-**Betafied** is an authentic recreation of **Minecraft Beta 1.7.3** running inside modern **Bedrock Edition** (Script API 2.11.0-beta). 
+**Betafied** is an authentic recreation of **Minecraft Beta 1.7.3** running inside modern **Bedrock Edition** (Script API 2.12.0-beta). 
 
 It is a ground-up behavioral reconstruction of how Minecraft actually behaved in the summer of 2011: the instant-heal food system, the machine-gun bow, Beta terrain generation, pre-1.8 mob AI, classic physics, and the atmospheric void fog. 
 
@@ -118,7 +118,7 @@ Connect directly to the dedicated multiplayer server. Both behavior and resource
 3. In your world settings:
    - Activate the **Betafied Behavior Pack**.
    - Activate the **Betafied Resource Pack**.
-4. Play! Requires Minecraft Bedrock **1.26.51** or newer.
+4. Play! Requires Minecraft Bedrock **1.26.60** or newer.
 
 </details>
 

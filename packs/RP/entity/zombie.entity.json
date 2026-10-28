@@ -3,7 +3,6 @@
   "minecraft:client_entity": {
     "description": {
       "identifier": "minecraft:zombie",
-      "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
       "min_engine_version": "1.8.0",
       "materials": {
         "default": "zombie"
@@ -99,8 +98,7 @@
         },
         {
           "swimming": "controller.animation.zombie.swimming"
-        },
-        { "bh_entity_shadow": "controller.animation.betarock.entity_shadow" }
+        }
       ],
       "render_controllers": [
         "controller.render.zombie"

@@ -3,7 +3,6 @@
     "minecraft:client_entity": {
         "description": {
             "identifier": "minecraft:cow",
-            "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
             "min_engine_version": "1.8.0",
             "materials": {
                 "default": "cow"
@@ -15,7 +14,6 @@
                 "default": "geometry.cow.v1.8"
             },
             "animations": {
-                "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
                 "setup": "animation.cow.setup",
                 "walk": "animation.quadruped.walk",
                 "look_at_target": "animation.common.look_at_target"
@@ -26,8 +24,7 @@
                     {
                         "walk": "query.modified_move_speed"
                     },
-                    "look_at_target",
-                    "bh_entity_shadow"
+                    "look_at_target"
                 ]
             },
             "render_controllers": [

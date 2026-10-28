@@ -3,27 +3,11 @@
   "minecraft:entity": {
     "description": {
       "identifier": "minecraft:zombie",
-      "properties": {
-          "betarock:shadow_span": { "type": "float", "range": [0.0, 4.0], "default": 0.5, "client_sync": true },
-          "betarock:shadow_alpha": { "type": "float", "range": [0.0, 1.0], "default": 0.275, "client_sync": true },
-          "betarock:shadow_ground": { "type": "float", "range": [-64.0, 320.0], "default": 0.0, "client_sync": true }
-      },
       "spawn_category": "monster",
       "is_spawnable": true,
       "is_summonable": true
     },
     "components": {
-      "minecraft:renders_when_invisible": {},
-      "minecraft:spell_effects": {
-        "add_effects": [
-          {
-            "effect": "invisibility",
-            "duration": "infinite",
-            "visible": false
-          }
-        ]
-      },
-      "minecraft:is_hidden_when_invisible": {},
       "minecraft:nameable": {},
       "minecraft:type_family": {
         "family": [

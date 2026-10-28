@@ -3,7 +3,6 @@
   "minecraft:client_entity": {
     "description": {
       "identifier": "minecraft:creeper",
-      "particle_effects": { "bh_entity_shadow": "bh:entity_shadow" },
       "min_engine_version": "1.8.0",
       "materials": {
         "default": "creeper",
@@ -31,12 +30,10 @@
         "animate": [
           "creeper_head_controller",
           "creeper_legs_controller",
-          "creeper_swelling_controller",
-          "bh_entity_shadow"
+          "creeper_swelling_controller"
         ]
       },
       "animations": {
-        "bh_entity_shadow": "controller.animation.betarock.entity_shadow",
         "creeper_head": "animation.common.look_at_target",
         "creeper_legs": "animation.creeper.legs",
         "creeper_swelling": "animation.creeper.swelling",

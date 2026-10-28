@@ -31,7 +31,6 @@ import "./interactions/doorPunch.js";
 import "./interactions/cakeEating.js";
 import "./mobs/entitySpawnHandler.js";
 import "./mobs/entityCleaner.js";
-import "./mobs/entityShadow.js";
 import "./mobs/betaAnimalAI.js";
 import "./mobs/nightmares.js";
 import "./mobs/herobrine.js";

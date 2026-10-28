@@ -572,8 +572,7 @@ export const EntityComponentTypes = Object.freeze({
     Variant: "minecraft:variant",
     Movement: "minecraft:movement",
     Color: "minecraft:color",
-    Riding: "minecraft:riding",
-    IsHiddenWhenInvisible: "minecraft:is_hidden_when_invisible"
+    Riding: "minecraft:riding"
 });
 
 export const ItemComponentTypes = Object.freeze({
@@ -582,10 +581,7 @@ export const ItemComponentTypes = Object.freeze({
     Cooldown: "minecraft:cooldown"
 });
 
-export const declaredEntityProperties: Map<string, number> = new Map([
-    ["betarock:shadow_span", 1],
-    ["betarock:shadow_alpha", 0.5]
-]);
+export const declaredEntityProperties: Map<string, number> = new Map();
 
 export class Entity {
     id: string = "mock_entity";

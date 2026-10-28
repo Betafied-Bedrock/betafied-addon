@@ -526,7 +526,7 @@ Also still open: the raw-ore clamp discards the surplus of a stack that arrived 
 save, since it reads a raw ore drop as one mined block. If the era's one-ore-per-block reading is
 ever dropped, delete `ORE_DROP_AMOUNT` so the amount rides across — do not change one caller.
 
-## 15. The shadow swap cannot be had without aggro invisibility, so the engine's shadow is switched off instead
+## 15. The custom shadow decals and the invisibility swap are retired
 
 The 5.6 blob shadows take the wiki's only reliable route to a shadowless entity: a permanent
 invisibility effect, which is what stops the engine drawing its own decal, plus
@@ -541,47 +541,27 @@ On the player that meant hostile mobs never acquired the target they exist for: 
 `creeper`, `spider`, `slime` and `ghast` all name family `player` in a `nearest_attackable_target`, and
 an always-invisible player answered that filter with "no" for as long as the player lived. It read as a
 targeting bug rather than a rendering one because retaliation is a sight-free path: hitting a mob still
-worked, and so did standing close enough to be hit by its swing.
+worked, and so did standing close enough to be hit by its swing. Once the swap moved off the player it
+kept the same cost for every mob: `wolf.json` hunts `is_family sheep` and `is_family skeleton` with
+`must_see` true, so wolves could not hunt sheep or fight skeletons while both sides were invisible.
 
-**Decided:** the player carries none of the three components and binds no decal. Beta drew no shadow
-under the player, so `packs/RP/materials/shadows.material` removes the engine's blob shadow for every
-entity instead: its `shadow_overlay` blends the destination back unchanged, which is no shadow at all.
-A Beta mob's only shadow is then the pack's own decal, rather than that decal laid over the engine's.
-The route is the one the wiki marks dead after RenderDragon, so whether a given client honours the file
-is unverified in-game; deleting it gives the engine shadows back. A world that already ran 5.6.1 has the
-effect applied to its players, and it does not lapse: the migration wrote twenty million ticks, so
-`entityMigration` now strips the invisibility back off any Beta mob whose definition no longer declares
-the component it was installed under. Nothing else in the era grants invisibility, so the absence of that component is an exact
-marker for the pack's own leftover. The swap, the decal binding and the gate that hid the local player's own
-decal are gone; `entity_shadow_player.json` stays in the pack, unreferenced, as the decal a safe swap
-would bind again. The two `betarock:shadow_*` properties stay declared on the player, because the
-migration repairs a missing property by writing it and an entity whose definition does not declare one
-leaves `resetProperty` throwing on every pass that sees it -- a declarative roster for the property
-rules is the better fix if anyone wants the pair gone.
+**Decided:** the decals and the swap are retired. The pack ships no shadow particle, animation
+controller, ground sweep or `shadow_overlay` material, and no Beta entity declares the invisibility
+components or the `betarock:shadow_*` properties. Bedrock draws its own shadows again, and every mob is
+visible to the AI that targets it. `entityMigration` still strips the retired swap's permanent
+invisibility from Beta mobs in existing worlds: twenty million ticks outlive the save, and the era
+grants no invisibility of its own, so an invisibility effect on a Beta mob is this pack's leftover.
 
-**Where the decal finds the ground:** a decal is a local-space particle, so it simulates in the
-entity's frame — `particle_motion_collision` has no terrain to resolve against and falls straight
-through the world — and a particle's Molang context rejects every world query, `query.above_top_solid`
-and `query.heightmap` included, so the surface can be neither read where the decal is drawn nor moved
-where it is drawn. It is published instead: `entityShadow.ts` sweeps the Beta mobs near players every
-second tick and writes `betarock:shadow_ground` only when the surface under a mob changes. A grounded
-entity's own feet are that surface, the only reading exact on a half block, so the raycast is spent
-only on mobs the engine reports in the air. The decal turns the published height into
-`ground - query.position(1)` on every frame, which keeps the motion at render rate while the property
-itself only syncs when a block boundary is crossed. The same pair of readings gives the decal its height
-falloff: Beta draws a block's shadow at `(opacity - (height + 1) / 2) * 0.5`, so the opacity loses a
-quarter per block of clearance and a decal is gone about a block and a half up -- a jumping mob trails a
-fainter disc the higher it goes, rather than the same one hanging in the air.
+**Why the decal route is not coming back:** a decal is a local-space particle, so it simulates in the
+entity's frame and cannot collide with terrain, and a particle's Molang context rejects every world
+query, `query.above_top_solid` and `query.heightmap` included. The surface therefore had to be published
+by a script sweep into `betarock:shadow_ground` and turned into a per-frame offset on the client, and
+the engine's own shadow had to be suppressed by a `shadow_overlay` material the wiki marks dead after
+RenderDragon. Three moving parts, an unverified material, and permanent invisibility on every mob was
+the price.
 
-**Still open, and now load-bearing for the rest of the roster:**
+**Related, still standing:**
 
-- Every other Beta mob keeps the swap, so an invisible mob is equally invisible to hostile mob AI.
-  `wolf.json` hunts `is_family sheep` and `is_family skeleton` with `must_see` true, which means wolves
-  cannot hunt sheep or fight skeletons today: the same bug the player just had, one mob removed.
-- There is no per-entity shadow control to put in the swap's place. The wiki's other routes are a tiny
-  `minecraft:collision_box` (which `entityDimensions.test.ts` pins at the era's sizes), a
-  `shadow_overlay` material the same page marks dead after RenderDragon, and a `banner_pole` model that
-  no source anywhere documents beyond the one sentence naming it.
 - `minecraft:behavior.hurt_by_target` is back on the zombie, which had lost it in the 4.0 rewrite while
   every other hostile kept it. Without it a zombie could only ever attack on sight, so the retaliation
   the era's mobs do have was missing from the one mob a player meets first.
